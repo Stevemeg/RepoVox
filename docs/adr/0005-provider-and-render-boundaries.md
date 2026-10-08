@@ -11,3 +11,5 @@ Alternatives: paid APIs easier to operate but violate selected normal-production
 Consequences: GPU idle/weights/registry/security, rights-aware dataset and comparative adapter promotion required. Baseline is not called custom-trained. Schema/entailment/speech/media/sandbox/license gates retained. Reversal requires explicit owner architecture-policy change, not economic pressure or outage convenience.
 
 Evidence: [contracts](../architecture/pipeline.md), [cost/license](../operations/cost-model.md), [Remotion licensing](https://www.remotion.dev/docs/license/pricing).
+
+R0-01 clarification: stage-specific Director chunks, deterministic whole-stage assembly and immutable chunk resume replace the combined model response. Stage 10 owns storyboard/visual/citation data; Stage 11 owns narration linked to its digest. This adds validation/persistence work but prevents premature mixed outputs and repeated completed inference. See [stage contract](../ai/director-architecture.md#stage-contracts-and-deterministic-assembly).

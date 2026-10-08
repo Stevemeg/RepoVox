@@ -1,14 +1,14 @@
 {
   "synthetic": true,
-  "note": "All media, timings, model digests and usage are synthetic contract illustrations; no model inference/audio/render occurred. Base-only adapter and dataset fields are null.",
+  "note": "Synthetic complete stage-specific chunks, assembled outputs, model hashes and audio timings. No inference, GPU, database or media execution occurred.",
   "artifacts": [
     {
-      "schema_version": "2.0",
+      "schema_version": "2.1",
       "kind": "source_manifest",
       "owner_id": "11111111-1111-4111-8111-111111111111",
       "snapshot_id": "22222222-2222-4222-8222-222222222222",
       "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "pipeline_version": "phase0-example-v2",
+      "pipeline_version": "phase0-example-v2.1",
       "input_digest": "bfef7c6b9466d77e9a14266b006f6dbaa493069b7d7f19e52461a4a0a7930d0d",
       "payload": {
         "repository": "https://github.com/example/demo",
@@ -40,12 +40,12 @@
       "generation_metadata": null
     },
     {
-      "schema_version": "2.0",
+      "schema_version": "2.1",
       "kind": "structure",
       "owner_id": "11111111-1111-4111-8111-111111111111",
       "snapshot_id": "22222222-2222-4222-8222-222222222222",
       "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "pipeline_version": "phase0-example-v2",
+      "pipeline_version": "phase0-example-v2.1",
       "input_digest": "bcf59024f35c88ad0394efde83531459250f4be0e1d0eb8a11e23414b82fa97b",
       "payload": {
         "symbols": [
@@ -98,12 +98,12 @@
       "generation_metadata": null
     },
     {
-      "schema_version": "2.0",
+      "schema_version": "2.1",
       "kind": "knowledge",
       "owner_id": "11111111-1111-4111-8111-111111111111",
       "snapshot_id": "22222222-2222-4222-8222-222222222222",
       "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "pipeline_version": "phase0-example-v2",
+      "pipeline_version": "phase0-example-v2.1",
       "input_digest": "5a446d3e344586a4c13aba8b90cdfb6c79c12a32d4751871fd0db6eac460df30",
       "payload": {
         "scope": "Synthetic single Python module; no runtime trace.",
@@ -196,12 +196,12 @@
       "generation_metadata": null
     },
     {
-      "schema_version": "2.0",
+      "schema_version": "2.1",
       "kind": "evidence",
       "owner_id": "11111111-1111-4111-8111-111111111111",
       "snapshot_id": "22222222-2222-4222-8222-222222222222",
       "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "pipeline_version": "phase0-example-v2",
+      "pipeline_version": "phase0-example-v2.1",
       "input_digest": "71930748be23d4a4b81aeedb0588f841d7f53b87fa4f397cef79711b85a1de51",
       "payload": {
         "items": [
@@ -276,12 +276,12 @@
       "generation_metadata": null
     },
     {
-      "schema_version": "2.0",
+      "schema_version": "2.1",
       "kind": "verification",
       "owner_id": "11111111-1111-4111-8111-111111111111",
       "snapshot_id": "22222222-2222-4222-8222-222222222222",
       "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "pipeline_version": "phase0-example-v2",
+      "pipeline_version": "phase0-example-v2.1",
       "input_digest": "e2662faacadadbece9887fc0ce0ac9201f714a43edfc4f9b298acb72a84a345b",
       "payload": {
         "verifier_version": "static-example-v1",
@@ -352,17 +352,17 @@
       "generation_metadata": null
     },
     {
-      "schema_version": "2.0",
+      "schema_version": "2.1",
       "kind": "storyboard",
       "owner_id": "11111111-1111-4111-8111-111111111111",
       "snapshot_id": "22222222-2222-4222-8222-222222222222",
       "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "pipeline_version": "phase0-example-v2",
-      "input_digest": "9ff10b21b00464edacf9978814dc3ee43433681703e226240d81dad09d1a29ae",
+      "pipeline_version": "phase0-example-v2.1",
+      "input_digest": "0630b75b0ed5a3780604c732346cdb7e68a9df180f8348026a2a3ad818c4cb41",
       "payload": {
         "scenes": [
           {
-            "id": "s1",
+            "id": "purpose-1",
             "topic": "purpose",
             "type": "title",
             "title": "Purpose",
@@ -378,7 +378,7 @@
             }
           },
           {
-            "id": "s2",
+            "id": "stack-1",
             "topic": "stack",
             "type": "stack",
             "title": "Stack",
@@ -394,7 +394,7 @@
             }
           },
           {
-            "id": "s3",
+            "id": "architecture-1",
             "topic": "architecture",
             "type": "architecture",
             "title": "Architecture",
@@ -410,7 +410,7 @@
             }
           },
           {
-            "id": "s4",
+            "id": "flow-1",
             "topic": "flow",
             "type": "flow",
             "title": "Flow",
@@ -426,7 +426,7 @@
             }
           },
           {
-            "id": "s5",
+            "id": "code-1",
             "topic": "code",
             "type": "code",
             "title": "Code",
@@ -442,7 +442,7 @@
             }
           },
           {
-            "id": "s6",
+            "id": "summary-1",
             "topic": "summary",
             "type": "summary",
             "title": "Summary",
@@ -460,7 +460,7 @@
         ],
         "visual_instructions": [
           {
-            "scene_id": "s1",
+            "scene_id": "purpose-1",
             "type": "section_card",
             "layout": "centered",
             "label": "Documentation describes a configuration display demo.",
@@ -474,7 +474,7 @@
             "edges": []
           },
           {
-            "scene_id": "s2",
+            "scene_id": "stack-1",
             "type": "section_card",
             "layout": "centered",
             "label": "The Python module imports Path from pathlib.",
@@ -488,7 +488,7 @@
             "edges": []
           },
           {
-            "scene_id": "s3",
+            "scene_id": "architecture-1",
             "type": "architecture_graph",
             "layout": "left_to_right",
             "label": "The configuration reader and entry point appear grouped in one module.",
@@ -517,7 +517,7 @@
             "edges": []
           },
           {
-            "scene_id": "s4",
+            "scene_id": "flow-1",
             "type": "flow_graph",
             "layout": "left_to_right",
             "label": "main contains a call to read_config with config.json.",
@@ -555,7 +555,7 @@
             ]
           },
           {
-            "scene_id": "s5",
+            "scene_id": "code-1",
             "type": "code_focus",
             "layout": "centered",
             "label": "read_config returns a Path.read_text call.",
@@ -569,7 +569,7 @@
             "edges": []
           },
           {
-            "scene_id": "s6",
+            "scene_id": "summary-1",
             "type": "section_card",
             "layout": "centered",
             "label": "A main guard contains a call to main.",
@@ -585,60 +585,131 @@
         ],
         "citation_mappings": [
           {
-            "scene_id": "s1",
+            "scene_id": "purpose-1",
             "claim_ids": [
               "c1"
             ],
             "evidence_ids": [
               "e1"
+            ],
+            "claim_bindings": [
+              {
+                "status": "documentation_only",
+                "evidence_ids": [
+                  "e1"
+                ],
+                "claim_id": "c1"
+              }
             ]
           },
           {
-            "scene_id": "s2",
+            "scene_id": "stack-1",
             "claim_ids": [
               "c2"
             ],
             "evidence_ids": [
               "e2"
+            ],
+            "claim_bindings": [
+              {
+                "status": "verified",
+                "evidence_ids": [
+                  "e2"
+                ],
+                "claim_id": "c2"
+              }
             ]
           },
           {
-            "scene_id": "s3",
+            "scene_id": "architecture-1",
             "claim_ids": [
               "c3"
             ],
             "evidence_ids": [
               "e3"
+            ],
+            "claim_bindings": [
+              {
+                "status": "inferred",
+                "evidence_ids": [
+                  "e3"
+                ],
+                "claim_id": "c3"
+              }
             ]
           },
           {
-            "scene_id": "s4",
+            "scene_id": "flow-1",
             "claim_ids": [
               "c4"
             ],
             "evidence_ids": [
               "e4"
+            ],
+            "claim_bindings": [
+              {
+                "status": "verified",
+                "evidence_ids": [
+                  "e4"
+                ],
+                "claim_id": "c4"
+              }
             ]
           },
           {
-            "scene_id": "s5",
+            "scene_id": "code-1",
             "claim_ids": [
               "c5"
             ],
             "evidence_ids": [
               "e5"
+            ],
+            "claim_bindings": [
+              {
+                "status": "verified",
+                "evidence_ids": [
+                  "e5"
+                ],
+                "claim_id": "c5"
+              }
             ]
           },
           {
-            "scene_id": "s6",
+            "scene_id": "summary-1",
             "claim_ids": [
               "c6"
             ],
             "evidence_ids": [
               "e6"
+            ],
+            "claim_bindings": [
+              {
+                "status": "verified",
+                "evidence_ids": [
+                  "e6"
+                ],
+                "claim_id": "c6"
+              }
             ]
           }
-        ]
+        ],
+        "assembly": {
+          "plan_version": "topic-pairs-v1",
+          "chunk_digests": [
+            {
+              "chunk_id": "purpose_stack",
+              "sha256": "f2df25e8207ad727c4b7ef77774743d7946b08d2db1c45e92ea074c1d3e66675"
+            },
+            {
+              "chunk_id": "architecture_flow",
+              "sha256": "4f3350ec8146435dbe15603fc8c8f3363b1f212ba8e6fa107b117d69aad43b72"
+            },
+            {
+              "chunk_id": "code_summary",
+              "sha256": "f1df3a6480541b6874baaf1238cdc997c9e51682f75ed248fc254239f4b8cbff"
+            }
+          ]
+        }
       },
       "generation_metadata": {
         "release_id": "director-base-example-v2",
@@ -657,82 +728,117 @@
         "engine_version": "illustrative-version-not-installed",
         "quantization": "AWQ-INT4",
         "quantization_version": "illustrative-unmeasured",
-        "input_tokens": 10000,
-        "output_tokens": 1000,
-        "inference_duration_seconds": 50,
+        "input_tokens": 30000,
+        "output_tokens": 3000,
+        "inference_duration_seconds": 150,
         "gpu_type": "L4",
-        "gpu_seconds": 50,
+        "gpu_seconds": 135,
         "cpu_seconds": 0,
         "validation_status": "passed",
         "measurement_status": "illustrative_not_executed"
       }
     },
     {
-      "schema_version": "2.0",
+      "schema_version": "2.1",
       "kind": "narration",
       "owner_id": "11111111-1111-4111-8111-111111111111",
       "snapshot_id": "22222222-2222-4222-8222-222222222222",
       "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "pipeline_version": "phase0-example-v2",
-      "input_digest": "bcf4205fcbc8734fa0cdae260fd07b51674e255029a01c96cd3f600362775d72",
+      "pipeline_version": "phase0-example-v2.1",
+      "input_digest": "35f82698dc27fcd96b854e649cfdc8ccb1ffd43d650fbc7edb2767a363cb8754",
       "payload": {
         "sentences": [
           {
-            "scene_id": "s1",
+            "scene_id": "purpose-1",
             "text": "Documentation describes a configuration display demo.",
             "technical": true,
             "claim_ids": [
               "c1"
             ],
-            "uncertainty": "documentation_only"
+            "uncertainty": "documentation_only",
+            "evidence_ids": [
+              "e1"
+            ]
           },
           {
-            "scene_id": "s2",
+            "scene_id": "stack-1",
             "text": "The Python module imports Path from pathlib.",
             "technical": true,
             "claim_ids": [
               "c2"
             ],
-            "uncertainty": "verified"
+            "uncertainty": "verified",
+            "evidence_ids": [
+              "e2"
+            ]
           },
           {
-            "scene_id": "s3",
+            "scene_id": "architecture-1",
             "text": "The configuration reader and entry point appear grouped in one module.",
             "technical": true,
             "claim_ids": [
               "c3"
             ],
-            "uncertainty": "inferred"
+            "uncertainty": "inferred",
+            "evidence_ids": [
+              "e3"
+            ]
           },
           {
-            "scene_id": "s4",
+            "scene_id": "flow-1",
             "text": "main contains a call to read_config with config.json.",
             "technical": true,
             "claim_ids": [
               "c4"
             ],
-            "uncertainty": "verified"
+            "uncertainty": "verified",
+            "evidence_ids": [
+              "e4"
+            ]
           },
           {
-            "scene_id": "s5",
+            "scene_id": "code-1",
             "text": "read_config returns a Path.read_text call.",
             "technical": true,
             "claim_ids": [
               "c5"
             ],
-            "uncertainty": "verified"
+            "uncertainty": "verified",
+            "evidence_ids": [
+              "e5"
+            ]
           },
           {
-            "scene_id": "s6",
+            "scene_id": "summary-1",
             "text": "A main guard contains a call to main.",
             "technical": true,
             "claim_ids": [
               "c6"
             ],
-            "uncertainty": "verified"
+            "uncertainty": "verified",
+            "evidence_ids": [
+              "e6"
+            ]
           }
         ],
-        "note": "Abbreviated illustrative sentences; target timings are not generated audio."
+        "storyboard_digest": "466fe1482c1aa63b77696ebcda87c382e70f3c40018880099d878ff14d03a073",
+        "assembly": {
+          "plan_version": "topic-pairs-v1",
+          "chunk_digests": [
+            {
+              "chunk_id": "purpose_stack",
+              "sha256": "b5a061f04f70549b6970de0facbc521806fda090c79b2397e0a4ae1404342a9f"
+            },
+            {
+              "chunk_id": "architecture_flow",
+              "sha256": "ed3dd939254b3a28aafd5baeb38188a927ae7e7d6fc4042c6a3272c09af3a572"
+            },
+            {
+              "chunk_id": "code_summary",
+              "sha256": "4adb6a37a63cb65c9caa0d53150d389612afa9bffb97c3cad1fae62aeae3b741"
+            }
+          ]
+        }
       },
       "generation_metadata": {
         "release_id": "director-base-example-v2",
@@ -751,23 +857,23 @@
         "engine_version": "illustrative-version-not-installed",
         "quantization": "AWQ-INT4",
         "quantization_version": "illustrative-unmeasured",
-        "input_tokens": 10000,
-        "output_tokens": 1000,
-        "inference_duration_seconds": 50,
+        "input_tokens": 30000,
+        "output_tokens": 3000,
+        "inference_duration_seconds": 150,
         "gpu_type": "L4",
-        "gpu_seconds": 50,
+        "gpu_seconds": 135,
         "cpu_seconds": 0,
         "validation_status": "passed",
         "measurement_status": "illustrative_not_executed"
       }
     },
     {
-      "schema_version": "2.0",
+      "schema_version": "2.1",
       "kind": "audio",
       "owner_id": "11111111-1111-4111-8111-111111111111",
       "snapshot_id": "22222222-2222-4222-8222-222222222222",
       "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "pipeline_version": "phase0-example-v2",
+      "pipeline_version": "phase0-example-v2.1",
       "input_digest": "e80a5125cf49a74ec827957a64da084870b5375932488d6448d7501cf7add6eb",
       "payload": {
         "provider": "self-hosted-kokoro-example-not-called",
@@ -775,7 +881,7 @@
         "settings_version": "example-v1",
         "scenes": [
           {
-            "scene_id": "s1",
+            "scene_id": "purpose-1",
             "object_key": "example/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222/audio/s1.wav",
             "sha256": "70650900007e47f29506b0e21fd421715edb445e5e0c45070014e1b261f06fce",
             "duration_seconds": 40,
@@ -790,7 +896,7 @@
             ]
           },
           {
-            "scene_id": "s2",
+            "scene_id": "stack-1",
             "object_key": "example/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222/audio/s2.wav",
             "sha256": "cd7939786c7c77753fb822c18bf0178dda75833b1498e8b9087e8fc50c2afdba",
             "duration_seconds": 40,
@@ -805,7 +911,7 @@
             ]
           },
           {
-            "scene_id": "s3",
+            "scene_id": "architecture-1",
             "object_key": "example/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222/audio/s3.wav",
             "sha256": "959e3810fe929160439d12663367e7e4fb25dcb6e490f45d34e70cb98321fd5f",
             "duration_seconds": 40,
@@ -820,7 +926,7 @@
             ]
           },
           {
-            "scene_id": "s4",
+            "scene_id": "flow-1",
             "object_key": "example/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222/audio/s4.wav",
             "sha256": "aea9c61abcb502b9ee3e7c5386643d133fe8d3315fcdcf1c050a4fca8d0dbada",
             "duration_seconds": 40,
@@ -835,7 +941,7 @@
             ]
           },
           {
-            "scene_id": "s5",
+            "scene_id": "code-1",
             "object_key": "example/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222/audio/s5.wav",
             "sha256": "7550c69f6a15e590356d0458a970351fcbf5a77b997d221b8c22202639247338",
             "duration_seconds": 40,
@@ -850,7 +956,7 @@
             ]
           },
           {
-            "scene_id": "s6",
+            "scene_id": "summary-1",
             "object_key": "example/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222/audio/s6.wav",
             "sha256": "3db6429562efb4b06d3fd626a31ed3b81bb8bb8b0971ee1f0f0435826f219ec0",
             "duration_seconds": 40,
@@ -898,12 +1004,12 @@
       }
     },
     {
-      "schema_version": "2.0",
+      "schema_version": "2.1",
       "kind": "render_manifest",
       "owner_id": "11111111-1111-4111-8111-111111111111",
       "snapshot_id": "22222222-2222-4222-8222-222222222222",
       "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "pipeline_version": "phase0-example-v2",
+      "pipeline_version": "phase0-example-v2.1",
       "input_digest": "989eccc5b97f7960b0fa6bedac38ed3f6a5d7082a95efb98be66a31912899ee3",
       "payload": {
         "template_version": "example-not-rendered-v1",
@@ -912,37 +1018,37 @@
         "fps": 30,
         "scenes": [
           {
-            "scene_id": "s1",
+            "scene_id": "purpose-1",
             "start_frame": 0,
             "end_frame_exclusive": 1200,
             "audio_sha256": "70650900007e47f29506b0e21fd421715edb445e5e0c45070014e1b261f06fce"
           },
           {
-            "scene_id": "s2",
+            "scene_id": "stack-1",
             "start_frame": 1200,
             "end_frame_exclusive": 2400,
             "audio_sha256": "cd7939786c7c77753fb822c18bf0178dda75833b1498e8b9087e8fc50c2afdba"
           },
           {
-            "scene_id": "s3",
+            "scene_id": "architecture-1",
             "start_frame": 2400,
             "end_frame_exclusive": 3600,
             "audio_sha256": "959e3810fe929160439d12663367e7e4fb25dcb6e490f45d34e70cb98321fd5f"
           },
           {
-            "scene_id": "s4",
+            "scene_id": "flow-1",
             "start_frame": 3600,
             "end_frame_exclusive": 4800,
             "audio_sha256": "aea9c61abcb502b9ee3e7c5386643d133fe8d3315fcdcf1c050a4fca8d0dbada"
           },
           {
-            "scene_id": "s5",
+            "scene_id": "code-1",
             "start_frame": 4800,
             "end_frame_exclusive": 6000,
             "audio_sha256": "7550c69f6a15e590356d0458a970351fcbf5a77b997d221b8c22202639247338"
           },
           {
-            "scene_id": "s6",
+            "scene_id": "summary-1",
             "start_frame": 6000,
             "end_frame_exclusive": 7200,
             "audio_sha256": "3db6429562efb4b06d3fd626a31ed3b81bb8bb8b0971ee1f0f0435826f219ec0"
@@ -952,12 +1058,12 @@
       "generation_metadata": null
     },
     {
-      "schema_version": "2.0",
+      "schema_version": "2.1",
       "kind": "video",
       "owner_id": "11111111-1111-4111-8111-111111111111",
       "snapshot_id": "22222222-2222-4222-8222-222222222222",
       "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "pipeline_version": "phase0-example-v2",
+      "pipeline_version": "phase0-example-v2.1",
       "input_digest": "afa41674237e612a60c175561fb040a7124786e3a91265b687ad98dbcab8e9d8",
       "payload": {
         "object_key": "example/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222/video.mp4",
@@ -979,266 +1085,1145 @@
       "generation_metadata": null
     }
   ],
-  "director_input": {
-    "contract_version": "2.0",
-    "owner_id": "11111111-1111-4111-8111-111111111111",
-    "snapshot_id": "22222222-2222-4222-8222-222222222222",
-    "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "knowledge": {
-      "scope": "Synthetic single Python module; no runtime trace.",
-      "stack": [
-        "python"
+  "director_stage10_inputs": [
+    {
+      "contract_version": "2.1",
+      "owner_id": "11111111-1111-4111-8111-111111111111",
+      "snapshot_id": "22222222-2222-4222-8222-222222222222",
+      "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "knowledge": {
+        "scope": "Synthetic single Python module; no runtime trace.",
+        "stack": [
+          "python"
+        ],
+        "modules": [
+          "app/main.py"
+        ],
+        "entrypoint_ids": [
+          "sym-main"
+        ],
+        "edges": [
+          {
+            "source": "sym-main",
+            "target": "sym-read",
+            "claim_ids": [
+              "c4"
+            ]
+          }
+        ],
+        "claims": [
+          {
+            "id": "c1",
+            "text": "Documentation describes a configuration display demo.",
+            "status": "documentation_only",
+            "evidence_ids": [
+              "e1"
+            ],
+            "reason": "Purpose not proven by implementation."
+          },
+          {
+            "id": "c2",
+            "text": "The Python module imports Path from pathlib.",
+            "status": "verified",
+            "evidence_ids": [
+              "e2"
+            ],
+            "reason": "Import declaration inspected."
+          },
+          {
+            "id": "c3",
+            "text": "The configuration reader and entry point appear grouped in one module.",
+            "status": "inferred",
+            "evidence_ids": [
+              "e3"
+            ],
+            "reason": "Module grouping suggests structure; runtime architecture is not observed."
+          },
+          {
+            "id": "c4",
+            "text": "main contains a call to read_config with config.json.",
+            "status": "verified",
+            "evidence_ids": [
+              "e4"
+            ],
+            "reason": "Call syntax inspected, not executed."
+          },
+          {
+            "id": "c5",
+            "text": "read_config returns a Path.read_text call.",
+            "status": "verified",
+            "evidence_ids": [
+              "e5"
+            ],
+            "reason": "Return expression inspected; file contents and errors are unknown."
+          },
+          {
+            "id": "c6",
+            "text": "A main guard contains a call to main.",
+            "status": "verified",
+            "evidence_ids": [
+              "e6"
+            ],
+            "reason": "Guard syntax inspected, no execution claim."
+          },
+          {
+            "id": "c7",
+            "text": "The program supports concurrent configuration updates.",
+            "status": "unsupported",
+            "evidence_ids": [],
+            "reason": "No supporting source found."
+          }
+        ],
+        "limitations": [
+          "No execution, file contents unknown.",
+          "Purpose from documentation only."
+        ]
+      },
+      "evidence": {
+        "items": [
+          {
+            "id": "e1",
+            "path": "README.md",
+            "start_line": 1,
+            "end_line": 1,
+            "file_sha256": "d87cc9d62fe14e14859934d7c17085e5b5273f26e86cf696e65d0adddf143e93",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "documentation",
+            "rule": "doc_assertion",
+            "redacted": false
+          },
+          {
+            "id": "e2",
+            "path": "app/main.py",
+            "start_line": 1,
+            "end_line": 1,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          },
+          {
+            "id": "e3",
+            "path": "app/main.py",
+            "start_line": 3,
+            "end_line": 7,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          },
+          {
+            "id": "e4",
+            "path": "app/main.py",
+            "start_line": 6,
+            "end_line": 7,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          },
+          {
+            "id": "e5",
+            "path": "app/main.py",
+            "start_line": 3,
+            "end_line": 4,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          },
+          {
+            "id": "e6",
+            "path": "app/main.py",
+            "start_line": 9,
+            "end_line": 10,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          }
+        ]
+      },
+      "verification": {
+        "verifier_version": "static-example-v1",
+        "verdicts": [
+          {
+            "claim_id": "c1",
+            "status": "documentation_only",
+            "evidence_ids": [
+              "e1"
+            ],
+            "rule": "qualification",
+            "reason": "Purpose not proven by implementation."
+          },
+          {
+            "claim_id": "c2",
+            "status": "verified",
+            "evidence_ids": [
+              "e2"
+            ],
+            "rule": "static_entailment",
+            "reason": "Import declaration inspected."
+          },
+          {
+            "claim_id": "c3",
+            "status": "inferred",
+            "evidence_ids": [
+              "e3"
+            ],
+            "rule": "qualification",
+            "reason": "Module grouping suggests structure; runtime architecture is not observed."
+          },
+          {
+            "claim_id": "c4",
+            "status": "verified",
+            "evidence_ids": [
+              "e4"
+            ],
+            "rule": "static_entailment",
+            "reason": "Call syntax inspected, not executed."
+          },
+          {
+            "claim_id": "c5",
+            "status": "verified",
+            "evidence_ids": [
+              "e5"
+            ],
+            "rule": "static_entailment",
+            "reason": "Return expression inspected; file contents and errors are unknown."
+          },
+          {
+            "claim_id": "c6",
+            "status": "verified",
+            "evidence_ids": [
+              "e6"
+            ],
+            "rule": "static_entailment",
+            "reason": "Guard syntax inspected, no execution claim."
+          },
+          {
+            "claim_id": "c7",
+            "status": "unsupported",
+            "evidence_ids": [],
+            "rule": "qualification",
+            "reason": "No supporting source found."
+          }
+        ]
+      },
+      "allowed_claim_ids": [
+        "c1",
+        "c2"
       ],
-      "modules": [
-        "app/main.py"
+      "selected_evidence_ids": [
+        "e1",
+        "e2"
       ],
-      "entrypoint_ids": [
-        "sym-main"
+      "omitted_claim_ids": [
+        "c3",
+        "c4",
+        "c5",
+        "c6",
+        "c7"
       ],
-      "edges": [
+      "request_limits": {
+        "prompt_tokens_max": 12288,
+        "output_tokens_max": 4096,
+        "context_tokens_max": 16384
+      },
+      "stage": "storyboard",
+      "chunk_id": "purpose_stack",
+      "input_digest": "a275dd3129114dc17f54814e6a13530589e56274d5fdfe24de04465276c26476"
+    },
+    {
+      "contract_version": "2.1",
+      "owner_id": "11111111-1111-4111-8111-111111111111",
+      "snapshot_id": "22222222-2222-4222-8222-222222222222",
+      "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "knowledge": {
+        "scope": "Synthetic single Python module; no runtime trace.",
+        "stack": [
+          "python"
+        ],
+        "modules": [
+          "app/main.py"
+        ],
+        "entrypoint_ids": [
+          "sym-main"
+        ],
+        "edges": [
+          {
+            "source": "sym-main",
+            "target": "sym-read",
+            "claim_ids": [
+              "c4"
+            ]
+          }
+        ],
+        "claims": [
+          {
+            "id": "c1",
+            "text": "Documentation describes a configuration display demo.",
+            "status": "documentation_only",
+            "evidence_ids": [
+              "e1"
+            ],
+            "reason": "Purpose not proven by implementation."
+          },
+          {
+            "id": "c2",
+            "text": "The Python module imports Path from pathlib.",
+            "status": "verified",
+            "evidence_ids": [
+              "e2"
+            ],
+            "reason": "Import declaration inspected."
+          },
+          {
+            "id": "c3",
+            "text": "The configuration reader and entry point appear grouped in one module.",
+            "status": "inferred",
+            "evidence_ids": [
+              "e3"
+            ],
+            "reason": "Module grouping suggests structure; runtime architecture is not observed."
+          },
+          {
+            "id": "c4",
+            "text": "main contains a call to read_config with config.json.",
+            "status": "verified",
+            "evidence_ids": [
+              "e4"
+            ],
+            "reason": "Call syntax inspected, not executed."
+          },
+          {
+            "id": "c5",
+            "text": "read_config returns a Path.read_text call.",
+            "status": "verified",
+            "evidence_ids": [
+              "e5"
+            ],
+            "reason": "Return expression inspected; file contents and errors are unknown."
+          },
+          {
+            "id": "c6",
+            "text": "A main guard contains a call to main.",
+            "status": "verified",
+            "evidence_ids": [
+              "e6"
+            ],
+            "reason": "Guard syntax inspected, no execution claim."
+          },
+          {
+            "id": "c7",
+            "text": "The program supports concurrent configuration updates.",
+            "status": "unsupported",
+            "evidence_ids": [],
+            "reason": "No supporting source found."
+          }
+        ],
+        "limitations": [
+          "No execution, file contents unknown.",
+          "Purpose from documentation only."
+        ]
+      },
+      "evidence": {
+        "items": [
+          {
+            "id": "e1",
+            "path": "README.md",
+            "start_line": 1,
+            "end_line": 1,
+            "file_sha256": "d87cc9d62fe14e14859934d7c17085e5b5273f26e86cf696e65d0adddf143e93",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "documentation",
+            "rule": "doc_assertion",
+            "redacted": false
+          },
+          {
+            "id": "e2",
+            "path": "app/main.py",
+            "start_line": 1,
+            "end_line": 1,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          },
+          {
+            "id": "e3",
+            "path": "app/main.py",
+            "start_line": 3,
+            "end_line": 7,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          },
+          {
+            "id": "e4",
+            "path": "app/main.py",
+            "start_line": 6,
+            "end_line": 7,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          },
+          {
+            "id": "e5",
+            "path": "app/main.py",
+            "start_line": 3,
+            "end_line": 4,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          },
+          {
+            "id": "e6",
+            "path": "app/main.py",
+            "start_line": 9,
+            "end_line": 10,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          }
+        ]
+      },
+      "verification": {
+        "verifier_version": "static-example-v1",
+        "verdicts": [
+          {
+            "claim_id": "c1",
+            "status": "documentation_only",
+            "evidence_ids": [
+              "e1"
+            ],
+            "rule": "qualification",
+            "reason": "Purpose not proven by implementation."
+          },
+          {
+            "claim_id": "c2",
+            "status": "verified",
+            "evidence_ids": [
+              "e2"
+            ],
+            "rule": "static_entailment",
+            "reason": "Import declaration inspected."
+          },
+          {
+            "claim_id": "c3",
+            "status": "inferred",
+            "evidence_ids": [
+              "e3"
+            ],
+            "rule": "qualification",
+            "reason": "Module grouping suggests structure; runtime architecture is not observed."
+          },
+          {
+            "claim_id": "c4",
+            "status": "verified",
+            "evidence_ids": [
+              "e4"
+            ],
+            "rule": "static_entailment",
+            "reason": "Call syntax inspected, not executed."
+          },
+          {
+            "claim_id": "c5",
+            "status": "verified",
+            "evidence_ids": [
+              "e5"
+            ],
+            "rule": "static_entailment",
+            "reason": "Return expression inspected; file contents and errors are unknown."
+          },
+          {
+            "claim_id": "c6",
+            "status": "verified",
+            "evidence_ids": [
+              "e6"
+            ],
+            "rule": "static_entailment",
+            "reason": "Guard syntax inspected, no execution claim."
+          },
+          {
+            "claim_id": "c7",
+            "status": "unsupported",
+            "evidence_ids": [],
+            "rule": "qualification",
+            "reason": "No supporting source found."
+          }
+        ]
+      },
+      "allowed_claim_ids": [
+        "c3",
+        "c4"
+      ],
+      "selected_evidence_ids": [
+        "e3",
+        "e4"
+      ],
+      "omitted_claim_ids": [
+        "c1",
+        "c2",
+        "c5",
+        "c6",
+        "c7"
+      ],
+      "request_limits": {
+        "prompt_tokens_max": 12288,
+        "output_tokens_max": 4096,
+        "context_tokens_max": 16384
+      },
+      "stage": "storyboard",
+      "chunk_id": "architecture_flow",
+      "input_digest": "19426dbb8b0716151d5fa3a57ce6111cddcfd5cbcd34ebaba5e2962d9c5481ba"
+    },
+    {
+      "contract_version": "2.1",
+      "owner_id": "11111111-1111-4111-8111-111111111111",
+      "snapshot_id": "22222222-2222-4222-8222-222222222222",
+      "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "knowledge": {
+        "scope": "Synthetic single Python module; no runtime trace.",
+        "stack": [
+          "python"
+        ],
+        "modules": [
+          "app/main.py"
+        ],
+        "entrypoint_ids": [
+          "sym-main"
+        ],
+        "edges": [
+          {
+            "source": "sym-main",
+            "target": "sym-read",
+            "claim_ids": [
+              "c4"
+            ]
+          }
+        ],
+        "claims": [
+          {
+            "id": "c1",
+            "text": "Documentation describes a configuration display demo.",
+            "status": "documentation_only",
+            "evidence_ids": [
+              "e1"
+            ],
+            "reason": "Purpose not proven by implementation."
+          },
+          {
+            "id": "c2",
+            "text": "The Python module imports Path from pathlib.",
+            "status": "verified",
+            "evidence_ids": [
+              "e2"
+            ],
+            "reason": "Import declaration inspected."
+          },
+          {
+            "id": "c3",
+            "text": "The configuration reader and entry point appear grouped in one module.",
+            "status": "inferred",
+            "evidence_ids": [
+              "e3"
+            ],
+            "reason": "Module grouping suggests structure; runtime architecture is not observed."
+          },
+          {
+            "id": "c4",
+            "text": "main contains a call to read_config with config.json.",
+            "status": "verified",
+            "evidence_ids": [
+              "e4"
+            ],
+            "reason": "Call syntax inspected, not executed."
+          },
+          {
+            "id": "c5",
+            "text": "read_config returns a Path.read_text call.",
+            "status": "verified",
+            "evidence_ids": [
+              "e5"
+            ],
+            "reason": "Return expression inspected; file contents and errors are unknown."
+          },
+          {
+            "id": "c6",
+            "text": "A main guard contains a call to main.",
+            "status": "verified",
+            "evidence_ids": [
+              "e6"
+            ],
+            "reason": "Guard syntax inspected, no execution claim."
+          },
+          {
+            "id": "c7",
+            "text": "The program supports concurrent configuration updates.",
+            "status": "unsupported",
+            "evidence_ids": [],
+            "reason": "No supporting source found."
+          }
+        ],
+        "limitations": [
+          "No execution, file contents unknown.",
+          "Purpose from documentation only."
+        ]
+      },
+      "evidence": {
+        "items": [
+          {
+            "id": "e1",
+            "path": "README.md",
+            "start_line": 1,
+            "end_line": 1,
+            "file_sha256": "d87cc9d62fe14e14859934d7c17085e5b5273f26e86cf696e65d0adddf143e93",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "documentation",
+            "rule": "doc_assertion",
+            "redacted": false
+          },
+          {
+            "id": "e2",
+            "path": "app/main.py",
+            "start_line": 1,
+            "end_line": 1,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          },
+          {
+            "id": "e3",
+            "path": "app/main.py",
+            "start_line": 3,
+            "end_line": 7,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          },
+          {
+            "id": "e4",
+            "path": "app/main.py",
+            "start_line": 6,
+            "end_line": 7,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          },
+          {
+            "id": "e5",
+            "path": "app/main.py",
+            "start_line": 3,
+            "end_line": 4,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          },
+          {
+            "id": "e6",
+            "path": "app/main.py",
+            "start_line": 9,
+            "end_line": 10,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          }
+        ]
+      },
+      "verification": {
+        "verifier_version": "static-example-v1",
+        "verdicts": [
+          {
+            "claim_id": "c1",
+            "status": "documentation_only",
+            "evidence_ids": [
+              "e1"
+            ],
+            "rule": "qualification",
+            "reason": "Purpose not proven by implementation."
+          },
+          {
+            "claim_id": "c2",
+            "status": "verified",
+            "evidence_ids": [
+              "e2"
+            ],
+            "rule": "static_entailment",
+            "reason": "Import declaration inspected."
+          },
+          {
+            "claim_id": "c3",
+            "status": "inferred",
+            "evidence_ids": [
+              "e3"
+            ],
+            "rule": "qualification",
+            "reason": "Module grouping suggests structure; runtime architecture is not observed."
+          },
+          {
+            "claim_id": "c4",
+            "status": "verified",
+            "evidence_ids": [
+              "e4"
+            ],
+            "rule": "static_entailment",
+            "reason": "Call syntax inspected, not executed."
+          },
+          {
+            "claim_id": "c5",
+            "status": "verified",
+            "evidence_ids": [
+              "e5"
+            ],
+            "rule": "static_entailment",
+            "reason": "Return expression inspected; file contents and errors are unknown."
+          },
+          {
+            "claim_id": "c6",
+            "status": "verified",
+            "evidence_ids": [
+              "e6"
+            ],
+            "rule": "static_entailment",
+            "reason": "Guard syntax inspected, no execution claim."
+          },
+          {
+            "claim_id": "c7",
+            "status": "unsupported",
+            "evidence_ids": [],
+            "rule": "qualification",
+            "reason": "No supporting source found."
+          }
+        ]
+      },
+      "allowed_claim_ids": [
+        "c5",
+        "c6"
+      ],
+      "selected_evidence_ids": [
+        "e5",
+        "e6"
+      ],
+      "omitted_claim_ids": [
+        "c1",
+        "c2",
+        "c3",
+        "c4",
+        "c7"
+      ],
+      "request_limits": {
+        "prompt_tokens_max": 12288,
+        "output_tokens_max": 4096,
+        "context_tokens_max": 16384
+      },
+      "stage": "storyboard",
+      "chunk_id": "code_summary",
+      "input_digest": "f548e5a378b867a562d27470d31a8f1344a7a34dbeac8dde4633792114d57957"
+    }
+  ],
+  "director_stage10_chunks": [
+    {
+      "contract_version": "2.1",
+      "stage": "storyboard",
+      "chunk_id": "purpose_stack",
+      "input_digest": "a275dd3129114dc17f54814e6a13530589e56274d5fdfe24de04465276c26476",
+      "storyboard": {
+        "scenes": [
+          {
+            "id": "purpose-1",
+            "topic": "purpose",
+            "type": "title",
+            "title": "Purpose",
+            "target_seconds": 40,
+            "claim_ids": [
+              "c1"
+            ],
+            "evidence_ids": [
+              "e1"
+            ],
+            "data": {
+              "label": "Documentation describes a configuration display demo."
+            }
+          },
+          {
+            "id": "stack-1",
+            "topic": "stack",
+            "type": "stack",
+            "title": "Stack",
+            "target_seconds": 40,
+            "claim_ids": [
+              "c2"
+            ],
+            "evidence_ids": [
+              "e2"
+            ],
+            "data": {
+              "label": "The Python module imports Path from pathlib."
+            }
+          }
+        ]
+      },
+      "visual_instructions": [
         {
-          "source": "sym-main",
-          "target": "sym-read",
+          "scene_id": "purpose-1",
+          "type": "section_card",
+          "layout": "centered",
+          "label": "Documentation describes a configuration display demo.",
+          "claim_ids": [
+            "c1"
+          ],
+          "evidence_ids": [
+            "e1"
+          ],
+          "nodes": [],
+          "edges": []
+        },
+        {
+          "scene_id": "stack-1",
+          "type": "section_card",
+          "layout": "centered",
+          "label": "The Python module imports Path from pathlib.",
+          "claim_ids": [
+            "c2"
+          ],
+          "evidence_ids": [
+            "e2"
+          ],
+          "nodes": [],
+          "edges": []
+        }
+      ],
+      "citation_mappings": [
+        {
+          "scene_id": "purpose-1",
+          "claim_ids": [
+            "c1"
+          ],
+          "evidence_ids": [
+            "e1"
+          ],
+          "claim_bindings": [
+            {
+              "status": "documentation_only",
+              "evidence_ids": [
+                "e1"
+              ],
+              "claim_id": "c1"
+            }
+          ]
+        },
+        {
+          "scene_id": "stack-1",
+          "claim_ids": [
+            "c2"
+          ],
+          "evidence_ids": [
+            "e2"
+          ],
+          "claim_bindings": [
+            {
+              "status": "verified",
+              "evidence_ids": [
+                "e2"
+              ],
+              "claim_id": "c2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "contract_version": "2.1",
+      "stage": "storyboard",
+      "chunk_id": "architecture_flow",
+      "input_digest": "19426dbb8b0716151d5fa3a57ce6111cddcfd5cbcd34ebaba5e2962d9c5481ba",
+      "storyboard": {
+        "scenes": [
+          {
+            "id": "architecture-1",
+            "topic": "architecture",
+            "type": "architecture",
+            "title": "Architecture",
+            "target_seconds": 40,
+            "claim_ids": [
+              "c3"
+            ],
+            "evidence_ids": [
+              "e3"
+            ],
+            "data": {
+              "label": "The configuration reader and entry point appear grouped in one module."
+            }
+          },
+          {
+            "id": "flow-1",
+            "topic": "flow",
+            "type": "flow",
+            "title": "Flow",
+            "target_seconds": 40,
+            "claim_ids": [
+              "c4"
+            ],
+            "evidence_ids": [
+              "e4"
+            ],
+            "data": {
+              "label": "main contains a call to read_config with config.json."
+            }
+          }
+        ]
+      },
+      "visual_instructions": [
+        {
+          "scene_id": "architecture-1",
+          "type": "architecture_graph",
+          "layout": "left_to_right",
+          "label": "The configuration reader and entry point appear grouped in one module.",
+          "claim_ids": [
+            "c3"
+          ],
+          "evidence_ids": [
+            "e3"
+          ],
+          "nodes": [
+            {
+              "id": "main",
+              "label": "main",
+              "claim_ids": [
+                "c3"
+              ]
+            },
+            {
+              "id": "reader",
+              "label": "read_config",
+              "claim_ids": [
+                "c3"
+              ]
+            }
+          ],
+          "edges": []
+        },
+        {
+          "scene_id": "flow-1",
+          "type": "flow_graph",
+          "layout": "left_to_right",
+          "label": "main contains a call to read_config with config.json.",
           "claim_ids": [
             "c4"
+          ],
+          "evidence_ids": [
+            "e4"
+          ],
+          "nodes": [
+            {
+              "id": "main",
+              "label": "main",
+              "claim_ids": [
+                "c4"
+              ]
+            },
+            {
+              "id": "reader",
+              "label": "read_config",
+              "claim_ids": [
+                "c4"
+              ]
+            }
+          ],
+          "edges": [
+            {
+              "source": "main",
+              "target": "reader",
+              "label": "contains static call",
+              "claim_ids": [
+                "c4"
+              ]
+            }
           ]
         }
       ],
-      "claims": [
+      "citation_mappings": [
         {
-          "id": "c1",
-          "text": "Documentation describes a configuration display demo.",
-          "status": "documentation_only",
-          "evidence_ids": [
-            "e1"
+          "scene_id": "architecture-1",
+          "claim_ids": [
+            "c3"
           ],
-          "reason": "Purpose not proven by implementation."
-        },
-        {
-          "id": "c2",
-          "text": "The Python module imports Path from pathlib.",
-          "status": "verified",
-          "evidence_ids": [
-            "e2"
-          ],
-          "reason": "Import declaration inspected."
-        },
-        {
-          "id": "c3",
-          "text": "The configuration reader and entry point appear grouped in one module.",
-          "status": "inferred",
           "evidence_ids": [
             "e3"
           ],
-          "reason": "Module grouping suggests structure; runtime architecture is not observed."
+          "claim_bindings": [
+            {
+              "status": "inferred",
+              "evidence_ids": [
+                "e3"
+              ],
+              "claim_id": "c3"
+            }
+          ]
         },
         {
-          "id": "c4",
-          "text": "main contains a call to read_config with config.json.",
-          "status": "verified",
+          "scene_id": "flow-1",
+          "claim_ids": [
+            "c4"
+          ],
           "evidence_ids": [
             "e4"
           ],
-          "reason": "Call syntax inspected, not executed."
-        },
+          "claim_bindings": [
+            {
+              "status": "verified",
+              "evidence_ids": [
+                "e4"
+              ],
+              "claim_id": "c4"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "contract_version": "2.1",
+      "stage": "storyboard",
+      "chunk_id": "code_summary",
+      "input_digest": "f548e5a378b867a562d27470d31a8f1344a7a34dbeac8dde4633792114d57957",
+      "storyboard": {
+        "scenes": [
+          {
+            "id": "code-1",
+            "topic": "code",
+            "type": "code",
+            "title": "Code",
+            "target_seconds": 40,
+            "claim_ids": [
+              "c5"
+            ],
+            "evidence_ids": [
+              "e5"
+            ],
+            "data": {
+              "label": "read_config returns a Path.read_text call."
+            }
+          },
+          {
+            "id": "summary-1",
+            "topic": "summary",
+            "type": "summary",
+            "title": "Summary",
+            "target_seconds": 40,
+            "claim_ids": [
+              "c6"
+            ],
+            "evidence_ids": [
+              "e6"
+            ],
+            "data": {
+              "label": "A main guard contains a call to main."
+            }
+          }
+        ]
+      },
+      "visual_instructions": [
         {
-          "id": "c5",
-          "text": "read_config returns a Path.read_text call.",
-          "status": "verified",
+          "scene_id": "code-1",
+          "type": "code_focus",
+          "layout": "centered",
+          "label": "read_config returns a Path.read_text call.",
+          "claim_ids": [
+            "c5"
+          ],
           "evidence_ids": [
             "e5"
           ],
-          "reason": "Return expression inspected; file contents and errors are unknown."
+          "nodes": [],
+          "edges": []
         },
         {
-          "id": "c6",
-          "text": "A main guard contains a call to main.",
-          "status": "verified",
+          "scene_id": "summary-1",
+          "type": "section_card",
+          "layout": "centered",
+          "label": "A main guard contains a call to main.",
+          "claim_ids": [
+            "c6"
+          ],
           "evidence_ids": [
             "e6"
           ],
-          "reason": "Guard syntax inspected, no execution claim."
-        },
-        {
-          "id": "c7",
-          "text": "The program supports concurrent configuration updates.",
-          "status": "unsupported",
-          "evidence_ids": [],
-          "reason": "No supporting source found."
+          "nodes": [],
+          "edges": []
         }
       ],
-      "limitations": [
-        "No execution, file contents unknown.",
-        "Purpose from documentation only."
-      ]
-    },
-    "evidence": {
-      "items": [
+      "citation_mappings": [
         {
-          "id": "e1",
-          "path": "README.md",
-          "start_line": 1,
-          "end_line": 1,
-          "file_sha256": "d87cc9d62fe14e14859934d7c17085e5b5273f26e86cf696e65d0adddf143e93",
-          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "kind": "documentation",
-          "rule": "doc_assertion",
-          "redacted": false
-        },
-        {
-          "id": "e2",
-          "path": "app/main.py",
-          "start_line": 1,
-          "end_line": 1,
-          "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
-          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "kind": "source",
-          "rule": "static_syntax",
-          "redacted": false
-        },
-        {
-          "id": "e3",
-          "path": "app/main.py",
-          "start_line": 3,
-          "end_line": 7,
-          "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
-          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "kind": "source",
-          "rule": "static_syntax",
-          "redacted": false
-        },
-        {
-          "id": "e4",
-          "path": "app/main.py",
-          "start_line": 6,
-          "end_line": 7,
-          "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
-          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "kind": "source",
-          "rule": "static_syntax",
-          "redacted": false
-        },
-        {
-          "id": "e5",
-          "path": "app/main.py",
-          "start_line": 3,
-          "end_line": 4,
-          "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
-          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "kind": "source",
-          "rule": "static_syntax",
-          "redacted": false
-        },
-        {
-          "id": "e6",
-          "path": "app/main.py",
-          "start_line": 9,
-          "end_line": 10,
-          "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
-          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "kind": "source",
-          "rule": "static_syntax",
-          "redacted": false
-        }
-      ]
-    },
-    "verification": {
-      "verifier_version": "static-example-v1",
-      "verdicts": [
-        {
-          "claim_id": "c1",
-          "status": "documentation_only",
-          "evidence_ids": [
-            "e1"
+          "scene_id": "code-1",
+          "claim_ids": [
+            "c5"
           ],
-          "rule": "qualification",
-          "reason": "Purpose not proven by implementation."
-        },
-        {
-          "claim_id": "c2",
-          "status": "verified",
-          "evidence_ids": [
-            "e2"
-          ],
-          "rule": "static_entailment",
-          "reason": "Import declaration inspected."
-        },
-        {
-          "claim_id": "c3",
-          "status": "inferred",
-          "evidence_ids": [
-            "e3"
-          ],
-          "rule": "qualification",
-          "reason": "Module grouping suggests structure; runtime architecture is not observed."
-        },
-        {
-          "claim_id": "c4",
-          "status": "verified",
-          "evidence_ids": [
-            "e4"
-          ],
-          "rule": "static_entailment",
-          "reason": "Call syntax inspected, not executed."
-        },
-        {
-          "claim_id": "c5",
-          "status": "verified",
           "evidence_ids": [
             "e5"
           ],
-          "rule": "static_entailment",
-          "reason": "Return expression inspected; file contents and errors are unknown."
+          "claim_bindings": [
+            {
+              "status": "verified",
+              "evidence_ids": [
+                "e5"
+              ],
+              "claim_id": "c5"
+            }
+          ]
         },
         {
-          "claim_id": "c6",
-          "status": "verified",
+          "scene_id": "summary-1",
+          "claim_ids": [
+            "c6"
+          ],
           "evidence_ids": [
             "e6"
           ],
-          "rule": "static_entailment",
-          "reason": "Guard syntax inspected, no execution claim."
-        },
-        {
-          "claim_id": "c7",
-          "status": "unsupported",
-          "evidence_ids": [],
-          "rule": "qualification",
-          "reason": "No supporting source found."
+          "claim_bindings": [
+            {
+              "status": "verified",
+              "evidence_ids": [
+                "e6"
+              ],
+              "claim_id": "c6"
+            }
+          ]
         }
       ]
-    },
-    "allowed_claim_ids": [
-      "c1",
-      "c2",
-      "c3",
-      "c4",
-      "c5",
-      "c6"
-    ],
-    "selected_evidence_ids": [
-      "e1",
-      "e2",
-      "e3",
-      "e4",
-      "e5",
-      "e6"
-    ],
-    "omitted_claim_ids": [
-      "c7"
-    ],
-    "request_limits": {
-      "prompt_tokens_max": 12288,
-      "output_tokens_max": 4096,
-      "context_tokens_max": 16384
     }
-  },
-  "director_output": {
-    "contract_version": "2.0",
+  ],
+  "director_stage10_output": {
+    "contract_version": "2.1",
+    "stage": "storyboard",
     "storyboard": {
       "scenes": [
         {
-          "id": "s1",
+          "id": "purpose-1",
           "topic": "purpose",
           "type": "title",
           "title": "Purpose",
@@ -1254,7 +2239,7 @@
           }
         },
         {
-          "id": "s2",
+          "id": "stack-1",
           "topic": "stack",
           "type": "stack",
           "title": "Stack",
@@ -1270,7 +2255,7 @@
           }
         },
         {
-          "id": "s3",
+          "id": "architecture-1",
           "topic": "architecture",
           "type": "architecture",
           "title": "Architecture",
@@ -1286,7 +2271,7 @@
           }
         },
         {
-          "id": "s4",
+          "id": "flow-1",
           "topic": "flow",
           "type": "flow",
           "title": "Flow",
@@ -1302,7 +2287,7 @@
           }
         },
         {
-          "id": "s5",
+          "id": "code-1",
           "topic": "code",
           "type": "code",
           "title": "Code",
@@ -1318,7 +2303,7 @@
           }
         },
         {
-          "id": "s6",
+          "id": "summary-1",
           "topic": "summary",
           "type": "summary",
           "title": "Summary",
@@ -1335,68 +2320,9 @@
         }
       ]
     },
-    "narration": {
-      "sentences": [
-        {
-          "scene_id": "s1",
-          "text": "Documentation describes a configuration display demo.",
-          "technical": true,
-          "claim_ids": [
-            "c1"
-          ],
-          "uncertainty": "documentation_only"
-        },
-        {
-          "scene_id": "s2",
-          "text": "The Python module imports Path from pathlib.",
-          "technical": true,
-          "claim_ids": [
-            "c2"
-          ],
-          "uncertainty": "verified"
-        },
-        {
-          "scene_id": "s3",
-          "text": "The configuration reader and entry point appear grouped in one module.",
-          "technical": true,
-          "claim_ids": [
-            "c3"
-          ],
-          "uncertainty": "inferred"
-        },
-        {
-          "scene_id": "s4",
-          "text": "main contains a call to read_config with config.json.",
-          "technical": true,
-          "claim_ids": [
-            "c4"
-          ],
-          "uncertainty": "verified"
-        },
-        {
-          "scene_id": "s5",
-          "text": "read_config returns a Path.read_text call.",
-          "technical": true,
-          "claim_ids": [
-            "c5"
-          ],
-          "uncertainty": "verified"
-        },
-        {
-          "scene_id": "s6",
-          "text": "A main guard contains a call to main.",
-          "technical": true,
-          "claim_ids": [
-            "c6"
-          ],
-          "uncertainty": "verified"
-        }
-      ],
-      "note": "Abbreviated illustrative sentences; target timings are not generated audio."
-    },
     "visual_instructions": [
       {
-        "scene_id": "s1",
+        "scene_id": "purpose-1",
         "type": "section_card",
         "layout": "centered",
         "label": "Documentation describes a configuration display demo.",
@@ -1410,7 +2336,7 @@
         "edges": []
       },
       {
-        "scene_id": "s2",
+        "scene_id": "stack-1",
         "type": "section_card",
         "layout": "centered",
         "label": "The Python module imports Path from pathlib.",
@@ -1424,7 +2350,7 @@
         "edges": []
       },
       {
-        "scene_id": "s3",
+        "scene_id": "architecture-1",
         "type": "architecture_graph",
         "layout": "left_to_right",
         "label": "The configuration reader and entry point appear grouped in one module.",
@@ -1453,7 +2379,7 @@
         "edges": []
       },
       {
-        "scene_id": "s4",
+        "scene_id": "flow-1",
         "type": "flow_graph",
         "layout": "left_to_right",
         "label": "main contains a call to read_config with config.json.",
@@ -1491,7 +2417,7 @@
         ]
       },
       {
-        "scene_id": "s5",
+        "scene_id": "code-1",
         "type": "code_focus",
         "layout": "centered",
         "label": "read_config returns a Path.read_text call.",
@@ -1505,7 +2431,7 @@
         "edges": []
       },
       {
-        "scene_id": "s6",
+        "scene_id": "summary-1",
         "type": "section_card",
         "layout": "centered",
         "label": "A main guard contains a call to main.",
@@ -1521,59 +2447,1389 @@
     ],
     "citation_mappings": [
       {
-        "scene_id": "s1",
+        "scene_id": "purpose-1",
         "claim_ids": [
           "c1"
         ],
         "evidence_ids": [
           "e1"
+        ],
+        "claim_bindings": [
+          {
+            "status": "documentation_only",
+            "evidence_ids": [
+              "e1"
+            ],
+            "claim_id": "c1"
+          }
         ]
       },
       {
-        "scene_id": "s2",
+        "scene_id": "stack-1",
         "claim_ids": [
           "c2"
         ],
         "evidence_ids": [
           "e2"
+        ],
+        "claim_bindings": [
+          {
+            "status": "verified",
+            "evidence_ids": [
+              "e2"
+            ],
+            "claim_id": "c2"
+          }
         ]
       },
       {
-        "scene_id": "s3",
+        "scene_id": "architecture-1",
         "claim_ids": [
           "c3"
         ],
         "evidence_ids": [
           "e3"
+        ],
+        "claim_bindings": [
+          {
+            "status": "inferred",
+            "evidence_ids": [
+              "e3"
+            ],
+            "claim_id": "c3"
+          }
         ]
       },
       {
-        "scene_id": "s4",
+        "scene_id": "flow-1",
         "claim_ids": [
           "c4"
         ],
         "evidence_ids": [
           "e4"
+        ],
+        "claim_bindings": [
+          {
+            "status": "verified",
+            "evidence_ids": [
+              "e4"
+            ],
+            "claim_id": "c4"
+          }
         ]
       },
       {
-        "scene_id": "s5",
+        "scene_id": "code-1",
         "claim_ids": [
           "c5"
         ],
         "evidence_ids": [
           "e5"
+        ],
+        "claim_bindings": [
+          {
+            "status": "verified",
+            "evidence_ids": [
+              "e5"
+            ],
+            "claim_id": "c5"
+          }
         ]
       },
       {
-        "scene_id": "s6",
+        "scene_id": "summary-1",
         "claim_ids": [
           "c6"
         ],
         "evidence_ids": [
           "e6"
+        ],
+        "claim_bindings": [
+          {
+            "status": "verified",
+            "evidence_ids": [
+              "e6"
+            ],
+            "claim_id": "c6"
+          }
         ]
       }
-    ]
-  }
+    ],
+    "assembly": {
+      "plan_version": "topic-pairs-v1",
+      "chunk_digests": [
+        {
+          "chunk_id": "purpose_stack",
+          "sha256": "f2df25e8207ad727c4b7ef77774743d7946b08d2db1c45e92ea074c1d3e66675"
+        },
+        {
+          "chunk_id": "architecture_flow",
+          "sha256": "4f3350ec8146435dbe15603fc8c8f3363b1f212ba8e6fa107b117d69aad43b72"
+        },
+        {
+          "chunk_id": "code_summary",
+          "sha256": "f1df3a6480541b6874baaf1238cdc997c9e51682f75ed248fc254239f4b8cbff"
+        }
+      ]
+    }
+  },
+  "director_stage11_inputs": [
+    {
+      "contract_version": "2.1",
+      "owner_id": "11111111-1111-4111-8111-111111111111",
+      "snapshot_id": "22222222-2222-4222-8222-222222222222",
+      "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "knowledge": {
+        "scope": "Synthetic single Python module; no runtime trace.",
+        "stack": [
+          "python"
+        ],
+        "modules": [
+          "app/main.py"
+        ],
+        "entrypoint_ids": [
+          "sym-main"
+        ],
+        "edges": [
+          {
+            "source": "sym-main",
+            "target": "sym-read",
+            "claim_ids": [
+              "c4"
+            ]
+          }
+        ],
+        "claims": [
+          {
+            "id": "c1",
+            "text": "Documentation describes a configuration display demo.",
+            "status": "documentation_only",
+            "evidence_ids": [
+              "e1"
+            ],
+            "reason": "Purpose not proven by implementation."
+          },
+          {
+            "id": "c2",
+            "text": "The Python module imports Path from pathlib.",
+            "status": "verified",
+            "evidence_ids": [
+              "e2"
+            ],
+            "reason": "Import declaration inspected."
+          },
+          {
+            "id": "c3",
+            "text": "The configuration reader and entry point appear grouped in one module.",
+            "status": "inferred",
+            "evidence_ids": [
+              "e3"
+            ],
+            "reason": "Module grouping suggests structure; runtime architecture is not observed."
+          },
+          {
+            "id": "c4",
+            "text": "main contains a call to read_config with config.json.",
+            "status": "verified",
+            "evidence_ids": [
+              "e4"
+            ],
+            "reason": "Call syntax inspected, not executed."
+          },
+          {
+            "id": "c5",
+            "text": "read_config returns a Path.read_text call.",
+            "status": "verified",
+            "evidence_ids": [
+              "e5"
+            ],
+            "reason": "Return expression inspected; file contents and errors are unknown."
+          },
+          {
+            "id": "c6",
+            "text": "A main guard contains a call to main.",
+            "status": "verified",
+            "evidence_ids": [
+              "e6"
+            ],
+            "reason": "Guard syntax inspected, no execution claim."
+          },
+          {
+            "id": "c7",
+            "text": "The program supports concurrent configuration updates.",
+            "status": "unsupported",
+            "evidence_ids": [],
+            "reason": "No supporting source found."
+          }
+        ],
+        "limitations": [
+          "No execution, file contents unknown.",
+          "Purpose from documentation only."
+        ]
+      },
+      "evidence": {
+        "items": [
+          {
+            "id": "e1",
+            "path": "README.md",
+            "start_line": 1,
+            "end_line": 1,
+            "file_sha256": "d87cc9d62fe14e14859934d7c17085e5b5273f26e86cf696e65d0adddf143e93",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "documentation",
+            "rule": "doc_assertion",
+            "redacted": false
+          },
+          {
+            "id": "e2",
+            "path": "app/main.py",
+            "start_line": 1,
+            "end_line": 1,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          },
+          {
+            "id": "e3",
+            "path": "app/main.py",
+            "start_line": 3,
+            "end_line": 7,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          },
+          {
+            "id": "e4",
+            "path": "app/main.py",
+            "start_line": 6,
+            "end_line": 7,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          },
+          {
+            "id": "e5",
+            "path": "app/main.py",
+            "start_line": 3,
+            "end_line": 4,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          },
+          {
+            "id": "e6",
+            "path": "app/main.py",
+            "start_line": 9,
+            "end_line": 10,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          }
+        ]
+      },
+      "verification": {
+        "verifier_version": "static-example-v1",
+        "verdicts": [
+          {
+            "claim_id": "c1",
+            "status": "documentation_only",
+            "evidence_ids": [
+              "e1"
+            ],
+            "rule": "qualification",
+            "reason": "Purpose not proven by implementation."
+          },
+          {
+            "claim_id": "c2",
+            "status": "verified",
+            "evidence_ids": [
+              "e2"
+            ],
+            "rule": "static_entailment",
+            "reason": "Import declaration inspected."
+          },
+          {
+            "claim_id": "c3",
+            "status": "inferred",
+            "evidence_ids": [
+              "e3"
+            ],
+            "rule": "qualification",
+            "reason": "Module grouping suggests structure; runtime architecture is not observed."
+          },
+          {
+            "claim_id": "c4",
+            "status": "verified",
+            "evidence_ids": [
+              "e4"
+            ],
+            "rule": "static_entailment",
+            "reason": "Call syntax inspected, not executed."
+          },
+          {
+            "claim_id": "c5",
+            "status": "verified",
+            "evidence_ids": [
+              "e5"
+            ],
+            "rule": "static_entailment",
+            "reason": "Return expression inspected; file contents and errors are unknown."
+          },
+          {
+            "claim_id": "c6",
+            "status": "verified",
+            "evidence_ids": [
+              "e6"
+            ],
+            "rule": "static_entailment",
+            "reason": "Guard syntax inspected, no execution claim."
+          },
+          {
+            "claim_id": "c7",
+            "status": "unsupported",
+            "evidence_ids": [],
+            "rule": "qualification",
+            "reason": "No supporting source found."
+          }
+        ]
+      },
+      "allowed_claim_ids": [
+        "c1",
+        "c2"
+      ],
+      "selected_evidence_ids": [
+        "e1",
+        "e2"
+      ],
+      "omitted_claim_ids": [
+        "c3",
+        "c4",
+        "c5",
+        "c6",
+        "c7"
+      ],
+      "request_limits": {
+        "prompt_tokens_max": 12288,
+        "output_tokens_max": 4096,
+        "context_tokens_max": 16384
+      },
+      "stage": "narration",
+      "chunk_id": "purpose_stack",
+      "storyboard_digest": "466fe1482c1aa63b77696ebcda87c382e70f3c40018880099d878ff14d03a073",
+      "scene_subset": [
+        {
+          "id": "purpose-1",
+          "topic": "purpose",
+          "type": "title",
+          "title": "Purpose",
+          "target_seconds": 40,
+          "claim_ids": [
+            "c1"
+          ],
+          "evidence_ids": [
+            "e1"
+          ],
+          "data": {
+            "label": "Documentation describes a configuration display demo."
+          }
+        },
+        {
+          "id": "stack-1",
+          "topic": "stack",
+          "type": "stack",
+          "title": "Stack",
+          "target_seconds": 40,
+          "claim_ids": [
+            "c2"
+          ],
+          "evidence_ids": [
+            "e2"
+          ],
+          "data": {
+            "label": "The Python module imports Path from pathlib."
+          }
+        }
+      ],
+      "citation_subset": [
+        {
+          "scene_id": "purpose-1",
+          "claim_ids": [
+            "c1"
+          ],
+          "evidence_ids": [
+            "e1"
+          ],
+          "claim_bindings": [
+            {
+              "status": "documentation_only",
+              "evidence_ids": [
+                "e1"
+              ],
+              "claim_id": "c1"
+            }
+          ]
+        },
+        {
+          "scene_id": "stack-1",
+          "claim_ids": [
+            "c2"
+          ],
+          "evidence_ids": [
+            "e2"
+          ],
+          "claim_bindings": [
+            {
+              "status": "verified",
+              "evidence_ids": [
+                "e2"
+              ],
+              "claim_id": "c2"
+            }
+          ]
+        }
+      ],
+      "input_digest": "67c91ee51fd80bfda5516d5ac5e1d2875be21dcdfe0f1cd12b828b1d1cdd44a5"
+    },
+    {
+      "contract_version": "2.1",
+      "owner_id": "11111111-1111-4111-8111-111111111111",
+      "snapshot_id": "22222222-2222-4222-8222-222222222222",
+      "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "knowledge": {
+        "scope": "Synthetic single Python module; no runtime trace.",
+        "stack": [
+          "python"
+        ],
+        "modules": [
+          "app/main.py"
+        ],
+        "entrypoint_ids": [
+          "sym-main"
+        ],
+        "edges": [
+          {
+            "source": "sym-main",
+            "target": "sym-read",
+            "claim_ids": [
+              "c4"
+            ]
+          }
+        ],
+        "claims": [
+          {
+            "id": "c1",
+            "text": "Documentation describes a configuration display demo.",
+            "status": "documentation_only",
+            "evidence_ids": [
+              "e1"
+            ],
+            "reason": "Purpose not proven by implementation."
+          },
+          {
+            "id": "c2",
+            "text": "The Python module imports Path from pathlib.",
+            "status": "verified",
+            "evidence_ids": [
+              "e2"
+            ],
+            "reason": "Import declaration inspected."
+          },
+          {
+            "id": "c3",
+            "text": "The configuration reader and entry point appear grouped in one module.",
+            "status": "inferred",
+            "evidence_ids": [
+              "e3"
+            ],
+            "reason": "Module grouping suggests structure; runtime architecture is not observed."
+          },
+          {
+            "id": "c4",
+            "text": "main contains a call to read_config with config.json.",
+            "status": "verified",
+            "evidence_ids": [
+              "e4"
+            ],
+            "reason": "Call syntax inspected, not executed."
+          },
+          {
+            "id": "c5",
+            "text": "read_config returns a Path.read_text call.",
+            "status": "verified",
+            "evidence_ids": [
+              "e5"
+            ],
+            "reason": "Return expression inspected; file contents and errors are unknown."
+          },
+          {
+            "id": "c6",
+            "text": "A main guard contains a call to main.",
+            "status": "verified",
+            "evidence_ids": [
+              "e6"
+            ],
+            "reason": "Guard syntax inspected, no execution claim."
+          },
+          {
+            "id": "c7",
+            "text": "The program supports concurrent configuration updates.",
+            "status": "unsupported",
+            "evidence_ids": [],
+            "reason": "No supporting source found."
+          }
+        ],
+        "limitations": [
+          "No execution, file contents unknown.",
+          "Purpose from documentation only."
+        ]
+      },
+      "evidence": {
+        "items": [
+          {
+            "id": "e1",
+            "path": "README.md",
+            "start_line": 1,
+            "end_line": 1,
+            "file_sha256": "d87cc9d62fe14e14859934d7c17085e5b5273f26e86cf696e65d0adddf143e93",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "documentation",
+            "rule": "doc_assertion",
+            "redacted": false
+          },
+          {
+            "id": "e2",
+            "path": "app/main.py",
+            "start_line": 1,
+            "end_line": 1,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          },
+          {
+            "id": "e3",
+            "path": "app/main.py",
+            "start_line": 3,
+            "end_line": 7,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          },
+          {
+            "id": "e4",
+            "path": "app/main.py",
+            "start_line": 6,
+            "end_line": 7,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          },
+          {
+            "id": "e5",
+            "path": "app/main.py",
+            "start_line": 3,
+            "end_line": 4,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          },
+          {
+            "id": "e6",
+            "path": "app/main.py",
+            "start_line": 9,
+            "end_line": 10,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          }
+        ]
+      },
+      "verification": {
+        "verifier_version": "static-example-v1",
+        "verdicts": [
+          {
+            "claim_id": "c1",
+            "status": "documentation_only",
+            "evidence_ids": [
+              "e1"
+            ],
+            "rule": "qualification",
+            "reason": "Purpose not proven by implementation."
+          },
+          {
+            "claim_id": "c2",
+            "status": "verified",
+            "evidence_ids": [
+              "e2"
+            ],
+            "rule": "static_entailment",
+            "reason": "Import declaration inspected."
+          },
+          {
+            "claim_id": "c3",
+            "status": "inferred",
+            "evidence_ids": [
+              "e3"
+            ],
+            "rule": "qualification",
+            "reason": "Module grouping suggests structure; runtime architecture is not observed."
+          },
+          {
+            "claim_id": "c4",
+            "status": "verified",
+            "evidence_ids": [
+              "e4"
+            ],
+            "rule": "static_entailment",
+            "reason": "Call syntax inspected, not executed."
+          },
+          {
+            "claim_id": "c5",
+            "status": "verified",
+            "evidence_ids": [
+              "e5"
+            ],
+            "rule": "static_entailment",
+            "reason": "Return expression inspected; file contents and errors are unknown."
+          },
+          {
+            "claim_id": "c6",
+            "status": "verified",
+            "evidence_ids": [
+              "e6"
+            ],
+            "rule": "static_entailment",
+            "reason": "Guard syntax inspected, no execution claim."
+          },
+          {
+            "claim_id": "c7",
+            "status": "unsupported",
+            "evidence_ids": [],
+            "rule": "qualification",
+            "reason": "No supporting source found."
+          }
+        ]
+      },
+      "allowed_claim_ids": [
+        "c3",
+        "c4"
+      ],
+      "selected_evidence_ids": [
+        "e3",
+        "e4"
+      ],
+      "omitted_claim_ids": [
+        "c1",
+        "c2",
+        "c5",
+        "c6",
+        "c7"
+      ],
+      "request_limits": {
+        "prompt_tokens_max": 12288,
+        "output_tokens_max": 4096,
+        "context_tokens_max": 16384
+      },
+      "stage": "narration",
+      "chunk_id": "architecture_flow",
+      "storyboard_digest": "466fe1482c1aa63b77696ebcda87c382e70f3c40018880099d878ff14d03a073",
+      "scene_subset": [
+        {
+          "id": "architecture-1",
+          "topic": "architecture",
+          "type": "architecture",
+          "title": "Architecture",
+          "target_seconds": 40,
+          "claim_ids": [
+            "c3"
+          ],
+          "evidence_ids": [
+            "e3"
+          ],
+          "data": {
+            "label": "The configuration reader and entry point appear grouped in one module."
+          }
+        },
+        {
+          "id": "flow-1",
+          "topic": "flow",
+          "type": "flow",
+          "title": "Flow",
+          "target_seconds": 40,
+          "claim_ids": [
+            "c4"
+          ],
+          "evidence_ids": [
+            "e4"
+          ],
+          "data": {
+            "label": "main contains a call to read_config with config.json."
+          }
+        }
+      ],
+      "citation_subset": [
+        {
+          "scene_id": "architecture-1",
+          "claim_ids": [
+            "c3"
+          ],
+          "evidence_ids": [
+            "e3"
+          ],
+          "claim_bindings": [
+            {
+              "status": "inferred",
+              "evidence_ids": [
+                "e3"
+              ],
+              "claim_id": "c3"
+            }
+          ]
+        },
+        {
+          "scene_id": "flow-1",
+          "claim_ids": [
+            "c4"
+          ],
+          "evidence_ids": [
+            "e4"
+          ],
+          "claim_bindings": [
+            {
+              "status": "verified",
+              "evidence_ids": [
+                "e4"
+              ],
+              "claim_id": "c4"
+            }
+          ]
+        }
+      ],
+      "input_digest": "a8945466718c7885d24fb55e39b6ef5ee65fd943da50bb287f1a488ff3f1c2e7"
+    },
+    {
+      "contract_version": "2.1",
+      "owner_id": "11111111-1111-4111-8111-111111111111",
+      "snapshot_id": "22222222-2222-4222-8222-222222222222",
+      "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "knowledge": {
+        "scope": "Synthetic single Python module; no runtime trace.",
+        "stack": [
+          "python"
+        ],
+        "modules": [
+          "app/main.py"
+        ],
+        "entrypoint_ids": [
+          "sym-main"
+        ],
+        "edges": [
+          {
+            "source": "sym-main",
+            "target": "sym-read",
+            "claim_ids": [
+              "c4"
+            ]
+          }
+        ],
+        "claims": [
+          {
+            "id": "c1",
+            "text": "Documentation describes a configuration display demo.",
+            "status": "documentation_only",
+            "evidence_ids": [
+              "e1"
+            ],
+            "reason": "Purpose not proven by implementation."
+          },
+          {
+            "id": "c2",
+            "text": "The Python module imports Path from pathlib.",
+            "status": "verified",
+            "evidence_ids": [
+              "e2"
+            ],
+            "reason": "Import declaration inspected."
+          },
+          {
+            "id": "c3",
+            "text": "The configuration reader and entry point appear grouped in one module.",
+            "status": "inferred",
+            "evidence_ids": [
+              "e3"
+            ],
+            "reason": "Module grouping suggests structure; runtime architecture is not observed."
+          },
+          {
+            "id": "c4",
+            "text": "main contains a call to read_config with config.json.",
+            "status": "verified",
+            "evidence_ids": [
+              "e4"
+            ],
+            "reason": "Call syntax inspected, not executed."
+          },
+          {
+            "id": "c5",
+            "text": "read_config returns a Path.read_text call.",
+            "status": "verified",
+            "evidence_ids": [
+              "e5"
+            ],
+            "reason": "Return expression inspected; file contents and errors are unknown."
+          },
+          {
+            "id": "c6",
+            "text": "A main guard contains a call to main.",
+            "status": "verified",
+            "evidence_ids": [
+              "e6"
+            ],
+            "reason": "Guard syntax inspected, no execution claim."
+          },
+          {
+            "id": "c7",
+            "text": "The program supports concurrent configuration updates.",
+            "status": "unsupported",
+            "evidence_ids": [],
+            "reason": "No supporting source found."
+          }
+        ],
+        "limitations": [
+          "No execution, file contents unknown.",
+          "Purpose from documentation only."
+        ]
+      },
+      "evidence": {
+        "items": [
+          {
+            "id": "e1",
+            "path": "README.md",
+            "start_line": 1,
+            "end_line": 1,
+            "file_sha256": "d87cc9d62fe14e14859934d7c17085e5b5273f26e86cf696e65d0adddf143e93",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "documentation",
+            "rule": "doc_assertion",
+            "redacted": false
+          },
+          {
+            "id": "e2",
+            "path": "app/main.py",
+            "start_line": 1,
+            "end_line": 1,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          },
+          {
+            "id": "e3",
+            "path": "app/main.py",
+            "start_line": 3,
+            "end_line": 7,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          },
+          {
+            "id": "e4",
+            "path": "app/main.py",
+            "start_line": 6,
+            "end_line": 7,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          },
+          {
+            "id": "e5",
+            "path": "app/main.py",
+            "start_line": 3,
+            "end_line": 4,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          },
+          {
+            "id": "e6",
+            "path": "app/main.py",
+            "start_line": 9,
+            "end_line": 10,
+            "file_sha256": "c8429d1d513bd6d1ce9ff7e4c8c38fff381af4ac2f9c0c3f04b0709b110166a1",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "rule": "static_syntax",
+            "redacted": false
+          }
+        ]
+      },
+      "verification": {
+        "verifier_version": "static-example-v1",
+        "verdicts": [
+          {
+            "claim_id": "c1",
+            "status": "documentation_only",
+            "evidence_ids": [
+              "e1"
+            ],
+            "rule": "qualification",
+            "reason": "Purpose not proven by implementation."
+          },
+          {
+            "claim_id": "c2",
+            "status": "verified",
+            "evidence_ids": [
+              "e2"
+            ],
+            "rule": "static_entailment",
+            "reason": "Import declaration inspected."
+          },
+          {
+            "claim_id": "c3",
+            "status": "inferred",
+            "evidence_ids": [
+              "e3"
+            ],
+            "rule": "qualification",
+            "reason": "Module grouping suggests structure; runtime architecture is not observed."
+          },
+          {
+            "claim_id": "c4",
+            "status": "verified",
+            "evidence_ids": [
+              "e4"
+            ],
+            "rule": "static_entailment",
+            "reason": "Call syntax inspected, not executed."
+          },
+          {
+            "claim_id": "c5",
+            "status": "verified",
+            "evidence_ids": [
+              "e5"
+            ],
+            "rule": "static_entailment",
+            "reason": "Return expression inspected; file contents and errors are unknown."
+          },
+          {
+            "claim_id": "c6",
+            "status": "verified",
+            "evidence_ids": [
+              "e6"
+            ],
+            "rule": "static_entailment",
+            "reason": "Guard syntax inspected, no execution claim."
+          },
+          {
+            "claim_id": "c7",
+            "status": "unsupported",
+            "evidence_ids": [],
+            "rule": "qualification",
+            "reason": "No supporting source found."
+          }
+        ]
+      },
+      "allowed_claim_ids": [
+        "c5",
+        "c6"
+      ],
+      "selected_evidence_ids": [
+        "e5",
+        "e6"
+      ],
+      "omitted_claim_ids": [
+        "c1",
+        "c2",
+        "c3",
+        "c4",
+        "c7"
+      ],
+      "request_limits": {
+        "prompt_tokens_max": 12288,
+        "output_tokens_max": 4096,
+        "context_tokens_max": 16384
+      },
+      "stage": "narration",
+      "chunk_id": "code_summary",
+      "storyboard_digest": "466fe1482c1aa63b77696ebcda87c382e70f3c40018880099d878ff14d03a073",
+      "scene_subset": [
+        {
+          "id": "code-1",
+          "topic": "code",
+          "type": "code",
+          "title": "Code",
+          "target_seconds": 40,
+          "claim_ids": [
+            "c5"
+          ],
+          "evidence_ids": [
+            "e5"
+          ],
+          "data": {
+            "label": "read_config returns a Path.read_text call."
+          }
+        },
+        {
+          "id": "summary-1",
+          "topic": "summary",
+          "type": "summary",
+          "title": "Summary",
+          "target_seconds": 40,
+          "claim_ids": [
+            "c6"
+          ],
+          "evidence_ids": [
+            "e6"
+          ],
+          "data": {
+            "label": "A main guard contains a call to main."
+          }
+        }
+      ],
+      "citation_subset": [
+        {
+          "scene_id": "code-1",
+          "claim_ids": [
+            "c5"
+          ],
+          "evidence_ids": [
+            "e5"
+          ],
+          "claim_bindings": [
+            {
+              "status": "verified",
+              "evidence_ids": [
+                "e5"
+              ],
+              "claim_id": "c5"
+            }
+          ]
+        },
+        {
+          "scene_id": "summary-1",
+          "claim_ids": [
+            "c6"
+          ],
+          "evidence_ids": [
+            "e6"
+          ],
+          "claim_bindings": [
+            {
+              "status": "verified",
+              "evidence_ids": [
+                "e6"
+              ],
+              "claim_id": "c6"
+            }
+          ]
+        }
+      ],
+      "input_digest": "c126ffcd02855ad87c7e87c8b69a4f96e71b44648d4cc004a3c8ae207db7b632"
+    }
+  ],
+  "director_stage11_chunks": [
+    {
+      "contract_version": "2.1",
+      "stage": "narration",
+      "chunk_id": "purpose_stack",
+      "input_digest": "67c91ee51fd80bfda5516d5ac5e1d2875be21dcdfe0f1cd12b828b1d1cdd44a5",
+      "storyboard_digest": "466fe1482c1aa63b77696ebcda87c382e70f3c40018880099d878ff14d03a073",
+      "narration": {
+        "sentences": [
+          {
+            "scene_id": "purpose-1",
+            "text": "Documentation describes a configuration display demo.",
+            "technical": true,
+            "claim_ids": [
+              "c1"
+            ],
+            "uncertainty": "documentation_only",
+            "evidence_ids": [
+              "e1"
+            ]
+          },
+          {
+            "scene_id": "stack-1",
+            "text": "The Python module imports Path from pathlib.",
+            "technical": true,
+            "claim_ids": [
+              "c2"
+            ],
+            "uncertainty": "verified",
+            "evidence_ids": [
+              "e2"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "contract_version": "2.1",
+      "stage": "narration",
+      "chunk_id": "architecture_flow",
+      "input_digest": "a8945466718c7885d24fb55e39b6ef5ee65fd943da50bb287f1a488ff3f1c2e7",
+      "storyboard_digest": "466fe1482c1aa63b77696ebcda87c382e70f3c40018880099d878ff14d03a073",
+      "narration": {
+        "sentences": [
+          {
+            "scene_id": "architecture-1",
+            "text": "The configuration reader and entry point appear grouped in one module.",
+            "technical": true,
+            "claim_ids": [
+              "c3"
+            ],
+            "uncertainty": "inferred",
+            "evidence_ids": [
+              "e3"
+            ]
+          },
+          {
+            "scene_id": "flow-1",
+            "text": "main contains a call to read_config with config.json.",
+            "technical": true,
+            "claim_ids": [
+              "c4"
+            ],
+            "uncertainty": "verified",
+            "evidence_ids": [
+              "e4"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "contract_version": "2.1",
+      "stage": "narration",
+      "chunk_id": "code_summary",
+      "input_digest": "c126ffcd02855ad87c7e87c8b69a4f96e71b44648d4cc004a3c8ae207db7b632",
+      "storyboard_digest": "466fe1482c1aa63b77696ebcda87c382e70f3c40018880099d878ff14d03a073",
+      "narration": {
+        "sentences": [
+          {
+            "scene_id": "code-1",
+            "text": "read_config returns a Path.read_text call.",
+            "technical": true,
+            "claim_ids": [
+              "c5"
+            ],
+            "uncertainty": "verified",
+            "evidence_ids": [
+              "e5"
+            ]
+          },
+          {
+            "scene_id": "summary-1",
+            "text": "A main guard contains a call to main.",
+            "technical": true,
+            "claim_ids": [
+              "c6"
+            ],
+            "uncertainty": "verified",
+            "evidence_ids": [
+              "e6"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "director_stage11_output": {
+    "contract_version": "2.1",
+    "stage": "narration",
+    "storyboard_digest": "466fe1482c1aa63b77696ebcda87c382e70f3c40018880099d878ff14d03a073",
+    "narration": {
+      "sentences": [
+        {
+          "scene_id": "purpose-1",
+          "text": "Documentation describes a configuration display demo.",
+          "technical": true,
+          "claim_ids": [
+            "c1"
+          ],
+          "uncertainty": "documentation_only",
+          "evidence_ids": [
+            "e1"
+          ]
+        },
+        {
+          "scene_id": "stack-1",
+          "text": "The Python module imports Path from pathlib.",
+          "technical": true,
+          "claim_ids": [
+            "c2"
+          ],
+          "uncertainty": "verified",
+          "evidence_ids": [
+            "e2"
+          ]
+        },
+        {
+          "scene_id": "architecture-1",
+          "text": "The configuration reader and entry point appear grouped in one module.",
+          "technical": true,
+          "claim_ids": [
+            "c3"
+          ],
+          "uncertainty": "inferred",
+          "evidence_ids": [
+            "e3"
+          ]
+        },
+        {
+          "scene_id": "flow-1",
+          "text": "main contains a call to read_config with config.json.",
+          "technical": true,
+          "claim_ids": [
+            "c4"
+          ],
+          "uncertainty": "verified",
+          "evidence_ids": [
+            "e4"
+          ]
+        },
+        {
+          "scene_id": "code-1",
+          "text": "read_config returns a Path.read_text call.",
+          "technical": true,
+          "claim_ids": [
+            "c5"
+          ],
+          "uncertainty": "verified",
+          "evidence_ids": [
+            "e5"
+          ]
+        },
+        {
+          "scene_id": "summary-1",
+          "text": "A main guard contains a call to main.",
+          "technical": true,
+          "claim_ids": [
+            "c6"
+          ],
+          "uncertainty": "verified",
+          "evidence_ids": [
+            "e6"
+          ]
+        }
+      ]
+    },
+    "assembly": {
+      "plan_version": "topic-pairs-v1",
+      "chunk_digests": [
+        {
+          "chunk_id": "purpose_stack",
+          "sha256": "b5a061f04f70549b6970de0facbc521806fda090c79b2397e0a4ae1404342a9f"
+        },
+        {
+          "chunk_id": "architecture_flow",
+          "sha256": "ed3dd939254b3a28aafd5baeb38188a927ae7e7d6fc4042c6a3272c09af3a572"
+        },
+        {
+          "chunk_id": "code_summary",
+          "sha256": "4adb6a37a63cb65c9caa0d53150d389612afa9bffb97c3cad1fae62aeae3b741"
+        }
+      ]
+    }
+  },
+  "director_usage_receipts": [
+    {
+      "operation_id": "storyboard-op-1",
+      "stage": "storyboard",
+      "chunk_id": "purpose_stack",
+      "stage_attempt": 1,
+      "status": "completed",
+      "input_tokens": 10000,
+      "output_tokens": 1000,
+      "duration_seconds": 50,
+      "gpu_seconds": 45,
+      "measurement_status": "illustrative_not_executed"
+    },
+    {
+      "operation_id": "storyboard-op-2",
+      "stage": "storyboard",
+      "chunk_id": "architecture_flow",
+      "stage_attempt": 1,
+      "status": "completed",
+      "input_tokens": 10000,
+      "output_tokens": 1000,
+      "duration_seconds": 50,
+      "gpu_seconds": 45,
+      "measurement_status": "illustrative_not_executed"
+    },
+    {
+      "operation_id": "storyboard-op-3",
+      "stage": "storyboard",
+      "chunk_id": "code_summary",
+      "stage_attempt": 1,
+      "status": "completed",
+      "input_tokens": 10000,
+      "output_tokens": 1000,
+      "duration_seconds": 50,
+      "gpu_seconds": 45,
+      "measurement_status": "illustrative_not_executed"
+    },
+    {
+      "operation_id": "narration-op-1",
+      "stage": "narration",
+      "chunk_id": "purpose_stack",
+      "stage_attempt": 1,
+      "status": "completed",
+      "input_tokens": 10000,
+      "output_tokens": 1000,
+      "duration_seconds": 50,
+      "gpu_seconds": 45,
+      "measurement_status": "illustrative_not_executed"
+    },
+    {
+      "operation_id": "narration-op-2",
+      "stage": "narration",
+      "chunk_id": "architecture_flow",
+      "stage_attempt": 1,
+      "status": "completed",
+      "input_tokens": 10000,
+      "output_tokens": 1000,
+      "duration_seconds": 50,
+      "gpu_seconds": 45,
+      "measurement_status": "illustrative_not_executed"
+    },
+    {
+      "operation_id": "narration-op-3",
+      "stage": "narration",
+      "chunk_id": "code_summary",
+      "stage_attempt": 1,
+      "status": "completed",
+      "input_tokens": 10000,
+      "output_tokens": 1000,
+      "duration_seconds": 50,
+      "gpu_seconds": 45,
+      "measurement_status": "illustrative_not_executed"
+    }
+  ]
 }

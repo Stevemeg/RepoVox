@@ -5,7 +5,7 @@
   "type": "object",
   "properties": {
     "schema_version": {
-      "const": "2.0"
+      "const": "2.1"
     },
     "kind": {
       "enum": [
@@ -735,7 +735,9 @@
                         "type": "string",
                         "pattern": "^[a-z][a-z0-9-]*$"
                       },
-                      "maxItems": 10000
+                      "maxItems": 256,
+                      "minItems": 1,
+                      "uniqueItems": true
                     },
                     "evidence_ids": {
                       "type": "array",
@@ -743,7 +745,9 @@
                         "type": "string",
                         "pattern": "^[a-z][a-z0-9-]*$"
                       },
-                      "maxItems": 10000
+                      "maxItems": 256,
+                      "minItems": 1,
+                      "uniqueItems": true
                     },
                     "data": {
                       "type": "object",
@@ -788,12 +792,16 @@
                 },
                 "minItems": 6,
                 "maxItems": 24
+              },
+              "assembly": {
+                "$ref": "#/$defs/assembly"
               }
             },
             "required": [
               "scenes",
               "visual_instructions",
-              "citation_mappings"
+              "citation_mappings",
+              "assembly"
             ],
             "additionalProperties": false
           }
@@ -836,15 +844,26 @@
                         "type": "string",
                         "pattern": "^[a-z][a-z0-9-]*$"
                       },
-                      "maxItems": 10000
+                      "maxItems": 256,
+                      "uniqueItems": true
                     },
                     "uncertainty": {
                       "enum": [
                         "verified",
                         "inferred",
                         "documentation_only",
-                        "unsupported"
+                        "none"
                       ]
+                    },
+                    "evidence_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]*$"
+                      },
+                      "uniqueItems": true,
+                      "maxItems": 256,
+                      "minItems": 0
                     }
                   },
                   "required": [
@@ -852,19 +871,71 @@
                     "text",
                     "technical",
                     "claim_ids",
-                    "uncertainty"
+                    "uncertainty",
+                    "evidence_ids"
                   ],
-                  "additionalProperties": false
+                  "additionalProperties": false,
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": {
+                          "technical": {
+                            "const": true
+                          }
+                        }
+                      },
+                      "then": {
+                        "properties": {
+                          "claim_ids": {
+                            "minItems": 1
+                          },
+                          "evidence_ids": {
+                            "minItems": 1
+                          },
+                          "uncertainty": {
+                            "enum": [
+                              "verified",
+                              "inferred",
+                              "documentation_only"
+                            ]
+                          }
+                        }
+                      },
+                      "else": {
+                        "properties": {
+                          "claim_ids": {
+                            "maxItems": 0
+                          },
+                          "evidence_ids": {
+                            "maxItems": 0
+                          },
+                          "uncertainty": {
+                            "const": "none"
+                          }
+                        }
+                      }
+                    }
+                  ]
                 },
-                "maxItems": 100
+                "maxItems": 100,
+                "minItems": 1
               },
               "note": {
                 "type": "string",
                 "minLength": 1
+              },
+              "storyboard_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "assembly": {
+                "$ref": "#/$defs/assembly"
               }
             },
             "required": [
-              "sentences"
+              "sentences",
+              "storyboard_digest",
+              "assembly"
             ],
             "additionalProperties": false
           }
@@ -1418,7 +1489,8 @@
             "pattern": "^[a-z][a-z0-9-]*$"
           },
           "uniqueItems": true,
-          "maxItems": 256
+          "maxItems": 256,
+          "minItems": 1
         },
         "evidence_ids": {
           "type": "array",
@@ -1427,7 +1499,8 @@
             "pattern": "^[a-z][a-z0-9-]*$"
           },
           "uniqueItems": true,
-          "maxItems": 256
+          "maxItems": 256,
+          "minItems": 1
         },
         "nodes": {
           "type": "array",
@@ -1451,7 +1524,8 @@
                   "pattern": "^[a-z][a-z0-9-]*$"
                 },
                 "uniqueItems": true,
-                "maxItems": 256
+                "maxItems": 256,
+                "minItems": 1
               }
             },
             "required": [
@@ -1489,7 +1563,8 @@
                   "pattern": "^[a-z][a-z0-9-]*$"
                 },
                 "uniqueItems": true,
-                "maxItems": 256
+                "maxItems": 256,
+                "minItems": 1
               }
             },
             "required": [
@@ -1554,7 +1629,8 @@
             "pattern": "^[a-z][a-z0-9-]*$"
           },
           "uniqueItems": true,
-          "maxItems": 256
+          "maxItems": 256,
+          "minItems": 1
         },
         "evidence_ids": {
           "type": "array",
@@ -1563,13 +1639,91 @@
             "pattern": "^[a-z][a-z0-9-]*$"
           },
           "uniqueItems": true,
+          "maxItems": 256,
+          "minItems": 1
+        },
+        "claim_bindings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "claim_id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "status": {
+                "enum": [
+                  "verified",
+                  "inferred",
+                  "documentation_only"
+                ]
+              },
+              "evidence_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]*$"
+                },
+                "uniqueItems": true,
+                "maxItems": 256,
+                "minItems": 1
+              }
+            },
+            "required": [
+              "claim_id",
+              "status",
+              "evidence_ids"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1,
           "maxItems": 256
         }
       },
       "required": [
         "scene_id",
         "claim_ids",
-        "evidence_ids"
+        "evidence_ids",
+        "claim_bindings"
+      ],
+      "additionalProperties": false
+    },
+    "assembly": {
+      "type": "object",
+      "properties": {
+        "plan_version": {
+          "const": "topic-pairs-v1"
+        },
+        "chunk_digests": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "properties": {
+              "chunk_id": {
+                "enum": [
+                  "purpose_stack",
+                  "architecture_flow",
+                  "code_summary"
+                ]
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "chunk_id",
+              "sha256"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "plan_version",
+        "chunk_digests"
       ],
       "additionalProperties": false
     }

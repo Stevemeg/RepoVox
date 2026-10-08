@@ -54,15 +54,76 @@
   },
   "research": {
     "training_gpu_hours": 96,
-    "evaluation_gpu_hours": 16,
+    "evaluation_gpu_hours": 24,
     "gpu_hourly": 1.59,
-    "dataset_cpu_hours": 40,
     "dataset_cpu_hourly": 0.08,
-    "annotation_hours": 80,
-    "annotation_hourly": 20,
-    "dataset_gib": 100,
     "checkpoint_gib": 100,
-    "repeat_every_months": 3
+    "repeat_every_months": 3,
+    "selected_training_examples": 100,
+    "training_example_scenarios": [
+      100,
+      500,
+      1000
+    ],
+    "annotator_hourly": 20,
+    "independent_reviewer_hourly": 30,
+    "dataset": {
+      "examples_per_family": 10,
+      "annotation_minutes": 20,
+      "source_verification_minutes": 15,
+      "provenance_minutes": 5,
+      "family_rights_minutes": 45,
+      "independent_review_minutes": 10,
+      "review_fraction": 0.1,
+      "minimum_reviewed_examples": 100,
+      "preparation_setup_hours": 8,
+      "cpu_setup_hours": 2,
+      "cpu_hours_per_example": 0.04,
+      "storage_gib_per_example": 0.02,
+      "storage_gib_per_family": 0.25,
+      "manifest_gib": 0.05
+    },
+    "evaluation_corpus": {
+      "development_families": 20,
+      "heldout_families": 60,
+      "hidden_families": 10,
+      "adversarial_variants": 100,
+      "family_annotation_minutes": 90,
+      "family_source_verification_minutes": 90,
+      "family_independent_review_minutes": 60,
+      "family_rights_minutes": 30,
+      "family_preparation_minutes": 20,
+      "variant_annotation_minutes": 10,
+      "variant_source_verification_minutes": 10,
+      "variant_independent_review_minutes": 10,
+      "variant_preparation_minutes": 5,
+      "hidden_creation_minutes": 60,
+      "preparation_setup_hours": 12,
+      "cpu_setup_hours": 2,
+      "cpu_hours_per_family": 0.5,
+      "cpu_hours_per_variant": 0.05,
+      "storage_gib_per_family": 0.25,
+      "storage_gib_per_variant": 0.01,
+      "manifest_gib": 0.05,
+      "scored_models_per_cycle": 2,
+      "scoring_minutes_per_family_per_model": 20,
+      "scoring_minutes_per_variant_per_model": 5
+    },
+    "annotation_sensitivities": [
+      {
+        "name": "fast hypothesis",
+        "annotation_minutes": 10
+      },
+      {
+        "name": "base hypothesis",
+        "annotation_minutes": 20
+      },
+      {
+        "name": "slow hypothesis",
+        "annotation_minutes": 40
+      }
+    ],
+    "labor_status": "Unmeasured effort/rate hypotheses, imputed labor not contracted cash; evaluation corpus prepared before baseline and separately from training."
   },
   "break_even_utilizations": [
     0.25,

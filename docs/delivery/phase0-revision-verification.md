@@ -1,5 +1,7 @@
 # Phase 0 self-hosted revision verification
 
+Historical execution record for the earlier self-hosted revision. Contracts, sequencing and research allowances are superseded by [targeted remediation](phase0-remediation-verification.md); original check counts remain historical.
+
 Revision against `ba9ec7ef000378c325ebb367250331a59874aad5`, 2026-10-08. **Phase 0 remains unapproved. READY FOR INDEPENDENT RE-REVIEW means documentation handoff, not approval or production readiness.** Existing [PR #1](https://github.com/Stevemeg/RepoVox/pull/1), branch `phase0/foundation`, base `main`. New submission SHA is reported in the PR/final completion report; this document does not claim to know its own enclosing commit hash.
 
 ## Executed evidence and limits
