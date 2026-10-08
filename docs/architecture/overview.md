@@ -1,76 +1,80 @@
 # SaaS architecture
 
-Proposed, 2026-10-08. [PRD](../product/prd.md) · [Pipeline](pipeline.md) · [Persistence](data-model.md) · [Deployment](../operations/deployment.md) · [ADRs](../adr/README.md)
+Revised Phase 0 proposal, 2026-10-08; unapproved and unimplemented. [PRD](../product/prd.md) | [Pipeline](pipeline.md) | [Persistence](data-model.md) | [Deployment](../operations/deployment.md) | [Impact audit](../ai/change-impact.md) | [ADRs](../adr/README.md)
 
 ## Selected shape
 
-One modular FastAPI backend owns authorization, projects, jobs, artifact access and usage. Next.js is the developer UI and same-origin session/BFF boundary. Python analysis and trusted TypeScript rendering use separately sized worker tasks. These are process roles of one product, not independent microservices. Dispatcher/reconciler shares backend code. PostgreSQL is authoritative; Redis/Celery only delivers notifications. No Kubernetes, service mesh, vector/graph database or event bus initially.
+One modular FastAPI backend owns authorization, projects, jobs, artifact access and usage. Next.js remains the developer UI/session BFF; PostgreSQL durable truth and Redis/Celery notifications, CPU analysis, trusted Remotion/FFmpeg and signed metered API media delivery remain. No Kubernetes or unnecessary microservices.
 
-Proposed hosting: AWS ECS Fargate, RDS PostgreSQL, ElastiCache Redis OSS-compatible managed service, Cognito and private S3. Network/task-role isolation motivates the choice over Render; see [hosting comparison](../operations/deployment.md#hosting-comparison). No resources are provisioned.
+**Self-hosted inference is the primary production strategy.** RepoVox Director is a private GPU serving boundary consuming verified PKM/evidence and returning schema-constrained data; separate CPU self-hosted TTS creates audio. Normal generation requires no paid third-party LLM/TTS API. External AI experiments need explicit owner approval, permitted data/terms and a separate budget, never silent fallback.
+
+CPU frontend/API/ingestion/render/TTS on ECS Fargate; Director on GPU-capable EC2 registered with ECS, **not GPU Fargate**. Training/evaluation account/workloads independent of inference/customer data; only approved hashed releases cross the registry boundary. A provisional unchanged base is not custom-trained. [Director](../ai/director-architecture.md), [selection](../ai/model-selection.md), [training](../ai/training-strategy.md), [evaluation](../ai/evaluation-plan.md) and [speech](../ai/speech-strategy.md) define promotion gates.
 
 ## Architecture diagram
 
-Browser cannot access DB/queue/workers. Acquisition/provider connections cross restricted egress; storage access has role and tenant boundaries.
+Training receives only licensed curated data, never production prompts. The gateway is private/authenticated; inference/TTS runtime has no internet egress. Video delivery is a role inside API, not a new independent service.
 
 ```mermaid
 flowchart TB
-  B[Developer browser]
-  IDP[Managed authentication Cognito]
-  subgraph External[External acquisition and AI services]
-    GH[GitHub fixed acquisition endpoints]
-    AI[LLM and TTS providers]
+  B[Developer browser] -->|HTTPS| FE[Next.js frontend and session BFF]
+  FE <-->|OIDC PKCE| IDP[Managed auth Cognito]
+  FE -->|validated access token| API[FastAPI API and metered delivery]
+  subgraph P[Private production network]
+    DB[(PostgreSQL durable state)] -->|outbox| D[Dispatcher and reconciler]
+    D -->|stage IDs| Q[(Redis notifications)]
+    subgraph W[Isolated worker roles]
+      A[CPU ingestion and static evidence verifier]
+      O[CPU Director orchestration and validation]
+      T[CPU self hosted TTS]
+      R[CPU trusted Remotion and FFmpeg]
+      G[Authenticated Director gateway]
+      L[GPU EC2 ECS vLLM Director]
+      A -->|locked PKM and evidence| O
+      O -->|approved narration| T
+      T -->|measured audio and safe scenes| R
+      O -->|scoped grant| G
+      G -->|bounded request| L
+      L -->|untrusted response| G
+      G -->|response for validation| O
+    end
+    Q -->|leased stage dispatch| W
+    W -->|leases usage fenced output pointers| DB
+    W <-->|private versioned artifacts| S[(Private artifact S3)]
+    M[(Private approved model registry)] -->|hashed weights| L
+    M -->|speech weights| T
   end
-  subgraph Web[HTTPS application boundary]
-    FE[Next.js frontend and session BFF]
-    API[FastAPI modular API]
-  end
-  subgraph Private[Private application network]
-    DB[(PostgreSQL durable state)]
-    D[Dispatcher and reconciler]
-    Q[(Redis delivery queue)]
-    A[Python analysis workers]
-    R[Remotion and FFmpeg render workers]
-    E[Restricted egress proxy]
-  end
-  O[(Private S3 artifact storage)]
-  V[Signed metered video delivery in API]
-  B -->|HTTPS UI and status polling| FE
-  FE <-->|OIDC authorization code with PKCE| IDP
-  FE -->|validated access token| API
-  API -->|JWKS token validation| IDP
   API -->|owner scoped transactions| DB
-  DB -->|outbox and due stages| D
-  D -->|stage IDs only| Q
-  Q -->|at least once notification| A
-  Q -->|at least once notification| R
-  A -->|leases artifacts and costs| DB
-  R -->|leases artifact publication| DB
-  A -->|acquisition or sanitized AI payload| E
-  E --> GH
-  E --> AI
-  A -->|immutable intermediate objects| O
-  R -->|trusted template media outputs| O
-  O --> V
-  API -->|authorized short lived URL| B
-  B -->|range requests playback download| V
+  A -->|restricted GitHub proxy pinned SHA| GH[Fixed GitHub acquisition endpoints]
+  S -->|authorized origin reads| API
+  API -->|signed grant metered range stream| B
 ```
+
+Worker-to-worker arrows show persisted artifact dependencies, not synchronous combined execution: each stage uses its own lease/role and private object/checksum pointer. Gateway reads authorization/fences and persists model operation state through restricted PostgreSQL procedures; engine has no direct database/customer-bucket access. Inference and TTS have no internet egress. CPU services run on Fargate; GPU service uses EC2, not Fargate.
+
+```mermaid
+flowchart LR
+  DATA[Private licensed curated dataset] --> TRAIN[Isolated research GPU baseline and PEFT]
+  TRAIN --> GATE[Independent evaluation and owner release gate]
+  GATE -->|signed approved manifest only| M[Private production model registry]
+```
+
+Research/training has separate account/IAM/storage; no production customer prompts or customer-prefix access. The release gate alone publishes reviewed model assets. This is a proposal, not deployed infrastructure.
 
 ## Technology decisions and alternatives
 
 | Area | Selection | Trade-off / alternative |
 | --- | --- | --- |
-| Frontend | Next.js/TypeScript session BFF; 5-second polling | Typed UI/render ecosystem, extra server surface vs Vite SPA; server session avoids browser token persistence. No long render handlers. |
-| API | FastAPI/Pydantic/OpenAPI modular backend | Python analysis alignment, two languages. Next.js-only reduces runtimes but complicates parsing integration. Never import repository modules. |
-| Database | PostgreSQL + small JSONB manifests; S3 large immutable bodies | Transactional quota/leases/outbox/ownership, migrations required. SQLite weak distributed concurrency; document DB less natural relational owner constraints. |
-| Queue | Celery/managed Redis, analysis/render routes | Mature Python tasks; trusted wrapper invokes Node rendering. Redis alone not durable workflow state. Temporal offers workflow features at greater initial operations complexity. |
-| Parsing | Python + pinned Tree-sitter Python/JS/TS/TSX grammars | Syntax/import edges without execution; cannot prove dynamic calls. Regex too weak; language servers can invoke plugins/install. |
-| LLM | Bounded structured provider adapter | Claude Haiku 4.5 cost candidate; exact production model requires quality/terms evaluation. Local models add compute; stronger models increase cost. No automatic escalation. |
-| TTS | Provider adapter; Polly Neural cost candidate | Per-character budgeting/timing; pronunciation needs evaluation. Local TTS adds hardware/quality work, premium voices raise cost. |
-| Video | Trusted Remotion templates + FFmpeg/probe | Typed scenes, motion/layout; Chromium memory/sandbox and license obligations. FFmpeg-only slides simpler/less expressive. Never accept generated JSX/JS. |
-| Artifacts | S3-compatible contract, AWS S3 private origin; signed metered API delivery | Ranged proxy adds API bandwidth, but enforces byte quota/revocation; direct presigned S3 links permit repeated download until expiry. CloudFront/CDN deferred pending metering design; alternate S3 vendors add vendor/egress trade-offs. |
-| Auth | Cognito OIDC; secure server session, API token validation | No passwords maintained. Auth0/Clerk turnkey UX at vendor cost; self-hosted auth raises burden. No GitHub repo OAuth permissions. |
+| Frontend/API | Next.js/TypeScript session BFF + FastAPI/Pydantic modular API | Two languages but Python analysis alignment and typed render UI; SPA/Next-only simpler runtime but extra session/parser integration. |
+| Durable data/queue | PostgreSQL RLS/FKs/outbox/leases + Redis/Celery delivery | Preserve idempotency/history under redelivery/loss; Temporal adds operations burden. No workflow truth in Redis. |
+| Analysis | Bounded Python Tree-sitter grammars and safe manifest readers | Static facts and qualified inference; regex too weak, project language servers risk execution. Never install or execute repository code. |
+| Director | Provisional Qwen2.5-Coder-14B unchanged baseline, private vLLM, reviewed quantization; RepoVox adapter only after evaluation | Open-weight licensing/VRAM/idle costs; SGLang/llama.cpp and ranked models evaluated under same gates. Paid AI comparator is not production dependency. |
+| TTS | CPU self-hosted Kokoro-82M candidate; Piper alternative | Voice/license/safe-format/CPU timing audit required. No paid API required. |
+| Render | Trusted Remotion templates + FFmpeg/probe, data only | Chromium memory/sandbox/license gates; generated executable JSX/commands forbidden; FFmpeg-only slides alternative less expressive. |
+| Objects/delivery | S3-compatible storage, private AWS S3; signed metered FastAPI stream | Adds API bandwidth to enforce replay byte quotas; direct S3 links lack hard transfer quota. CDN deferred. |
+| Auth | Cognito OIDC, server session and API validation | Avoids app-managed passwords and aligns AWS identity controls, with OIDC/UI integration work; Auth0/Clerk simplify SDK/UI but change pricing/vendor dependency, self-host identity adds security/on-call burden. |
+| Hosting | Fargate CPU + ECS GPU EC2; isolated training | GPU fleet/driver/idle overhead; GPU container provider and lower-cost private GPU VM compared in deployment. Fargate does not supply GPU acceleration. |
 
-Preferred technologies retained. Render uses bounded on-demand Fargate tasks instead of always-running render service; dispatcher controls starts and workers process eligible Redis notifications. CDN/WebSockets deferred. [ADR index](../adr/README.md) records reversal triggers.
+[ADR index](../adr/README.md) records reversal triggers. Managed infrastructure/vendor costs are allowed; third-party paid AI inference is exceptional owner-approved evaluation only. Nothing provisioned.
 
 ## API boundary (design only)
 

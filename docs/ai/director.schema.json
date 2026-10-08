@@ -1,0 +1,763 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RepoVox Director boundary contracts v2",
+  "description": "Validation plus independent evidence/ownership checks required. Director cannot assign verification status.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/input"
+    },
+    {
+      "$ref": "#/$defs/output"
+    }
+  ],
+  "$defs": {
+    "knowledge": {
+      "type": "object",
+      "properties": {
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stack": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "maxItems": 10000
+        },
+        "modules": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "maxItems": 10000
+        },
+        "entrypoint_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "maxItems": 10000
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "source": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "target": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "claim_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]*$"
+                },
+                "maxItems": 10000
+              }
+            },
+            "required": [
+              "source",
+              "target",
+              "claim_ids"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 10000
+        },
+        "claims": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1
+              },
+              "status": {
+                "enum": [
+                  "verified",
+                  "inferred",
+                  "documentation_only",
+                  "unsupported"
+                ]
+              },
+              "evidence_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]*$"
+                },
+                "maxItems": 10000
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "id",
+              "text",
+              "status",
+              "evidence_ids",
+              "reason"
+            ],
+            "additionalProperties": false,
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "enum": [
+                        "verified",
+                        "inferred",
+                        "documentation_only"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "evidence_ids": {
+                      "minItems": 1
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "maxItems": 10000
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "maxItems": 10000
+        }
+      },
+      "required": [
+        "scope",
+        "stack",
+        "modules",
+        "entrypoint_ids",
+        "edges",
+        "claims",
+        "limitations"
+      ],
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "start_line": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "end_line": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "file_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "commit_sha": {
+                "type": "string",
+                "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+              },
+              "kind": {
+                "enum": [
+                  "source",
+                  "manifest",
+                  "documentation"
+                ]
+              },
+              "rule": {
+                "type": "string",
+                "minLength": 1
+              },
+              "redacted": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "path",
+              "start_line",
+              "end_line",
+              "file_sha256",
+              "commit_sha",
+              "kind",
+              "rule",
+              "redacted"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 10000
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "verification": {
+      "type": "object",
+      "properties": {
+        "verifier_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verdicts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "claim_id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "status": {
+                "enum": [
+                  "verified",
+                  "inferred",
+                  "documentation_only",
+                  "unsupported"
+                ]
+              },
+              "evidence_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]*$"
+                },
+                "maxItems": 10000
+              },
+              "rule": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "claim_id",
+              "status",
+              "evidence_ids",
+              "rule",
+              "reason"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 10000
+        }
+      },
+      "required": [
+        "verifier_version",
+        "verdicts"
+      ],
+      "additionalProperties": false
+    },
+    "storyboard": {
+      "type": "object",
+      "properties": {
+        "scenes": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 24,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "topic": {
+                "enum": [
+                  "purpose",
+                  "stack",
+                  "architecture",
+                  "flow",
+                  "code",
+                  "summary"
+                ]
+              },
+              "type": {
+                "enum": [
+                  "title",
+                  "stack",
+                  "architecture",
+                  "flow",
+                  "code",
+                  "summary"
+                ]
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "target_seconds": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "claim_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]*$"
+                },
+                "maxItems": 10000
+              },
+              "evidence_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]*$"
+                },
+                "maxItems": 10000
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 400
+                  }
+                },
+                "required": [
+                  "label"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "topic",
+              "type",
+              "title",
+              "target_seconds",
+              "claim_ids",
+              "evidence_ids",
+              "data"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "scenes"
+      ],
+      "additionalProperties": false
+    },
+    "narration": {
+      "type": "object",
+      "properties": {
+        "sentences": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "scene_id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 800
+              },
+              "technical": {
+                "type": "boolean"
+              },
+              "claim_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]*$"
+                },
+                "maxItems": 10000
+              },
+              "uncertainty": {
+                "enum": [
+                  "verified",
+                  "inferred",
+                  "documentation_only",
+                  "unsupported"
+                ]
+              }
+            },
+            "required": [
+              "scene_id",
+              "text",
+              "technical",
+              "claim_ids",
+              "uncertainty"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 100
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "sentences"
+      ],
+      "additionalProperties": false
+    },
+    "visual": {
+      "type": "object",
+      "properties": {
+        "scene_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "type": {
+          "enum": [
+            "architecture_graph",
+            "flow_graph",
+            "code_focus",
+            "section_card"
+          ]
+        },
+        "layout": {
+          "enum": [
+            "left_to_right",
+            "top_to_bottom",
+            "centered"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400
+        },
+        "claim_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "uniqueItems": true,
+          "maxItems": 256
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "uniqueItems": true,
+          "maxItems": 256
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "claim_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]*$"
+                },
+                "uniqueItems": true,
+                "maxItems": 256
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "claim_ids"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 12
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "source": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "target": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "label": {
+                "type": "string",
+                "maxLength": 160
+              },
+              "claim_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]*$"
+                },
+                "uniqueItems": true,
+                "maxItems": 256
+              }
+            },
+            "required": [
+              "source",
+              "target",
+              "label",
+              "claim_ids"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 24
+        }
+      },
+      "required": [
+        "scene_id",
+        "type",
+        "layout",
+        "label",
+        "claim_ids",
+        "evidence_ids",
+        "nodes",
+        "edges"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "section_card",
+                  "code_focus"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "nodes": {
+                "maxItems": 0
+              },
+              "edges": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "input": {
+      "type": "object",
+      "properties": {
+        "contract_version": {
+          "const": "2.0"
+        },
+        "owner_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "snapshot_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "commit_sha": {
+          "type": "string",
+          "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+        },
+        "knowledge": {
+          "$ref": "#/$defs/knowledge"
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidence"
+        },
+        "verification": {
+          "$ref": "#/$defs/verification"
+        },
+        "allowed_claim_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "uniqueItems": true,
+          "maxItems": 256
+        },
+        "selected_evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "uniqueItems": true,
+          "maxItems": 256
+        },
+        "omitted_claim_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "uniqueItems": true,
+          "maxItems": 256
+        },
+        "request_limits": {
+          "type": "object",
+          "properties": {
+            "prompt_tokens_max": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12288
+            },
+            "output_tokens_max": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4096
+            },
+            "context_tokens_max": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16384
+            }
+          },
+          "required": [
+            "prompt_tokens_max",
+            "output_tokens_max",
+            "context_tokens_max"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "contract_version",
+        "owner_id",
+        "snapshot_id",
+        "commit_sha",
+        "knowledge",
+        "evidence",
+        "verification",
+        "allowed_claim_ids",
+        "selected_evidence_ids",
+        "omitted_claim_ids",
+        "request_limits"
+      ],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "contract_version": {
+          "const": "2.0"
+        },
+        "storyboard": {
+          "$ref": "#/$defs/storyboard"
+        },
+        "narration": {
+          "$ref": "#/$defs/narration"
+        },
+        "visual_instructions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/visual"
+          },
+          "minItems": 6,
+          "maxItems": 24
+        },
+        "citation_mappings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "scene_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "claim_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]*$"
+                },
+                "uniqueItems": true,
+                "maxItems": 256
+              },
+              "evidence_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]*$"
+                },
+                "uniqueItems": true,
+                "maxItems": 256
+              }
+            },
+            "required": [
+              "scene_id",
+              "claim_ids",
+              "evidence_ids"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 6,
+          "maxItems": 24
+        }
+      },
+      "required": [
+        "contract_version",
+        "storyboard",
+        "narration",
+        "visual_instructions",
+        "citation_mappings"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

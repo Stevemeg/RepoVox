@@ -13,9 +13,12 @@ Bring source code to life visually.
 5. [Security threat model](docs/security/threat-model.md)
 6. [Deployment](docs/operations/deployment.md), [reliability](docs/operations/reliability.md) and [cost model](docs/operations/cost-model.md)
 7. [Roadmap and requirements traceability](docs/delivery/roadmap.md)
-8. [ADRs](docs/adr/README.md) and [verification record](docs/delivery/phase0-verification.md)
+8. [RepoVox Director](docs/ai/director-architecture.md), [model selection](docs/ai/model-selection.md), [training](docs/ai/training-strategy.md), [evaluation](docs/ai/evaluation-plan.md), [self-hosted speech](docs/ai/speech-strategy.md) and [change impact](docs/ai/change-impact.md)
+9. [ADRs](docs/adr/README.md) and [revision verification](docs/delivery/phase0-revision-verification.md) ([historical record](docs/delivery/phase0-verification.md))
 
 V1: public GitHub URL; Python, JavaScript and TypeScript; asynchronous generation; 3–5 minute 1280×720 narrated MP4; dashboard, progress, playback, download and history; claims tied to source files and the exact commit. Private repositories, arbitrary documents, avatars, teams, custom editing and advanced billing are deferred.
+
+Self-hosted RepoVox Director and speech are the primary production strategy. Normal videos require no paid third-party LLM/TTS API; external AI evaluation needs explicit owner approval. No model has been trained/evaluated locally. [Revision verification](docs/delivery/phase0-revision-verification.md) distinguishes design checks from future GPU/training results.
 
 ## Documentation checks
 
@@ -25,6 +28,7 @@ Python 3.11+ and Node.js LTS are used for planning tooling only:
 python -m pip install -r tools/requirements-docs.txt
 python tools/check_docs.py
 python tools/cost_model.py --check
+python -m unittest discover -s tools -p "test_*.py" -v
 $diagramConfig = Join-Path $env:TEMP 'repovox-puppeteer.json'
 # Use an installed browser; adjust this path if needed. Config and outputs stay outside Git.
 @{ executablePath = 'C:\Program Files\Google\Chrome\Application\chrome.exe' } | ConvertTo-Json | Set-Content -LiteralPath $diagramConfig -Encoding ascii

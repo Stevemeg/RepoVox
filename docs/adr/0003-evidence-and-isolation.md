@@ -4,7 +4,7 @@ Status: proposed · Date: 2026-10-08
 
 Context: repository content is adversarial; docs/static graphs can mislead.
 
-Decision: bounded GitHub archive pinned to SHA, safe regular-file inspection without checkout/install, Tree-sitter parsing and evidence-linked claims. Label inference; deny executable model output and repository assets. Acquisition/parsing/provider/render task profiles have separate permissions.
+Decision: bounded GitHub archive pinned to SHA, safe regular-file inspection without checkout/install, Tree-sitter parsing and evidence-linked claims. Director cannot assign verified status; source-verification ledger owns it. Label inference; deny executable model output and repository assets. Acquisition/parsing/Director/TTS/render/research task profiles have separate permissions.
 
 Alternatives: running repositories enriches traces but violates policy/expands risk; README-only is unreliable; regex lacks structure; language servers may run project plugins. Static analysis provides auditability with explicit runtime uncertainty.
 

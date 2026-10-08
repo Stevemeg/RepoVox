@@ -1,3 +1,5 @@
+> HISTORICAL verification for original Phase 0 at `ba9ec7ef000378c325ebb367250331a59874aad5`. Its provider choices, API economics and completion status are superseded by the self-hosted revision. Original executed-check evidence below is retained; it does not validate this revision. See [revision verification](phase0-revision-verification.md).
+
 # Phase 0 verification record
 
 Phase 0 only, 2026-10-08. Review evidence; independent validation has not passed yet. [Roadmap](roadmap.md) · [Checks](../../README.md#documentation-checks) · [Sole-contributor policy](../../AGENTS.md)

@@ -1,83 +1,76 @@
-# Cost model and quota policy
+# Self-hosted production and research cost model
 
-Planning estimate as of **2026-10-08**, USD before taxes. No paid account/API call/purchase initiated. [Inputs](cost-inputs.json) · [Calculator](../../tools/cost_model.py) · [Deployment](deployment.md) · [PRD](../product/prd.md)
+Planning revision, 2026-10-08. USD, 730-hour month, no tax/discount/credits. This replaces the previous API-centric approximately $0.24 marginal estimate; that number is historical and is not the revised product cost. No GPU was benchmarked, rented or provisioned. [Inputs](cost-inputs.json) and [offline calculator](../../tools/cost_model.py) are authoritative arithmetic; workload and unquoted prices are estimates. [Deployment](deployment.md) | [Training](../ai/training-strategy.md)
 
-## Price evidence versus estimates
+## Prices and assumptions
 
-| Component | Rate used | Evidence/status |
-| --- | --- | --- |
-| LLM cost candidate Claude Haiku 4.5 | $1/M input tokens, $5/M output tokens | Verified on [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing), accessed 2026-10-08. Base uncached rates, no batch/cache discounts assumed. Model availability/quality must be rechecked at integration. |
-| TTS cost candidate Polly Neural | $16/M billed characters | Verified on [Polly pricing](https://aws.amazon.com/polly/pricing/), accessed 2026-10-08. Speech marks separately billed; base model does **not** request speech marks. Timing from measured per-scene audio; caption precision evaluated later. |
-| Fargate Linux/x86 us-east-1 | $0.000011244/vCPU-second; $0.000001235/GiB-second | Verified from regional worked example on [Fargate pricing](https://aws.amazon.com/fargate/pricing/), accessed 2026-10-08. 20 GiB included ephemeral storage, minimum billing and image-pull duration apply. Not a contractual quote or benchmark. |
-| S3 Standard | $0.023/GiB-month; $0.005/1k PUT, $0.0004/1k GET | **Regional planning assumptions**, not verified current rates: [S3 pricing](https://aws.amazon.com/s3/pricing/) inspected 2026-10-08 but regional dynamic tables were not exposed. Recheck official calculator before launch. |
-| Internet delivery | $0.09/GiB | **Estimate**, not verified current price: [AWS EC2 transfer pricing](https://aws.amazon.com/ec2/pricing/on-demand/) is the API-host egress reference; region/geography/tier recheck required. No free transfer credit assumed. Private same-region S3→API origin transfer assumed no incremental egress; verify. |
-| Remotion automation | $0.01/render, $100/month minimum if company license applies | Verified on [Remotion pricing](https://www.remotion.dev/docs/license/pricing), accessed 2026-10-08. Free license eligibility may apply to ≤3-person organizations under terms. Conservatively reserve paid minimum in all scenarios; owner must verify organization/licensing, not assume “open-source means free”. No purchase now. |
-| RDS/Redis/network/auth/backup/monitoring | Fixed allowances below | **Estimates**, not current provider quotes. References: [RDS](https://aws.amazon.com/rds/postgresql/pricing/), [ElastiCache](https://aws.amazon.com/elasticache/pricing/), [VPC](https://aws.amazon.com/vpc/pricing/), [ALB](https://aws.amazon.com/elasticloadbalancing/pricing/), [Cognito](https://aws.amazon.com/cognito/pricing/). Detailed SKU calculator quote required before provisioning. |
+| Input | Value and evidence/status as of 2026-10-08 |
+| --- | --- |
+| AWS g6.2xlarge/L4 GPU host | **$1.20/hour unverified planning allowance**, including host CPU/RAM; obtain regional on-demand quote before provisioning. [G6 hardware](https://aws.amazon.com/ec2/instance-types/g6/) and [ECS GPU support](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-gpu.html) establish capability, not this price. |
+| Dedicated GPU alternative | Runpod Secure Cloud L4 **$0.49/hour published list**, A40 also $0.49, A100 80GB $1.59; L4 serverless $0.69/hour shown. [Official price page](https://www.runpod.io/pricing), accessed 2026-10-08. Availability, disks, private networking and terms require a quote; not purchased. |
+| CPU tasks | Fargate Linux/x86 us-east-1 reference $0.000011244/vCPU-second + $0.000001235/GiB-second; [official pricing](https://aws.amazon.com/fargate/pricing/). Region is provisional. Task launch minimums included conservatively in workload seconds. |
+| Storage/requests | S3 Standard reference $0.023/GiB-month, PUT $0.005/1k, GET $0.0004/1k from [S3 pricing](https://aws.amazon.com/s3/pricing/); planning approximation uses GiB consistently though billing unit conversion must be quoted. Disk $0.08/GiB-month and outbound $0.09/GiB are unverified allowances; no free tier assumed. |
+| License reserve | Remotion $100/month minimum or $0.01/render, [license pricing](https://www.remotion.dev/docs/license/pricing), reserve despite possible solo eligibility; exact eligibility must be reviewed. FFmpeg build obligations separately reviewed. |
+| API economic reference ONLY | Claude Haiku 4.5 $1/M input, $5/M output [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing); Polly Neural $16/M characters [Polly pricing](https://aws.amazon.com/polly/pricing/). Not selected production dependencies, no external calls authorized. Tokenization/quality differences mean not an equivalent-quality benchmark. |
+| Fixed SaaS | DB/Redis/network/observability/auth/backups and staging CPU are scenario allowances in JSON, **not verified vendor quotes**. Network allowance includes ALB/NAT/endpoints/internal transfers; avoid double counting video egress, priced separately. |
 
-Price references are separate from assumed utilization. Provider billed usage is measured later; illustrative numbers cannot establish profitability or production performance.
+Normal four-minute, 720p video: 60,000 aggregate input and 6,000 output tokens across at most six calls; prefill 1,000 tokens/s, decode 30 tokens/s **unmeasured aggregate GPU rates**, not per-request rates multiplied by concurrency. One active sequence/GPU. Overhead 20s/video; 1.1 attempt multiplier covers expected failures/repair across compute and reference APIs, not a guaranteed failure distribution. Hard budgets are higher than typical workloads.
 
-## Workload and formulas
+CPU Director orchestration 320 task-seconds at 1 vCPU/2 GiB (including inference wait; only launch after GPU slot reserved). Static analysis 600 task-seconds at 1 vCPU/2 GiB, CPU TTS 120s at 2/4 (3,500 chars, ~240s audio, CPU speed unmeasured), render+encode 720s at 4/8. Temporary source 0.25 GiB for one day; final video 0.09 GiB plus 0.035 GiB intermediates retained 30 days. Three full-delivery equivalents/video, 50 PUT and 500 GET. Request costs include bounded range reads, not unlimited replay. Model object allowance 60 GiB includes pinned base/quantized/adapter/TTS manifests; 80 GiB disk per GPU. Store actual file sizes after packaging; double-size rollback capacity needs quote.
 
-Base successful video: four minutes (~560 words, 3,500 characters), 720p H.264/AAC ~90 MiB (**0.09 GiB rounded**), three full-video delivery equivalents across playback/download/range requests. Source temporary storage 0.25 GiB for one day; intermediates/audio 0.035 GiB for 30 days; final video 30 days. Steady monthly volume/30-day retention, not indefinite history media storage. Source caps 250 MiB, output cap 150 MiB differ from average assumptions.
+## Reproducible formulas
 
-Aggregate across inference/verification/storyboard/narration: 60k input + 6k output tokens, including repeated context per call. No token estimate deduced from repository byte size alone. Stage estimate split: inference 30k/2k, verification 15k/1k, storyboard 8k/1.5k, narration 7k/1.5k. Actual provider tokenizer must enforce 120k/12k ceilings. Average analysis/acquisition/AI-wait task time **600 seconds at 1 vCPU/2 GiB**, render+encode **720 seconds at 4 vCPU/8 GiB**, including cold starts/image pulls. These are assumptions to benchmark, not observed speed. 10% extra charged work factor covers failed attempts/repair on LLM/TTS/worker compute; does not assert failures cost only 10% in practice.
+`h = (input_tokens / prefill_rate + output_tokens / decode_rate + overhead_seconds) * attempt_multiplier / 3600 = 0.08555556 GPU-hours/video` (308 GPU-seconds). Base, slow (500/15), fast (2000/60) rates yield 0.085556, 0.165000, 0.045833 h respectively. These are hypotheses; no throughput result is claimed.
 
-For monthly completed videos `N`, attempt factor `a=1.1`, source `Rs`, retained media `V`, intermediates `I`, storage rate `ps`, delivery count `d`, egress rate `pe`:
+`L = load_seconds * reloads_per_GPU_month / 3600 = 0.666667 h/GPU` (four 600s loads). `replicas = max(1, ceil(N*h / (730*target_utilization - L)))`, default utilization ceiling 50%. `warm_hours = replicas*730`, `busy=N*h`, `load=replicas*L`, `idle=warm-busy-load`. Pay **all** warm hours, not busy hours divided by concurrency. Warm capacity limits, queue bursts and cold loading still require load tests. Load costs are already inside warm cost, not added again. Staging adds 16 GPU-hours/month at the same rate; it must boot/load within those paid hours.
 
-```text
-LLM = (60000 * 1 + 6000 * 5) / 1000000 = $0.090000
-TTS = 3500 * 16 / 1000000 = $0.056000
-analysis = 600 * (1 * 0.000011244 + 2 * 0.000001235) = $0.0082284
-render = 720 * (4 * 0.000011244 + 8 * 0.000001235) = $0.03949632
-source_storage = 0.25 * (1/30) * 0.023 = $0.00019167
-persistent_storage = (0.09 + 0.035) * (30/30) * 0.023 = $0.002875
-delivery = 0.09 * 3 * 0.09 = $0.024300
-requests = (50 * 0.005 + 500 * 0.0004) / 1000 = $0.000450
-marginal = a * (LLM + TTS + analysis + render)
-           + source_storage + persistent_storage + delivery + requests
-         = $0.2409138587/video
-fixed_compute = 730 * 3600 * (allocated_vCPU * cpu_rate + allocated_GiB * memory_rate)
-license = max(100, N * a * 0.01)
-monthly_total = production_fixed + license + N * marginal + staging
-reserved_budget = monthly_total * 1.20
-fully_allocated_per_video = monthly_total / N
-```
+CPU unit cost: `seconds*(vCPU*CPU_rate + GiB*RAM_rate)`. Multiply expected attempts once. Non-GPU variable/video = CPU analysis+Director orchestration+TTS+render with attempts + temporary storage + retained artifacts + delivery + requests = **$0.08876168**. GPU busy allocation at $1.20/hour is $0.10266667/video; this excludes idle, models and fixed services and is **not** whole product unit cost.
 
-Worker compute is on-demand, separately counted per video; not counted twice as always-on infrastructure. API media route meters byte-range transfer, capped at three output-size equivalents/job by default; each stream reserves bytes before S3 fetch. Repeat/grant replay still counts. Reject extra delivery after cap; owner can grant extra only with new budget. API/control fixed compute allowances include signed streaming at assumed bandwidth, not dedicated delivery service; benchmark against burst limits before launch. 50 PUT and 500 GET/video includes artifacts/checks/ranges; temporary multipart uploads require cleanup. Network allowance includes proxy/NAT/endpoint data overhead; free tiers, discounts and credits ignored.
+`production_total = fixed_CPU_SaaS + warm_GPU + model_object_and_disks + N*non_GPU_variable + max(100, N*1.1*0.01) + staging`. Allocated/video is production_total/N. Reserve = production_total*1.20, not an incurred bill. CPU scenario slots keep average utilization below 50%; bursts are admission-controlled. A one-GPU floor remains expensive at low volume even with no jobs.
 
-## Monthly scenarios
+## Monthly production scenarios
 
-| Cost allowance | 100 videos | 1,000 videos | 10,000 videos |
-| --- | --- | --- | --- |
-| Frontend/API + dispatcher/proxy compute | $90.10 | $90.10 | $180.20 |
-| Managed PostgreSQL incl HA/storage | $120 | $160 | $300 |
-| Managed Redis primary/replica | $60 | $90 | $180 |
-| ALB/NAT/endpoints/proxy data/IP | $160 | $180 | $260 |
-| Logs/metrics/traces | $20 | $35 | $90 |
-| Auth/secrets/DNS | $15 | $30 | $80 |
-| Backup allowance | $20 | $30 | $60 |
-| Staging (separate allowance) | $100 | $100 | $150 |
+| Videos/month | GPU replicas | Warm GPU | Fixed SaaS | Models/disk | Other variable | License | Staging | Production total | Allocated/video | API reference |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 100 | 1 | $876.00 | $485.10 | $7.78 | $8.88 | $100.00 | $119.20 | $1,596.96 | $15.97 | $709.68 |
+| 1,000 | 1 | $876.00 | $615.10 | $7.78 | $88.76 | $100.00 | $119.20 | $1,806.84 | $1.81 | $1,060.84 |
+| 10,000 | 3 | $2,628.00 | $1,150.20 | $20.58 | $887.62 | $110.00 | $169.20 | $4,965.60 | $0.50 | $3,867.61 |
 
-Fixed SKU allowances are estimates and may be too low for regional HA/endpoints/traffic; before production require calculator quote. Staging allowance assumes reduced/scheduled capacity and mocks, not a second full production deployment. MAU assumptions 100/1,000/5,000 respectively; auth allowance must be replaced with selected Cognito tier pricing. 10k scenario doubles web/control resources and proposes eight analysis/eight render slots **only after** reviewed scaling approval. Launch remains two/two.
+These are modeled totals, not deployment evidence. Rounded table values come directly from the calculator. At 100/1,000/10,000 videos, total GPU busy/load/idle hours are respectively 8.556/0.667/720.778, 85.556/0.667/643.778 and 855.556/2.000/1,332.444. Actual busy+load utilization is 1.26%, 11.81%, 39.16%. Forecast reserves including 20% contingency: **$1,916.35 / $2,168.21 / $5,958.72**. Fixed SaaS grows with traffic and CPU slots; three GPUs at 10k are a planning scale scenario, not initial provisioned capacity.
 
-<!-- Reproduced by tools/cost_model.py; do not hand-edit values. -->
-| Videos/month | Production fixed | Remotion license | Variable | Staging | Total/month | With 20% reserve | Allocated/video | Reserved/video |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 100 | $485.10 | $100.00 | $24.09 | $100.00 | $709.19 | $851.03 | $7.09 | $8.51 |
-| 1,000 | $615.10 | $100.00 | $240.91 | $100.00 | $1,056.01 | $1,267.22 | $1.06 | $1.27 |
-| 10,000 | $1,150.20 | $110.00 | $2,409.14 | $150.00 | $3,819.34 | $4,583.21 | $0.38 | $0.46 |
+API comparison keeps common SaaS/render/storage/delivery/license/staging CPU, replaces GPU/models/staging GPU and CPU TTS with externally billed LLM/TTS. LLM reference/video $0.099 and TTS $0.0616 including attempts. It excludes research for both strategies. Self-hosting is a privacy/ownership/product strategy; there is no automatic requirement to be cheaper than an external API.
 
-Run `python tools/cost_model.py --check` to reproduce table; `--json` prints unrounded components/utilization. Average render capacity utilization: 1.5% / 15.1% / 37.7%; analysis 1.3% / 12.6% / 31.4%. These do not prove p95 latency under burst load. At 10k, launch two render slots would exceed average capacity (~151%); scale or admit fewer jobs. Keep target average utilization <50%, bounded queues and a benchmarked admission envelope. DB/Redis/storage rows increase by scenario, not a linear extrapolation of only tokens.
+## Research and specialization budget
 
-Sensitivity: doubling input/output tokens adds $0.099/video after retry factor; doubling render time adds $0.04345; moving 30→90-day media retention adds ~$0.00575; three→ten delivery equivalents adds ~$0.0567. At 100 videos/month fixed costs dominate. Omits human labor, payment processing (billing deferred), taxes, legal/support, extraordinary abuse and regional outages; these must enter commercial pricing. Illustrative 70% gross-margin price floor = allocated cost / 0.30: ~$23.64 / $3.52 / $1.27/video before omitted business costs. Marginal-only floor ~$0.80 would not cover low-volume fixed costs. No pricing or profitable business claim is approved.
+Separate from production: three 32-hour PEFT trials (96 GPU-hours) plus 16 evaluation GPU-hours on an A100 80GB planning rate $1.59/hour; dataset CPU 40h*$0.08; 80 annotation/review hours*$20/hour opportunity-cost allowance (no contracted labor). Initial cash estimate **$181.28**, labor allowance **$1,600**, combined **$1,781.28**. This is a small pilot, not training from scratch or a promise of a successful adapter. Baseline work is included in evaluation GPU-hours; expansion requires a new budget.
+
+Dataset 100 GiB + checkpoints 100 GiB cost $4.60/month. Repeating that research cycle quarterly yields `(181.28+1600)/3 + 4.60 = $598.36/month` including labor. Production+monthly research allocation at the three volumes: **$2,195.32 / $2,405.20 / $5,563.96**, before contingency. Research need not repeat quarterly; cadence is an illustrative sensitivity. Keep research cash, labor and storage separate in the ledger. Dataset rights/deletion and isolated training compute remain gates even if GPU time is cheap.
+
+## Break-even and utilization sensitivity
+
+Compare **Director LLM only**, with shared TTS/SaaS/render costs canceled: one warm GPU costs `730*hourly + 80*0.08 + 60*0.023`; reference LLM costs `N*0.099`. Integer crossover `ceil(one_GPU_fixed / 0.099)` must fit `floor((730*u - 0.666667)/h)`. This is a one-replica feasibility calculation; another GPU creates a price step and can remove the advantage. No universal linear crossover is asserted.
+
+| GPU hourly assumption | Target utilization ceiling | One-GPU capacity/month | Unconstrained crossover | Feasible before another GPU<= |
+| --- | --- | --- | --- | --- |
+| AWS allowance $1.20 | 25% | 2,125 | 8,928 | No |
+| AWS allowance $1.20 | 50% | 4,258 | 8,928 | No |
+| AWS allowance $1.20 | 80% | 6,818 | 8,928 | No |
+| Runpod list $0.49 | 25% | 2,125 | 3,692 | No |
+| Runpod list $0.49 | 50% | 4,258 | 3,692 | Yes, from 3,692 within one-GPU capacity |
+| Runpod list $0.49 | 80% | 6,818 | 3,692 | Yes, within one-GPU capacity |
+
+Throughput, quantization quality, adapter overhead, queue SLA and prompt selection can materially change capacity. Even 100% useful compute at baseline AWS rates costs ~$0.103/video versus $0.099 LLM reference before idle/storage. Faster throughput or lower hourly cost can change this. Serverless/scale-to-zero can reduce idle expense but adds repeated weight loads, minimum billing/storage, private-network constraints and cold-start delays; not assumed free or latency-compliant. More active sequences may improve aggregate rate or worsen VRAM/latency: measure before changing the input.
 
 ## Cost protection
 
-- Pilot allowlist; proposed 10 videos/month/user and two/day, one active/ten queued; two admissions/minute/user and IP ceiling ten/minute. Global pilot 100 completed videos/month unless owner raises capacity/budget. No unlimited trial or unauthenticated generation.
-- Proposed initial infrastructure+usage monthly budget **$1,000** (owner approval required), warning 80%, admission blocked at forecast/reservations 100%. 1k/10k scenarios require new approved monthly budget; not implicit permission to spend.
-- Reserve **$1 marginal/job** plus assigned fixed budget before admission under atomic ledger lock. Hard 120k/12k aggregate tokens and 6k TTS chars across attempts; reserve provider max output price before each send. Stage timeouts cap compute, and all attempts share absolute deadline. Unknown provider costs retain worst-case reservation; no automatic escalation/uncertain resubmit.
-- Meter streaming delivery: default total three output-size equivalents (≤450 MiB at cap), two simultaneous streams/owner, ≤8 MiB per range request, ≤50 MiB/minute/owner, global media bandwidth ceiling 100 MiB/minute at launch; full downloads chunked by gateway. Reserve response bytes before read, count pessimistically on dropped streams, revoke grants on deletion/logout. Signed URL replay cannot bypass aggregate reservations; DB unavailable means fail closed. Use token-bucket byte-rate enforcement, not request count alone.
-- Cache successful paid outputs by owner/SHA/input digest/provider/prompt version; never reuse across tenants or repeated changed HEAD. Fixed templates limit output/compute. Provider account caps are secondary controls, not durable ledger substitutes.
-- Reconcile actual billed tokens/chars/task time/storage/egress daily; account-level budget alert and paid-send kill switch. Daily max charged operations/job tracked, anomalies block. Before paid launch benchmark worst-case admitted workload fits $1 reservation; otherwise lower caps or raise owner-approved budget/price.
+Proposed pilot allowlist: global 100 admitted jobs/month, 10/user/month, one active and ten queued/user, one Director request/owner, eight pending engine requests, initial two analysis/TTS/render slots and one warm GPU. Atomic owner/month/job reservations in PostgreSQL, reject before work if unavailable. Admission rate <=5/min/IP and <=2/min/user; capacity gate queue age and 45-minute deadline. Retry/new jobs consume quotas; refunds explicit bounded policy, not unlimited retry loophole.
 
-For V1, operator-funded quotas contain pilot loss; advanced billing deferred. Commercial release needs owner-approved price/plan floors including allocated infrastructure and taxes/fees, not just marginal cost. No automatic purchases, account creation or billing configuration in this phase.
+Per job cumulative <=120k input/12k output, <=1,200 GPU compute-seconds (including repairs/replay), <=6k narration characters and bounded TTS attempts; stage limits in data model remain stricter where applicable. Gateway aborts on remaining GPU/time/token budget; estimate reservations pessimistically until actual usage settles. GPU wall occupancy recorded including partial failed attempts; unknown running inference remains reserved until stopped/reconciled. Completed artifacts prevent repeated inference; no silent paid fallback. CPU/task/time caps and delivery byte quotas prevent unbounded ancillary charges.
+
+Proposed owner-reviewed pilot production budget **$2,000/month** including contingency; independent research pilot budget **$2,500** including labor allowance, both proposals and neither authorization to spend. Warn forecast >=80%, stop new admission at 100%; existing bounded jobs may complete within reservations. Idle capacity is an infrastructure budget, not attributed to one user as marginal usage. Cap autoscaling at one GPU initially, later at three only after approval/quote. Scale-to-zero requires explicit availability trade-off. No pricing plan until allocated hosting, expected usage, support/payment overhead and chosen gross-margin target are signed off; advanced billing deferred.
+
+Delivery: cumulative bytes <=3 final-video sizes/job over retention, <=2 concurrent streams/grant and owner aggregate enforced atomically; range/download replay counts actual bytes, min accounting quantum 64 KiB. Signed grants expire <=5 min and deletion/logout revokes. Failed upstream byte reservation released only on confirmed non-delivery; egress has no free unbounded tier. Bandwidth quota increase requires explicit pricing/budget policy.
+
+## Limits and refresh procedure
+
+Obtain region-specific quotes for EC2/RDS/Redis/ALB/NAT/S3/EBS/Cognito and model/provider license terms before provisioning. Include taxes, payment fees, customer support, extra availability GPU and disaster reserve in commercial pricing; those are excluded from this technical planning estimate. Network/backup allowances may prove low. Dataset licensing/review time may dominate GPU expense. Update JSON with measured aggregate throughput/p95/load durations, repeat offline tests/table generation, attach quote date/region and compare worst-case failed jobs. No benchmark, paid account, GPU run or production deployment was executed here.

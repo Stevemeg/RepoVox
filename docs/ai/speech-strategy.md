@@ -1,0 +1,26 @@
+# Self-hosted speech strategy
+
+Proposed, 2026-10-08; no audio synthesized or pronunciation/latency measured. Normal production uses self-hosted TTS with **no paid third-party TTS API**. [Director](director-architecture.md) · [Deployment](../operations/deployment.md) · [Pipeline](../architecture/pipeline.md)
+
+## Systems and license boundaries
+
+| System | Evidence and commercial licensing | Deployment/quality trade-off |
+| --- | --- | --- |
+| Baseline `hexgrad/Kokoro-82M` v1.0 | Official card identifies 82M parameters, Apache-licensed weights and 24kHz output; separate engine/G2P/voice/data notices must be inventoried. [Model card](https://huggingface.co/hexgrad/Kokoro-82M), [voice documentation](https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md), accessed 2026-10-08. Card identifies CC-BY corpus contributions; retain attribution/rights review rather than claiming all speaker rights settled. | CPU baseline 2 vCPU/4 GiB task, 120s assumed for 240s audio including load/alignment; optional GPU profile only if measured need/budget warrants. Naturalness/code pronunciation unmeasured, not inferred from card quality claims. |
+| Alternative OHF Piper | [Maintained engine](https://github.com/OHF-Voice/piper1-gpl), [GPL-3.0 COPYING](https://github.com/OHF-Voice/piper1-gpl/blob/main/COPYING). Engine license differs from each voice model/dataset license; examine exact MODEL_CARD and notices before use. No blanket “MIT Piper” assumption. | CPU/ONNX-oriented smaller deployment candidate; less expressive voice expectation is a hypothesis. Voice selected only after rights/code-term audition and timing test; distribution compliance reviewed. |
+
+Provisional English preset `af_heart` for evaluation only, subject to voice/weight provenance and rights confirmation; no cloning, user voice uploads or imitation of real people. Base-model license, engine/dependencies, voice embeddings and speaker/data permissions are separate gates. No purchases, weights downloaded or license acceptance transaction here. Initial offline build converts any untrusted pickle-based upstream weight/voice files to inspected safe format in isolated lane; serving must not deserialize arbitrary `.pt`/`.pth` uploads. Pin conversion/runtime/hash and verify quality against baseline. If this cannot be done safely/legally, select reviewed alternative or block release.
+
+## Text, audio and alignment
+
+Input is approved plain narration only; no source archives, secrets, model-produced SSML or user-controlled voice paths. Trusted pronunciation dictionary for identifiers (FastAPI, PostgreSQL, OAuth, snake_case/acronyms), controlled phoneme mapping and whitespace/number normalization. Escape/control dictionary changes as versioned configuration; do not run shell tools based on narration. Generated text status/claim mapping verified **before** speech.
+
+Synthesize bounded sentences/phrases, preserve sentence IDs and narration text; concatenate trusted pauses. Measure PCM sample counts and audio duration, not characters-to-seconds heuristics. Persist per-sentence start/end samples and scene spans at 24kHz mono WAV; trusted FFmpeg resamples/muxes AAC for final MP4. Captions baseline sentence alignment from exact concatenation boundaries; no invented word timestamps. Word-level alignment optional local aligner constrained to known transcript, CPU budget included, with independently measured accuracy; never trust estimated character positions as exact speech timing. Silence trim rules versioned, preventing duration metadata drift.
+
+Measured narration drives contiguous 30fps scene frame ranges. If actual total outside 180–300s, allow one bounded TTS settings/pronunciation retry with unchanged approved text and accounting; otherwise fail. 6,000 aggregate characters is a resource cap, not exact duration. No unbounded regeneration/speed distortion to fit targets. A text rewrite requires a new job/version with renewed evidence verification, not a backward stage transition. Store engine/version, weight/voice/dictionary digest, sentence audio hashes/durations, CPU/GPU time and validation metadata; cache owner-scoped by exact approved narration and release/voice/settings.
+
+## Limits and acceptance
+
+TTS profile independent of Director GPU and renderer: two CPU TTS tasks initially, one owner task, 4GiB memory, ≤2GiB scratch, 240s attempt timeout/two attempts; per-segment input ≤400 characters, ≤100 sentences/phrases. Cancel checks ≤5s; terminate task ≤60s, reconcile incomplete operation before bounded replay. No internet runtime, approved weight bucket read only, no public TTS API, stage-scoped authentication/job budget. Research speech jobs separate from production.
+
+Future test corpus ≥100 sentences with code terms/numbers/paths/URLs spoken safely, ≥10 developer raters: mean intelligibility/naturalness ≥4/5, ≥95% critical code terms correctly transcribed, no clipping/NaNs/truncated speech. Sentence timing boundary error ≤50ms against annotated audio for ≥95% samples; word timing if shipped p95 ≤100ms. Every published video has actual 180–300s audio/media and valid readable captions. CPU p95 ≤240s for admitted workload, peak memory within cap; report real-time factor/load latency by hardware and failures. Failed pronunciation/rights/format tests block voice promotion; provider fallback is forbidden.
