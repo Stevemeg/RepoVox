@@ -1,0 +1,1086 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RepoVox Phase 0 representative artifact envelope",
+  "description": "Semantic entailment, ownership and byte provenance require separate validators. Production input contracts will be extended before integration.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "kind": {
+      "enum": [
+        "source_manifest",
+        "structure",
+        "knowledge",
+        "evidence",
+        "verification",
+        "storyboard",
+        "narration",
+        "audio",
+        "render_manifest",
+        "video"
+      ]
+    },
+    "owner_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "snapshot_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "commit_sha": {
+      "type": "string",
+      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+    },
+    "pipeline_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "input_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "payload": {}
+  },
+  "required": [
+    "schema_version",
+    "kind",
+    "owner_id",
+    "snapshot_id",
+    "commit_sha",
+    "pipeline_version",
+    "input_digest",
+    "payload"
+  ],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "source_manifest"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "properties": {
+              "repository": {
+                "type": "string",
+                "minLength": 1
+              },
+              "archive_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "files": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "file_sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "bytes": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "language": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "status": {
+                      "enum": [
+                        "parsed",
+                        "skipped",
+                        "failed",
+                        "context"
+                      ]
+                    },
+                    "reason": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "example_content": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "file_sha256",
+                    "bytes",
+                    "language",
+                    "status",
+                    "reason"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 10000
+              },
+              "eligible_bytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "parsed_bytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "excluded_bytes": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "repository",
+              "archive_sha256",
+              "files",
+              "eligible_bytes",
+              "parsed_bytes",
+              "excluded_bytes"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "structure"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "properties": {
+              "symbols": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    },
+                    "path": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "start_line": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "end_line": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "kind": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "path",
+                    "start_line",
+                    "end_line",
+                    "kind"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 10000
+              },
+              "edges": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "source": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    },
+                    "target": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    },
+                    "classification": {
+                      "enum": [
+                        "declared",
+                        "resolved_static",
+                        "unresolved"
+                      ]
+                    },
+                    "evidence_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]*$"
+                      },
+                      "maxItems": 10000
+                    }
+                  },
+                  "required": [
+                    "source",
+                    "target",
+                    "classification",
+                    "evidence_ids"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 10000
+              },
+              "dependencies": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "declared_constraint": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "locked_version": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "evidence_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]*$"
+                      },
+                      "maxItems": 10000
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "declared_constraint",
+                    "locked_version",
+                    "evidence_ids"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 10000
+              },
+              "entrypoints": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "symbol_id": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    },
+                    "rule": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "evidence_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]*$"
+                      },
+                      "maxItems": 10000
+                    }
+                  },
+                  "required": [
+                    "symbol_id",
+                    "rule",
+                    "evidence_ids"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 10000
+              },
+              "parse_errors": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "start_line": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "end_line": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "start_line",
+                    "end_line"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 10000
+              }
+            },
+            "required": [
+              "symbols",
+              "edges",
+              "dependencies",
+              "entrypoints",
+              "parse_errors"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "knowledge"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "minLength": 1
+              },
+              "stack": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "maxItems": 10000
+              },
+              "modules": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "maxItems": 10000
+              },
+              "entrypoint_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]*$"
+                },
+                "maxItems": 10000
+              },
+              "edges": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "source": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    },
+                    "target": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    },
+                    "claim_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]*$"
+                      },
+                      "maxItems": 10000
+                    }
+                  },
+                  "required": [
+                    "source",
+                    "target",
+                    "claim_ids"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 10000
+              },
+              "claims": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    },
+                    "text": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "status": {
+                      "enum": [
+                        "verified",
+                        "inferred",
+                        "documentation_only",
+                        "unsupported"
+                      ]
+                    },
+                    "evidence_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]*$"
+                      },
+                      "maxItems": 10000
+                    },
+                    "reason": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "text",
+                    "status",
+                    "evidence_ids",
+                    "reason"
+                  ],
+                  "additionalProperties": false,
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": {
+                          "status": {
+                            "enum": [
+                              "verified",
+                              "inferred",
+                              "documentation_only"
+                            ]
+                          }
+                        }
+                      },
+                      "then": {
+                        "properties": {
+                          "evidence_ids": {
+                            "minItems": 1
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                "maxItems": 10000
+              },
+              "limitations": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "maxItems": 10000
+              }
+            },
+            "required": [
+              "scope",
+              "stack",
+              "modules",
+              "entrypoint_ids",
+              "edges",
+              "claims",
+              "limitations"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "evidence"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    },
+                    "path": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "start_line": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "end_line": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "file_sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "commit_sha": {
+                      "type": "string",
+                      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                    },
+                    "kind": {
+                      "enum": [
+                        "source",
+                        "manifest",
+                        "documentation"
+                      ]
+                    },
+                    "rule": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "redacted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "path",
+                    "start_line",
+                    "end_line",
+                    "file_sha256",
+                    "commit_sha",
+                    "kind",
+                    "rule",
+                    "redacted"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 10000
+              }
+            },
+            "required": [
+              "items"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "verification"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "properties": {
+              "verifier_version": {
+                "type": "string",
+                "minLength": 1
+              },
+              "verdicts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "claim_id": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    },
+                    "status": {
+                      "enum": [
+                        "verified",
+                        "inferred",
+                        "documentation_only",
+                        "unsupported"
+                      ]
+                    },
+                    "evidence_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]*$"
+                      },
+                      "maxItems": 10000
+                    },
+                    "rule": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "reason": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "claim_id",
+                    "status",
+                    "evidence_ids",
+                    "rule",
+                    "reason"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 10000
+              }
+            },
+            "required": [
+              "verifier_version",
+              "verdicts"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "storyboard"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "properties": {
+              "scenes": {
+                "type": "array",
+                "minItems": 6,
+                "maxItems": 24,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    },
+                    "topic": {
+                      "enum": [
+                        "purpose",
+                        "stack",
+                        "architecture",
+                        "flow",
+                        "code",
+                        "summary"
+                      ]
+                    },
+                    "type": {
+                      "enum": [
+                        "title",
+                        "stack",
+                        "architecture",
+                        "flow",
+                        "code",
+                        "summary"
+                      ]
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "target_seconds": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "claim_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]*$"
+                      },
+                      "maxItems": 10000
+                    },
+                    "evidence_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]*$"
+                      },
+                      "maxItems": 10000
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "label"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "topic",
+                    "type",
+                    "title",
+                    "target_seconds",
+                    "claim_ids",
+                    "evidence_ids",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "scenes"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "narration"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "properties": {
+              "sentences": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "scene_id": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    },
+                    "text": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "technical": {
+                      "type": "boolean"
+                    },
+                    "claim_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]*$"
+                      },
+                      "maxItems": 10000
+                    },
+                    "uncertainty": {
+                      "enum": [
+                        "verified",
+                        "inferred",
+                        "documentation_only",
+                        "unsupported"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "scene_id",
+                    "text",
+                    "technical",
+                    "claim_ids",
+                    "uncertainty"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 10000
+              },
+              "note": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "sentences"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "properties": {
+              "provider": {
+                "type": "string",
+                "minLength": 1
+              },
+              "voice": {
+                "type": "string",
+                "minLength": 1
+              },
+              "settings_version": {
+                "type": "string",
+                "minLength": 1
+              },
+              "scenes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "scene_id": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    },
+                    "object_key": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "duration_seconds": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "characters": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "operation_id": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    }
+                  },
+                  "required": [
+                    "scene_id",
+                    "object_key",
+                    "sha256",
+                    "duration_seconds",
+                    "characters",
+                    "operation_id"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 10000
+              }
+            },
+            "required": [
+              "provider",
+              "voice",
+              "settings_version",
+              "scenes"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "render_manifest"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "properties": {
+              "template_version": {
+                "type": "string",
+                "minLength": 1
+              },
+              "width": {
+                "const": 1280
+              },
+              "height": {
+                "const": 720
+              },
+              "fps": {
+                "const": 30
+              },
+              "scenes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "scene_id": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    },
+                    "start_frame": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "end_frame_exclusive": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "audio_sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    }
+                  },
+                  "required": [
+                    "scene_id",
+                    "start_frame",
+                    "end_frame_exclusive",
+                    "audio_sha256"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 10000
+              }
+            },
+            "required": [
+              "template_version",
+              "width",
+              "height",
+              "fps",
+              "scenes"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "video"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "properties": {
+              "object_key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "size_bytes": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 157286400
+              },
+              "width": {
+                "const": 1280
+              },
+              "height": {
+                "const": 720
+              },
+              "fps": {
+                "const": 30
+              },
+              "duration_seconds": {
+                "type": "number",
+                "minimum": 180,
+                "maximum": 300
+              },
+              "video_codec": {
+                "const": "h264"
+              },
+              "pixel_format": {
+                "const": "yuv420p"
+              },
+              "audio_codec": {
+                "const": "aac"
+              },
+              "fast_start": {
+                "const": true
+              },
+              "sidecar_key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "caption_key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "probe_status": {
+                "enum": [
+                  "passed",
+                  "illustrative_not_executed"
+                ]
+              },
+              "expires_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "object_key",
+              "sha256",
+              "size_bytes",
+              "width",
+              "height",
+              "fps",
+              "duration_seconds",
+              "video_codec",
+              "pixel_format",
+              "audio_codec",
+              "fast_start",
+              "sidecar_key",
+              "caption_key",
+              "probe_status",
+              "expires_at"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    }
+  ]
+}

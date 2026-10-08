@@ -1,0 +1,2 @@
+# Documentation validation only; no application runtime dependencies.
+jsonschema==4.26.0
