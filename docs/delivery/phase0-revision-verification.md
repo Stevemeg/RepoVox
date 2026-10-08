@@ -50,8 +50,8 @@ Complete here means Phase 0 design/documentation deliverable complete; implement
 | 11 product/roadmap/deployed multi-user milestone | Complete | [Roadmap phases 0-8](roadmap.md), [README](../../README.md), F-01-13/N-01-08 trace matrix |
 | 12 updated ADR-004/005 and model/eval/GPU ADRs | Complete | [ADR index](../adr/README.md), ADR-006/007/008; 001-003 preserved and adjusted |
 | 13 security/privacy extension and no-code-execution policy | Complete | [S-01-22 / SEC-A-H](../security/threat-model.md), private inference and isolated research roles |
-| 14 sole contributor/no history rewrite | Complete design and pre-commit audit | AGENTS policy, identity commands and existing commit association above; final remote commit audit reported in handoff |
-| 15 same PR #1, no replacement/no merge | Submission step | This record targets existing PR; final response confirms pushed head/updated body and unmerged state after GitHub readback |
+| 14 sole contributor/no history rewrite | Complete | AGENTS policy, identity commands and existing commit association above; final remote commit audit reported in handoff |
+| 15 same PR #1, no replacement/no merge | Complete | Pushed revision, updated existing PR title/body and read back open/unmerged state; no replacement PR or merge |
 | 16 documentation/schema/cost/diagrams verification | Complete | Executed command table above; no GPU/training/deployment claims |
 
 Original Phase 0 requirements remain: public GitHub/Python/JS/TS/dev audience/3-5min/720p; auth/dashboard/progress/playback/download/history; excluded private repos/documents/avatars/teams/editor/advanced billing; all durable owner entities, PostgreSQL/outbox/fences/retries/cancellation/cleanup, verified source provenance and qualified uncertainty; secure untrusted acquisition, CI promotion/migrations/rollback/monitoring/incident/restore/retention. Evidence is in PRD, pipeline, data model, security and operations, linked above. No valid work discarded or application implementation introduced.
@@ -59,3 +59,7 @@ Original Phase 0 requirements remain: public GitHub/Python/JS/TS/dev audience/3-
 ## Outstanding approval and evidence
 
 [Owner decisions](roadmap.md#owner-decisions-before-implementationprovisioning): base/voice/data licenses and rights, provisional us-east-1/GPU quote/availability/standby, proposed $2,000 monthly production plus separate $2,500 research pilot budget, revised unmeasured warm p95 <=35min, retention/takedown, domain/on-call, independent human review appointments and truthful launch decision if specialization fails. The owner has decided the self-host strategy; provisional asset/hosting details still require later approval. No decision here authorizes external AI evaluation or paid training.
+
+## Remote submission audit
+
+Revision content commit `a13b6eb1d654d77d0589c43352c1134a0fa4d895` was pushed normally to `phase0/foundation`; GitHub author and committer both associate with Stevemeg and signature status is unsigned. All three commits then reachable were audited through authenticated GitHub commit GETs and full messages: sole identity Stevemeg / konabharath2004@gmail.com, zero co-author/generated trailers. GitHub contributors returned only Stevemeg. Existing PR #1 title/body were updated and read back open/unmerged with this content commit as head, base main unchanged. This audit record is added as a normal owner-authored follow-up, then its definitive remote SHA/metadata are rechecked in the final handoff. No force push, amended history, automation commit, identity change or additional human contributor.
