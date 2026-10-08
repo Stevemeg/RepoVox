@@ -1,0 +1,547 @@
+{
+  "historical": true,
+  "baseline_commit": "ba9ec7ef000378c325ebb367250331a59874aad5",
+  "purpose": "Exhaustive pre-revision broad AI/provider/paid/Fargate reference inventory; historical text is not current policy.",
+  "matches": [
+    {
+      "path": "README.md",
+      "line": 5,
+      "text": "**Status: Phase 0 documentation, awaiting independent validation.** No application features, paid integrations, cloud resources, benchmarks or production deployment exist. Decisions are implementation proposals; owner approvals are listed in the [roadmap](docs/delivery/roadmap.md)."
+    },
+    {
+      "path": "AGENTS.md",
+      "line": 11,
+      "text": "- No credentials, generated secrets, customer repository contents, customer artifacts or provider payloads in Git."
+    },
+    {
+      "path": "AGENTS.md",
+      "line": 15,
+      "text": "Phase 0 permits requirements, architecture, threat analysis, estimates, documentation and documentation checks only. No application implementation, paid API integration, provisioning, purchases or production-readiness claims. Stop at review handoff. Independent validation must pass and the owner must authorize the next phase. Apply this gate to every later phase. No merge without independent validation; no auto-merge bypass."
+    },
+    {
+      "path": "docs/adr/0002-durable-jobs.md",
+      "line": 5,
+      "text": "Context: queue messages repeat/disappear; paid work cannot depend on worker memory."
+    },
+    {
+      "path": "docs/adr/0002-durable-jobs.md",
+      "line": 7,
+      "text": "Decision: persisted stages/attempts, outbox, owner-scoped idempotency, expiring fenced leases and immutable artifact pointers. Redis messages hold IDs only; reconciler republishes due work. Persist results before acknowledgement; stale workers cannot publish/start provider operations."
+    },
+    {
+      "path": "docs/adr/0002-durable-jobs.md",
+      "line": 11,
+      "text": "Consequences: race/reconciliation tests required. Exactly-once external billing impossible without provider support; ambiguous paid outcomes block automatic retry. Revisit Temporal if workflow/operator complexity justifies migration."
+    },
+    {
+      "path": "docs/adr/0003-evidence-and-isolation.md",
+      "line": 7,
+      "text": "Decision: bounded GitHub archive pinned to SHA, safe regular-file inspection without checkout/install, Tree-sitter parsing and evidence-linked claims. Label inference; deny executable model output and repository assets. Acquisition/parsing/provider/render task profiles have separate permissions."
+    },
+    {
+      "path": "docs/adr/0004-hosting.md",
+      "line": 1,
+      "text": "# ADR-004: ECS Fargate initial hosting"
+    },
+    {
+      "path": "docs/adr/0004-hosting.md",
+      "line": 7,
+      "text": "Decision: ECS Fargate in us-east-1 pending owner approval, RDS PostgreSQL, ElastiCache Redis, Cognito, S3, ALB/ACM and Secrets Manager. Per-job tasks, VPC endpoints and restricted proxy for fixed acquisition/provider destinations; no EKS."
+    },
+    {
+      "path": "docs/adr/0005-provider-and-render-boundaries.md",
+      "line": 1,
+      "text": "# ADR-005: Provider adapters and trusted visual templates"
+    },
+    {
+      "path": "docs/adr/0005-provider-and-render-boundaries.md",
+      "line": 7,
+      "text": "Decision: bounded typed LLM/TTS adapters, usage/operation records. Cost candidates Haiku 4.5 and Polly Neural; production IDs after evaluation/terms review. Trusted Remotion scenes with FFmpeg encode/probe; no dynamic JSX/HTML/JS/commands/repository remote assets."
+    },
+    {
+      "path": "docs/adr/0005-provider-and-render-boundaries.md",
+      "line": 9,
+      "text": "Alternatives: direct SDK calls scatter privacy/budget/retry logic; local inference adds hardware/quality burden; generated code too risky; FFmpeg-only slides cheaper/less expressive. Explicit provider change invalidates relevant cache versions, no silent fallback."
+    },
+    {
+      "path": "docs/adr/README.md",
+      "line": 10,
+      "text": "| [004](0004-hosting.md) | ECS Fargate over initial PaaS hosting |"
+    },
+    {
+      "path": "docs/adr/README.md",
+      "line": 11,
+      "text": "| [005](0005-provider-and-render-boundaries.md) | Provider adapters and trusted rendering |"
+    },
+    {
+      "path": "docs/architecture/artifact.schema.json",
+      "line": 855,
+      "text": "              \"provider\": {"
+    },
+    {
+      "path": "docs/architecture/artifact.schema.json",
+      "line": 911,
+      "text": "              \"provider\","
+    },
+    {
+      "path": "docs/architecture/data-model.md",
+      "line": 22,
+      "text": "| `usage_cost_records` | owner/job/attempt FK, operation_id, provider/model/price_version, units, estimated/actual amount USD, reservation/settlement status | Append ledger with reversal/adjustment entries, not mutable overwritten charges. User reads own aggregate; operator reconciliation uses audited access. Includes failed/unknown charges and compute/storage/delivery estimates. |"
+    },
+    {
+      "path": "docs/architecture/data-model.md",
+      "line": 23,
+      "text": "| `provider_operations` | owner/stage FK, unique operation key, request digest, provider idempotency key/request ID, status/result pointer, usage record | Workers operate only under current lease. Sensitive payload not in logs. Durable send intent distinguishes planned/submitted/succeeded/failed/unknown; unknown never auto-resubmitted. |"
+    },
+    {
+      "path": "docs/architecture/data-model.md",
+      "line": 43,
+      "text": "  STAGE ||--o{ PROVIDER_OPERATION : submits"
+    },
+    {
+      "path": "docs/architecture/data-model.md",
+      "line": 59,
+      "text": "| `running` | `awaiting_reconciliation` | Provider outcome ambiguous; block paid retry and downstream stage. |"
+    },
+    {
+      "path": "docs/architecture/data-model.md",
+      "line": 60,
+      "text": "| `awaiting_reconciliation` | `running` | Audited reconciliation recovers valid paid result or confirms no charge/submission and safe bounded retry; same job deadline/budget still apply. |"
+    },
+    {
+      "path": "docs/architecture/data-model.md",
+      "line": 62,
+      "text": "| `running`, `retry_wait`, `awaiting_reconciliation` | `cancel_requested` | Owner cancel or deletion; increment cancellation epoch; stop new leases/paid operations/publication. |"
+    },
+    {
+      "path": "docs/architecture/data-model.md",
+      "line": 94,
+      "text": "Stage states: `pending -> ready -> running -> succeeded`; `running -> retry_wait -> ready`; `running -> blocked -> ready` only after safe provider reconciliation; `running -> failed` on permanent/exhausted work. Any nonterminal stage -> `cancelled` on job cancellation, or `failed` on job deadline/terminal failure. `ready -> failed` also allowed for policy/deadline before lease. `succeeded/failed/cancelled` immutable. Only one ready/running/retry_wait/blocked stage per job; next pending becomes ready in same transaction as prior success. Stage 1 starts succeeded because validation occurs at admission."
+    },
+    {
+      "path": "docs/architecture/data-model.md",
+      "line": 101,
+      "text": "| infer / knowledge / evidence / verify | 90 / 30 / 30 / 90 seconds | 2 each; paid retry only when known safe |"
+    },
+    {
+      "path": "docs/architecture/data-model.md",
+      "line": 106,
+      "text": "Absolute job deadline is 45 minutes from admission including queue/retry/reconciliation. Stage timeouts include local substeps; external request timeout ≤stage remaining time. Heartbeat every 15s, lease expires 60s after last renewal using DB clock; lease cannot exceed stage/job deadline. Retry backoff `min(120s, 5s * 2^(attempt_no-1))` plus jitter 0–5s, persisted `next_attempt_at`. No retry for invalid/malicious input, insufficient evidence, secret policy rejection, auth, deterministic schema error or budget exhaustion. 429/5xx/provider network retry only if outcome known safe; honor Retry-After within remaining deadline. Logical quality repair capped once per affected stage, consumes paid budget, not an extra free retry."
+    },
+    {
+      "path": "docs/architecture/data-model.md",
+      "line": 108,
+      "text": "Cancellation checks at least every 5s in local loops and immediately before each paid call/upload publication. In-flight HTTP may bill even after cancellation. Terminate task if no exit within 60s of request, revoke fence first; record unknown paid costs conservatively. Cancellation/success race is serialized by job row lock: if success committed first, cancel returns terminal conflict; if cancel committed first, success cannot publish."
+    },
+    {
+      "path": "docs/architecture/data-model.md",
+      "line": 114,
+      "text": "3. Atomic stage claim locks eligible row (`FOR UPDATE SKIP LOCKED`), verifies job active/budget/deadline, assigns monotonically increasing fence and lease. Duplicate messages no-op if another unexpired lease/output exists. Every heartbeat, provider send claim and artifact publication checks fence+state+expiry. Expiry alone cannot allow stale writes; epoch invalidates them. Task-start reservations in DB prevent dispatcher replicas exceeding concurrency; ECS task IDs reconciled after uncertain task-start responses."
+    },
+    {
+      "path": "docs/architecture/data-model.md",
+      "line": 115,
+      "text": "4. Artifact cache key = owner + snapshot SHA + stage + upstream checksums + parser/selector/prompt/model/voice/template/pipeline versions + configuration digest. Successful immutable artifact is reused only after checksum, schema, ownership, expiry and verification checks. Retained outputs let restart resume next stage without paid work repetition. No cross-tenant cache; purge invalid/expired results."
+    },
+    {
+      "path": "docs/architecture/data-model.md",
+      "line": 116,
+      "text": "5. External operation: record unique send intent/request digest, reserve maximum cost, and commit operation status before send. Use provider idempotency key **only if verified supported**. Capture result/request ID/usage into private deterministic staging object, then commit result pointer/usage/stage with fence. Persisted result can be validated/recovered after worker death. Crash after send but before durable response is `unknown`, not an automatic second charge; reconcile provider status/billing if possible, otherwise job fails at deadline with charged reservation held for audit. Operator may authorize a new bounded operation only after documenting duplicate-billing risk/remaining budget, never under original unknown key."
+    },
+    {
+      "path": "docs/architecture/data-model.md",
+      "line": 118,
+      "text": "7. DB outage: do not start paid work or new stages; worker can finish local bounded compute but cannot publish without valid renewed lease. Reconciler expires abandoned work after DB returns. Redis outage: retain due state/outbox, suspend dispatch and rebuild without losing jobs. Lost source scratch reacquired at exact SHA under policy; reuse paid artifacts only if input checksum matches."
+    },
+    {
+      "path": "docs/architecture/examples/pipeline.json",
+      "line": 3,
+      "text": "  \"note\": \"No repository acquisition, provider call, audio synthesis, rendering or probe has occurred. Hashes of media are placeholders. Source contents are illustrative fixture text, not application implementation.\","
+    },
+    {
+      "path": "docs/architecture/examples/pipeline.json",
+      "line": 535,
+      "text": "        \"provider\": \"example-not-called\","
+    },
+    {
+      "path": "docs/architecture/overview.md",
+      "line": 9,
+      "text": "Proposed hosting: AWS ECS Fargate, RDS PostgreSQL, ElastiCache Redis OSS-compatible managed service, Cognito and private S3. Network/task-role isolation motivates the choice over Render; see [hosting comparison](../operations/deployment.md#hosting-comparison). No resources are provisioned."
+    },
+    {
+      "path": "docs/architecture/overview.md",
+      "line": 13,
+      "text": "Browser cannot access DB/queue/workers. Acquisition/provider connections cross restricted egress; storage access has role and tenant boundaries."
+    },
+    {
+      "path": "docs/architecture/overview.md",
+      "line": 21,
+      "text": "    AI[LLM and TTS providers]"
+    },
+    {
+      "path": "docs/architecture/overview.md",
+      "line": 67,
+      "text": "| LLM | Bounded structured provider adapter | Claude Haiku 4.5 cost candidate; exact production model requires quality/terms evaluation. Local models add compute; stronger models increase cost. No automatic escalation. |"
+    },
+    {
+      "path": "docs/architecture/overview.md",
+      "line": 68,
+      "text": "| TTS | Provider adapter; Polly Neural cost candidate | Per-character budgeting/timing; pronunciation needs evaluation. Local TTS adds hardware/quality work, premium voices raise cost. |"
+    },
+    {
+      "path": "docs/architecture/overview.md",
+      "line": 73,
+      "text": "Preferred technologies retained. Render uses bounded on-demand Fargate tasks instead of always-running render service; dispatcher controls starts and workers process eligible Redis notifications. CDN/WebSockets deferred. [ADR index](../adr/README.md) records reversal triggers."
+    },
+    {
+      "path": "docs/architecture/pipeline.md",
+      "line": 35,
+      "text": "| 12 `tts` | Sanitized narration, voice/provider/version | Per-scene audio checksums/durations and timing manifest. ≤6k cumulative billed chars incl repair. If total outside 180–300s, one budgeted narration/tts repair under same stage attempt, otherwise fail. No unbounded stretching/re-generation. |"
+    },
+    {
+      "path": "docs/architecture/pipeline.md",
+      "line": 54,
+      "text": "| `audio` | Provider/model/voice/settings, per-scene object key/hash/duration/char count; request operation IDs. Timing map used for captions and rendering. |"
+    },
+    {
+      "path": "docs/architecture/pipeline.md",
+      "line": 58,
+      "text": "Representative synthetic JSON for PKM and downstream contracts is in [pipeline.json](examples/pipeline.json); it describes a made-up demo, not RepoVox implementation. [JSON Schema](artifact.schema.json) checks envelope, evidence/claim statuses and downstream scene/narration/audio/video shape. It is a Phase 0 representative contract, not a complete production parser schema: richer structure/manifests and strict provider input schemas must be finalized in Phase 2 before external calls. [Documentation checker](../../tools/check_docs.py) enforces cross-artifact example relationships and rejects unsupported narration claims; production additionally needs source-byte entailment/coverage validation. No claim that schema validation proves accuracy."
+    },
+    {
+      "path": "docs/architecture/pipeline.md",
+      "line": 62,
+      "text": "Rank entrypoints, central imports and representative code within a fixed context budget. Deterministic selection and omission ledger precede summarization; include provider tokenizer counts before send. Same snapshot/parser/selector versions yield same evidence inventory, but LLM/TTS output need not be byte-deterministic. Store prompt-template/model/voice versions, seed where supported, actual usage and response checksum. Model adapter treats source as quoted untrusted data under fixed system policy, has no tools, cannot change claim rules/tenant/budgets. Provider-retention terms are launch blockers. [Cost reservations](../operations/cost-model.md#cost-protection) govern all attempts."
+    },
+    {
+      "path": "docs/delivery/phase0-verification.md",
+      "line": 5,
+      "text": "No application, security fixture, paid API, load, media, cloud deployment or restore tests were run: those are later-phase gates. Synthetic JSON timings/probe fields are expressly illustrative. Cost compute timings are assumptions, not benchmarks."
+    },
+    {
+      "path": "docs/delivery/phase0-verification.md",
+      "line": 17,
+      "text": "| Cost arithmetic | `python tools/cost_model.py --json`, `python tools/cost_model.py --check` | PASS: documented table reproducible, base marginal $0.2409138587, average capacity headroom under proposed scenario slots. Estimates are not benchmarks/quotes. |"
+    },
+    {
+      "path": "docs/delivery/phase0-verification.md",
+      "line": 20,
+      "text": "| Price/source review | Official Anthropic/Polly/Fargate/Remotion pricing and AWS infrastructure/security sources opened | Token/character/compute-example/license rates verified as of review date. Dynamic regional storage/transfer/fixed service prices remain labelled assumptions. No paid calls/accounts. |"
+    },
+    {
+      "path": "docs/delivery/phase0-verification.md",
+      "line": 44,
+      "text": "Owner questions in [roadmap](roadmap.md#owner-decisions-before-implementationprovisioning): V1 proposals/quotas, region, budget, provider terms/disclosure/model/voice, retention, domain/on-call, licensing and pricing. Remaining technical risks: parser/Chromium isolation, secrets/inference accuracy, exact regional hosting prices, task cold-start/burst/media-gateway capacity, restore/deletion effectiveness and provider ambiguous billing. These have explicit later-phase gates; production readiness is not established."
+    },
+    {
+      "path": "docs/delivery/phase0-verification.md",
+      "line": 46,
+      "text": "Handoff status: **READY FOR INDEPENDENT REVIEW** when the review PR and final attribution audit are reported. Independent validator decides pass; no merge, paid integration, cloud provisioning or Phase 1 work authorized or performed here."
+    },
+    {
+      "path": "docs/delivery/roadmap.md",
+      "line": 10,
+      "text": "| 1 Local SaaS skeleton | Depends on Phase 0 accepted; Next.js/FastAPI boundaries, migrations, mock managed auth, owner authorization, local Postgres/Redis/S3 mocks | F-01, F-06/F-11 skeleton; two-tenant RLS/FK tests, durable job admission/outbox/stage state tests, no paid calls. Code/scaffold allowed only after authorization. |"
+    },
+    {
+      "path": "docs/delivery/roadmap.md",
+      "line": 11,
+      "text": "| 2 Static repository intelligence | Phase 1; secure pinned acquisition, filtering, Tree-sitter/entrypoint graph, formal full artifact/provider input schemas and synthetic fixtures | F-02/03/04 static evidence groundwork; malicious repo/SSRF/resource/secret tests SEC-A/B/C, coverage/limits/execution-tripwire tests. Never run submitted code. Claims deterministic/qualified, README conflicts tested. |"
+    },
+    {
+      "path": "docs/delivery/roadmap.md",
+      "line": 12,
+      "text": "| 3 Grounded AI/storytelling | Phase 2 evidence stable; provider adapters initially mocked; paid pilot evaluation only when owner authorizes credentials/budget/terms | F-04/05; sentence mapping, unsupported-claim rejection, prompt-injection tests, ≥20 fixture human accuracy audit N-01; budget/unknown-provider-outcome tests; terms/disclosure accepted. No automatic stronger model fallback. |"
+    },
+    {
+      "path": "docs/delivery/roadmap.md",
+      "line": 15,
+      "text": "| 6 Controlled production launch | Phase 5 independent validation, owner operational/legal/product sign-off, real secrets and release promotion | Deployed HTTPS app with authenticated dashboard, real public-repo pipeline, approved paid model/TTS, 720p video/playback/download/history, evidence links/uncertainty, quota/metered delivery, alerts/on-call/backup/deletion/rollback. Live smoke tests and monitored pilot recorded. **Final deployed-production milestone**; only now may status say deployed, with remaining SLA/quality limits disclosed. |"
+    },
+    {
+      "path": "docs/delivery/roadmap.md",
+      "line": 34,
+      "text": "| F-11 quotas/usage | Cost policy + data model ledger | Phase 1 admission races, Phase 3 paid operations, Phase 4 delivery byte races |"
+    },
+    {
+      "path": "docs/delivery/roadmap.md",
+      "line": 38,
+      "text": "| N-04 security/privacy | [Threat controls/suite](../security/threat-model.md) | Phase 5 all suites + provider terms/disclosure |"
+    },
+    {
+      "path": "docs/delivery/roadmap.md",
+      "line": 47,
+      "text": "2. Approve public-code provider disclosure/terms and region; exact model/voice selected after quality evaluation. If privacy/residency unsuitable, revise adapters/hosting, not bypass notice."
+    },
+    {
+      "path": "docs/delivery/roadmap.md",
+      "line": 51,
+      "text": "6. Choose commercial pricing/cost allocation before any paid customer plan; advanced billing remains deferred. Approve later-phase implementation separately after validator acceptance."
+    },
+    {
+      "path": "docs/operations/cost-model.md",
+      "line": 3,
+      "text": "Planning estimate as of **2026-10-08**, USD before taxes. No paid account/API call/purchase initiated. [Inputs](cost-inputs.json) · [Calculator](../../tools/cost_model.py) · [Deployment](deployment.md) · [PRD](../product/prd.md)"
+    },
+    {
+      "path": "docs/operations/cost-model.md",
+      "line": 9,
+      "text": "| LLM cost candidate Claude Haiku 4.5 | $1/M input tokens, $5/M output tokens | Verified on [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing), accessed 2026-10-08. Base uncached rates, no batch/cache discounts assumed. Model availability/quality must be rechecked at integration. |"
+    },
+    {
+      "path": "docs/operations/cost-model.md",
+      "line": 10,
+      "text": "| TTS cost candidate Polly Neural | $16/M billed characters | Verified on [Polly pricing](https://aws.amazon.com/polly/pricing/), accessed 2026-10-08. Speech marks separately billed; base model does **not** request speech marks. Timing from measured per-scene audio; caption precision evaluated later. |"
+    },
+    {
+      "path": "docs/operations/cost-model.md",
+      "line": 11,
+      "text": "| Fargate Linux/x86 us-east-1 | $0.000011244/vCPU-second; $0.000001235/GiB-second | Verified from regional worked example on [Fargate pricing](https://aws.amazon.com/fargate/pricing/), accessed 2026-10-08. 20 GiB included ephemeral storage, minimum billing and image-pull duration apply. Not a contractual quote or benchmark. |"
+    },
+    {
+      "path": "docs/operations/cost-model.md",
+      "line": 14,
+      "text": "| Remotion automation | $0.01/render, $100/month minimum if company license applies | Verified on [Remotion pricing](https://www.remotion.dev/docs/license/pricing), accessed 2026-10-08. Free license eligibility may apply to ≤3-person organizations under terms. Conservatively reserve paid minimum in all scenarios; owner must verify organization/licensing, not assume “open-source means free”. No purchase now. |"
+    },
+    {
+      "path": "docs/operations/cost-model.md",
+      "line": 15,
+      "text": "| RDS/Redis/network/auth/backup/monitoring | Fixed allowances below | **Estimates**, not current provider quotes. References: [RDS](https://aws.amazon.com/rds/postgresql/pricing/), [ElastiCache](https://aws.amazon.com/elasticache/pricing/), [VPC](https://aws.amazon.com/vpc/pricing/), [ALB](https://aws.amazon.com/elasticloadbalancing/pricing/), [Cognito](https://aws.amazon.com/cognito/pricing/). Detailed SKU calculator quote required before provisioning. |"
+    },
+    {
+      "path": "docs/operations/cost-model.md",
+      "line": 17,
+      "text": "Price references are separate from assumed utilization. Provider billed usage is measured later; illustrative numbers cannot establish profitability or production performance."
+    },
+    {
+      "path": "docs/operations/cost-model.md",
+      "line": 23,
+      "text": "Aggregate across inference/verification/storyboard/narration: 60k input + 6k output tokens, including repeated context per call. No token estimate deduced from repository byte size alone. Stage estimate split: inference 30k/2k, verification 15k/1k, storyboard 8k/1.5k, narration 7k/1.5k. Actual provider tokenizer must enforce 120k/12k ceilings. Average analysis/acquisition/AI-wait task time **600 seconds at 1 vCPU/2 GiB**, render+encode **720 seconds at 4 vCPU/8 GiB**, including cold starts/image pulls. These are assumptions to benchmark, not observed speed. 10% extra charged work factor covers failed attempts/repair on LLM/TTS/worker compute; does not assert failures cost only 10% in practice."
+    },
+    {
+      "path": "docs/operations/cost-model.md",
+      "line": 38,
+      "text": "         = $0.2409138587/video"
+    },
+    {
+      "path": "docs/operations/cost-model.md",
+      "line": 78,
+      "text": "- Reserve **$1 marginal/job** plus assigned fixed budget before admission under atomic ledger lock. Hard 120k/12k aggregate tokens and 6k TTS chars across attempts; reserve provider max output price before each send. Stage timeouts cap compute, and all attempts share absolute deadline. Unknown provider costs retain worst-case reservation; no automatic escalation/uncertain resubmit."
+    },
+    {
+      "path": "docs/operations/cost-model.md",
+      "line": 80,
+      "text": "- Cache successful paid outputs by owner/SHA/input digest/provider/prompt version; never reuse across tenants or repeated changed HEAD. Fixed templates limit output/compute. Provider account caps are secondary controls, not durable ledger substitutes."
+    },
+    {
+      "path": "docs/operations/cost-model.md",
+      "line": 81,
+      "text": "- Reconcile actual billed tokens/chars/task time/storage/egress daily; account-level budget alert and paid-send kill switch. Daily max charged operations/job tracked, anomalies block. Before paid launch benchmark worst-case admitted workload fits $1 reservation; otherwise lower caps or raise owner-approved budget/price."
+    },
+    {
+      "path": "docs/operations/deployment.md",
+      "line": 9,
+      "text": "| Render PaaS + AWS objects/auth | Next.js/FastAPI containers, background workers, managed Postgres/Redis; S3/Cognito | Few platform tasks, container support, simple releases | Always-on large render instances idle at low volume; equivalent egress/task-role isolation requires extra design. Cross-provider latency/egress and private network configuration. [Render offerings](https://render.com/pricing) accessed 2026-10-08; exact prices not verified from dynamic page. |"
+    },
+    {
+      "path": "docs/operations/deployment.md",
+      "line": 10,
+      "text": "| AWS ECS Fargate (selected) | Frontend/API services, dispatcher/proxy, bounded worker tasks, RDS/ElastiCache/S3/Cognito/ALB | Explicit SG/VPC endpoint/IAM boundaries, per-task sizing, no Kubernetes, managed DB | Higher fixed HA/network cost, infrastructure-as-code and AWS operations burden; Chromium sandbox/task behavior requires staging validation. [Fargate pricing/configuration](https://aws.amazon.com/fargate/pricing/) accessed 2026-10-08. |"
+    },
+    {
+      "path": "docs/operations/deployment.md",
+      "line": 18,
+      "text": "| Development | Local containers planned for Postgres/Redis/S3 emulator, mock auth/LLM/TTS and small synthetic fixtures; no real provider keys. Explicit dev-only mocks cannot deploy to production. No such containers implemented in Phase 0. |"
+    },
+    {
+      "path": "docs/operations/deployment.md",
+      "line": 19,
+      "text": "| Staging | Separate AWS account preferred, isolated VPC/buckets/identity pool/secrets/DB; same image digests/migrations/contracts as production at smaller size. Synthetic public fixtures only; capped paid evaluation after authorization in later phase. |"
+    },
+    {
+      "path": "docs/operations/deployment.md",
+      "line": 28,
+      "text": "Secrets Manager stores provider/DB/signing secrets, distinct per environment; least privilege ECS task roles, no secrets in Git/images/CI output. Use IAM task roles for S3, GitHub Actions OIDC for deployment with account/branch/environment constraints; no long-lived AWS key in CI. Key rotation and credential revocation runbook tested later."
+    },
+    {
+      "path": "docs/operations/deployment.md",
+      "line": 32,
+      "text": "One backend worker image can have different ECS task definitions/roles per stage class, not new services with independent databases. Dispatcher polls durable readiness, reserves global slots and starts bounded tasks; Celery consumes stage notifications, validates DB lease and exits after assigned work/idle timeout. Concurrency DB reservation + task ID reconciler prevents launch storms or duplicate task-start ambiguity. Worker heartbeat/paid work semantics remain [data model rules](../architecture/data-model.md#idempotency-delivery-and-recovery)."
+    },
+    {
+      "path": "docs/operations/deployment.md",
+      "line": 37,
+      "text": "| Static parsing | 1 vCPU / 2 GiB / 20 GiB | No internet; DB/queue/S3 endpoints only, no provider credentials. Untrusted parser runs as non-root, image read-only, no install/import paths. |"
+    },
+    {
+      "path": "docs/operations/deployment.md",
+      "line": 38,
+      "text": "| AI orchestration | 1 vCPU / 2 GiB / 20 GiB | Sanitized committed snippets only; provider allowlist via proxy, job budget/operation role, no raw archive processing. |"
+    },
+    {
+      "path": "docs/operations/deployment.md",
+      "line": 41,
+      "text": "Fargate includes 20 GiB ephemeral capacity; application scratch hard cap 2 GiB analysis / 10 GiB render, separate from image/system space. Stop task on overflow; intermediate chunks uploaded/removed incrementally. Maximum launch two analysis-class jobs and two render-class jobs, one job/task, Chromium page concurrency two and FFmpeg threads two. CPU/memory cannot exceed task specification. Source/archive limits in PRD and stage/job timeouts in data model. Per-file parse watchdog 5s. Cancellation termination 60s. Signed task IAM/S3 session scope must not be inferred from a client owner ID."
+    },
+    {
+      "path": "docs/operations/deployment.md",
+      "line": 43,
+      "text": "Chromium sandbox must work on the selected task image/platform with no unsafe `--no-sandbox` fallback. If Fargate compatibility tests cannot satisfy this, render hosting is blocked pending a reviewed isolated VM/container alternative and cost update. Do not claim undocumented Linux capabilities or namespace controls are available in Fargate."
+    },
+    {
+      "path": "docs/operations/deployment.md",
+      "line": 53,
+      "text": "5. Rolling API/frontend deploy behind health checks; pause new worker admission, drain/reconcile active jobs, retain old template/worker versions for in-flight artifact contracts, then promote. Re-enable admission after smoke checks/queue health. Kill switch blocks paid sends throughout failed release."
+    },
+    {
+      "path": "docs/operations/deployment.md",
+      "line": 57,
+      "text": "RDS automated backups/PITR retained 35 days; daily encrypted snapshots and monthly restore drill. Target DB RPO ≤1 hour/RTO ≤4 hours measured including incident response. S3 versioning for accidental overwrite recovery, lifecycle and all-version deletion required; final objects immutable/checksummed, deletion ledger outside restored DB checkpoint prevents resurrecting removed access. Redis snapshots optional convenience; restore work from PostgreSQL, not Redis correctness. Disaster restore also verifies objects/identity mappings/usage unknown charges and reconciles due jobs before provider calls resume."
+    },
+    {
+      "path": "docs/operations/deployment.md",
+      "line": 59,
+      "text": "Rollback order: disable admission/paid sends, drain/revoke leases of affected version; redeploy prior image/config compatible with expanded schema; keep new schema if compatible. Do not blindly run destructive down migration. If incompatible corruption, restore to a separate DB at pre-migration point, reconcile later writes/usage/deletions, owner accepts recovery-point loss, swap endpoint and reconcile jobs. Corrupt render/template outputs unpublished/tombstoned, prior template retained. Region-wide outage handled by restore/manual redeploy plan with stated RTO risk; active-active multi-region deferred."
+    },
+    {
+      "path": "docs/operations/deployment.md",
+      "line": 68,
+      "text": "| Intermediate PKM/redacted evidence/storyboard/narration/audio | 30 days from terminal state; bounded to 10 MiB average structured data, audio separately accounted. No raw provider payload dumps. |"
+    },
+    {
+      "path": "docs/operations/reliability.md",
+      "line": 7,
+      "text": "Structured JSON logs: timestamp/severity/service/environment/release/trace ID/job ID/stage/attempt/fence/error code/duration; pseudonymous owner ID only where needed. Do not log raw URLs with tokens, source, prompts, provider responses, secrets or signed media links. OpenTelemetry trace context flows API→outbox→attempt→provider/render; correlate provider request IDs without payload. Sampling must retain errors/security events, avoid high-cardinality job IDs as metric labels."
+    },
+    {
+      "path": "docs/operations/reliability.md",
+      "line": 9,
+      "text": "Metrics: admission/rejection by code, supported success %, queue age/length, stage p50/p95/p99, lease expiration/duplicates, reconciliation backlog, unknown provider operations, tokens/characters/cost vs reservation, render CPU/memory/scratch, MP4 validation failures, DB/Redis latency/errors, URL mint/playback errors, deletion overdue count and backup freshness."
+    },
+    {
+      "path": "docs/operations/reliability.md",
+      "line": 14,
+      "text": "| Queue/timeout | Oldest admitted stage >5 min or supported-job p95 >20 min; throttle admission, inspect resources/leases/provider status, do not exceed concurrency cap automatically. |"
+    },
+    {
+      "path": "docs/operations/reliability.md",
+      "line": 16,
+      "text": "| Cost/abuse | Forecast monthly budget ≥80% warning; ≥100% block new paid admissions. Any job attempts over reserved maximum blocks send; unknown paid outcomes alert immediately. |"
+    },
+    {
+      "path": "docs/operations/reliability.md",
+      "line": 17,
+      "text": "| Security | Any cross-tenant signal, secret egress canary or sandbox/network escape: stop admission/paid sends/signing, revoke keys if affected, incident response. |"
+    },
+    {
+      "path": "docs/operations/reliability.md",
+      "line": 24,
+      "text": "Severity 1: source/credential/tenant exposure or uncontrolled billing; severity 2: generation outage, object loss or failed restore; severity 3: degraded latency/local quality defect. Record detection/time/release/scope. Stop affected capability with independent admission, paid-send and URL-signing kill switches. Preserve redacted diagnostics and ledger; avoid copying secrets into tickets. Assess impact, rotate secrets/revoke sessions where relevant, rollback per deployment, notify affected users/owner as legally appropriate, verify recovery and document root cause/actions. Security notification obligations/contacts reviewed before launch. No messages or incident systems configured in Phase 0."
+    },
+    {
+      "path": "docs/operations/reliability.md",
+      "line": 28,
+      "text": "Future implementation tests, not executed results. Each needs DB state/assertions and provider mock call counts; genuine paid evaluation only after authorization."
+    },
+    {
+      "path": "docs/operations/reliability.md",
+      "line": 33,
+      "text": "| Worker death before paid send | Expired lease recovered, unique unsent intent reclaimed safely; at most one valid sender under DB guard. |"
+    },
+    {
+      "path": "docs/operations/reliability.md",
+      "line": 34,
+      "text": "| Worker death after provider send before durable response | Unknown operation blocks paid resubmit; recovered response/confirmed no-charge permits progression within deadline, else fails safely. No exactly-once billing claim. |"
+    },
+    {
+      "path": "docs/operations/reliability.md",
+      "line": 35,
+      "text": "| Worker death after artifact upload / DB commit | Pre-commit orphan removed; committed result reused without new provider call. Stale worker publish/heartbeat fenced out. |"
+    },
+    {
+      "path": "docs/operations/reliability.md",
+      "line": 38,
+      "text": "| DB outage/deadlock | No new paid sends without reservation/valid lease; transaction retries bounded; reconciliation restores correct stages, unknown charges retained. |"
+    },
+    {
+      "path": "docs/operations/reliability.md",
+      "line": 40,
+      "text": "| Provider 429/5xx/auth/timeout | Retry only known-safe transient failures, Retry-After honored within deadline; auth/policy fail permanently, no fallback escalation. |"
+    },
+    {
+      "path": "docs/operations/reliability.md",
+      "line": 42,
+      "text": "| Restore drill | Fresh isolated DB from PITR within RPO/RTO, deletion ledger applied, objects checked, Redis rebuilt, unknown usage reconciled before paid resume. |"
+    },
+    {
+      "path": "docs/product/prd.md",
+      "line": 23,
+      "text": "| F-09 | Cancel/retry | Cancel blocks new paid calls/stages and terminates overdue active work. Retry creates a new job linked to prior job and reuses eligible committed results. Terminal history immutable. |"
+    },
+    {
+      "path": "docs/product/prd.md",
+      "line": 54,
+      "text": "| N-05 | Cost | Normal marginal target ≤$0.50/video, reserved hard marginal budget $1/job. Meter failed attempts; report fully allocated costs separately. No automated provider escalation. |"
+    },
+    {
+      "path": "docs/security/threat-model.md",
+      "line": 7,
+      "text": "Protect account sessions, tenant projects/history, source snippets, provider credentials, artifact objects, usage reservations, integrity of claims and availability/cost. Adversaries include malicious submitters/repo maintainers, compromised model output/dependencies, stolen sessions and accidental secret exposure. Public source is not consent for unrestricted retention or external disclosure."
+    },
+    {
+      "path": "docs/security/threat-model.md",
+      "line": 20,
+      "text": "| S-04 SSRF/input URL | Parse strict canonical GitHub URL, no redirects from user URL. Construct API/archive paths internally; allow only `api.github.com` and `codeload.github.com`, HTTPS/443, validate redirects if any against same explicit allowlist (max 2). Resolve DNS at connection, reject non-global IPv4/IPv6 incl metadata/loopback/link-local/private; proxy revalidates each redirect and pins accepted address/TLS hostname to avoid rebinding. | GitHub outages/rate limits; no arbitrary provider URL overrides from request/content. |"
+    },
+    {
+      "path": "docs/security/threat-model.md",
+      "line": 22,
+      "text": "| S-06 Prompt injection | Fixed system prompts, source quoted as untrusted data, no tools/browsing/function execution, narrow structured output schemas, claim/evidence allowlists, output length caps. Repo text cannot set provider/owner/prompt/budget or verification status. Never evaluate generated commands/JSX/SQL. Post-narration claim checks. | Models may still misinterpret data; deterministic evidence gates plus human fixtures, fail closed when support absent. |"
+    },
+    {
+      "path": "docs/security/threat-model.md",
+      "line": 23,
+      "text": "| S-07 Accidental secrets | Before external calls/artifact rendering, scan filenames/content/high-entropy tokens/key patterns; exclude `.env`, credential/config/key material and known private keys. Redact suspicious spans with stable placeholders while preserving line numbers; do not emit secret-derived claims. High-confidence secret detection halts `secret_detected` by default before paid work and cleans scratch. No raw code/provider response in logs/telemetry. | Scanners miss secrets; transmit minimal snippets, disclosure notice, provider controls. User override not offered in V1. |"
+    },
+    {
+      "path": "docs/security/threat-model.md",
+      "line": 24,
+      "text": "| S-08 Source leakage/provider privacy | Explicit generation consent naming model/TTS recipients, public-code minimization, sanitized snippets only to LLM; narration only to TTS. TLS, keys in Secrets Manager, no training/retention assumptions: operator reviews actual provider terms/DPA/residency before launch. No provider prompt debugging logs. Isolate paid credential profile from acquisition/parser tasks. | Provider retention/residency unresolved is a launch blocker; deletion cannot guarantee removal from providers absent contractual support. |"
+    },
+    {
+      "path": "docs/security/threat-model.md",
+      "line": 29,
+      "text": "| S-13 Abuse/cost | Per-user/IP admission limits, one active/ten queued per owner, finite pilot allowlist and operator quotas, global concurrency, atomic budget reservations, request/file/token/character ceilings, provider account caps and kill switch. Auth required, no unlimited free tier. Do not retry unknown paid outcomes. | Provider billing may lag; reserve pessimistically and fail closed when ledger unavailable. IP limits need shared-network tuning. |"
+    },
+    {
+      "path": "docs/security/threat-model.md",
+      "line": 32,
+      "text": "Task profiles in [deployment](../operations/deployment.md#worker-profiles-and-resource-limits) are part of these controls. Container isolation cannot be asserted secure without adversarial tests; Chromium sandbox/egress validation is a launch blocker. Source parsers receive no paid keys; renderers receive no raw archive; model output is data only."
+    },
+    {
+      "path": "docs/security/threat-model.md",
+      "line": 42,
+      "text": "| SEC-C (S-06/07/08) | Repo instructions to ignore policy/exfiltrate/invent paths/emit JSX cannot change config/claims or execute. Canary secrets never appear in provider payloads, sidecar, video, logs/traces; secret policy rejects high-confidence canary before paid call. Provider terms/disclosure documented and acknowledged. |"
+    },
+    {
+      "path": "docs/security/threat-model.md",
+      "line": 45,
+      "text": "| SEC-F (S-12/13/14) | Concurrency race cannot over-reserve quota/budget. DB unavailable means zero paid sends. Duplicate deliveries no duplicate charged operations. Critical vulnerability scan blocks release; fork CI has no deployment credentials. Deletion purges all live versions ≤24h and restore does not revive deleted users/artifacts. |"
+    },
+    {
+      "path": "docs/security/threat-model.md",
+      "line": 47,
+      "text": "Outstanding risks: static inference quality, parser/Chromium vulnerabilities, undetected secrets, provider retention/residency, public-source intellectual property and bearer-link sharing. Controls reduce but do not eliminate risk. They require evidence at later gates; Phase 0 is not production security certification."
+    },
+    {
+      "path": "tools/cost_model.py",
+      "line": 65,
+      "text": "        assert result['marginal'] < 0.5, 'Base workload exceeds stated marginal target'"
+    },
+    {
+      "path": "tools/cost_model.py",
+      "line": 67,
+      "text": "        print('PASS: documented cost table, marginal target and average capacity assumptions')"
+    }
+  ]
+}

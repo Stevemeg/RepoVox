@@ -1,0 +1,210 @@
+{
+  "schema_version": 2,
+  "as_of": "2026-10-08",
+  "currency": "USD",
+  "production_strategy": "self_hosted",
+  "prompt_tokens": 60000,
+  "output_tokens": 6000,
+  "prefill_tokens_per_second": 1000,
+  "decode_tokens_per_second": 30,
+  "request_overhead_seconds": 20,
+  "attempt_multiplier": 1.1,
+  "gpu_hourly": 1.2,
+  "gpu_price_status": "unverified AWS g6.2xlarge planning allowance",
+  "monthly_hours": 730,
+  "target_gpu_utilization": 0.5,
+  "model_load_seconds": 600,
+  "reloads_per_gpu_month": 4,
+  "model_object_gib": 60,
+  "gpu_disk_gib": 80,
+  "gpu_disk_per_gib_month": 0.08,
+  "cpu_per_second": 1.1244e-05,
+  "memory_gib_per_second": 1.235e-06,
+  "analysis_seconds": 600,
+  "analysis_vcpu": 1,
+  "analysis_memory_gib": 2,
+  "tts_seconds": 120,
+  "tts_vcpu": 2,
+  "tts_memory_gib": 4,
+  "narration_characters": 3500,
+  "render_seconds": 720,
+  "render_vcpu": 4,
+  "render_memory_gib": 8,
+  "temporary_source_gib": 0.25,
+  "temporary_source_days": 1,
+  "intermediate_gib": 0.035,
+  "video_gib": 0.09,
+  "artifact_retention_days": 30,
+  "storage_per_gib_month": 0.023,
+  "full_delivery_equivalents": 3,
+  "delivery_per_gib": 0.09,
+  "puts_per_video": 50,
+  "gets_per_video": 500,
+  "put_per_1000": 0.005,
+  "get_per_1000": 0.0004,
+  "license_minimum_monthly": 100,
+  "license_per_render": 0.01,
+  "contingency_fraction": 0.2,
+  "staging_gpu_hours": 16,
+  "api_reference": {
+    "purpose": "economic comparison only, not production dependency",
+    "input_per_million": 1,
+    "output_per_million": 5,
+    "tts_per_million_characters": 16
+  },
+  "research": {
+    "training_gpu_hours": 96,
+    "evaluation_gpu_hours": 24,
+    "gpu_hourly": 1.59,
+    "dataset_cpu_hourly": 0.08,
+    "checkpoint_gib": 100,
+    "repeat_every_months": 3,
+    "selected_training_examples": 100,
+    "training_example_scenarios": [
+      100,
+      500,
+      1000
+    ],
+    "annotator_hourly": 20,
+    "independent_reviewer_hourly": 30,
+    "dataset": {
+      "examples_per_family": 10,
+      "annotation_minutes": 20,
+      "source_verification_minutes": 15,
+      "provenance_minutes": 5,
+      "family_rights_minutes": 45,
+      "independent_review_minutes": 10,
+      "review_fraction": 0.1,
+      "minimum_reviewed_examples": 100,
+      "preparation_setup_hours": 8,
+      "cpu_setup_hours": 2,
+      "cpu_hours_per_example": 0.04,
+      "storage_gib_per_example": 0.02,
+      "storage_gib_per_family": 0.25,
+      "manifest_gib": 0.05
+    },
+    "evaluation_corpus": {
+      "development_families": 20,
+      "heldout_families": 60,
+      "hidden_families": 10,
+      "adversarial_variants": 100,
+      "family_annotation_minutes": 90,
+      "family_source_verification_minutes": 90,
+      "family_independent_review_minutes": 60,
+      "family_rights_minutes": 30,
+      "family_preparation_minutes": 20,
+      "variant_annotation_minutes": 10,
+      "variant_source_verification_minutes": 10,
+      "variant_independent_review_minutes": 10,
+      "variant_preparation_minutes": 5,
+      "hidden_creation_minutes": 60,
+      "preparation_setup_hours": 12,
+      "cpu_setup_hours": 2,
+      "cpu_hours_per_family": 0.5,
+      "cpu_hours_per_variant": 0.05,
+      "storage_gib_per_family": 0.25,
+      "storage_gib_per_variant": 0.01,
+      "manifest_gib": 0.05,
+      "scored_models_per_cycle": 2,
+      "scoring_minutes_per_family_per_model": 20,
+      "scoring_minutes_per_variant_per_model": 5
+    },
+    "annotation_sensitivities": [
+      {
+        "name": "fast hypothesis",
+        "annotation_minutes": 10
+      },
+      {
+        "name": "base hypothesis",
+        "annotation_minutes": 20
+      },
+      {
+        "name": "slow hypothesis",
+        "annotation_minutes": 40
+      }
+    ],
+    "labor_status": "Unmeasured effort/rate hypotheses, imputed labor not contracted cash; evaluation corpus prepared before baseline and separately from training."
+  },
+  "break_even_utilizations": [
+    0.25,
+    0.5,
+    0.8
+  ],
+  "gpu_hourly_alternatives": {
+    "aws_planning": 1.2,
+    "runpod_l4_list": 0.49
+  },
+  "throughput_sensitivities": [
+    {
+      "name": "slow",
+      "prefill": 500,
+      "decode": 15
+    },
+    {
+      "name": "base",
+      "prefill": 1000,
+      "decode": 30
+    },
+    {
+      "name": "fast",
+      "prefill": 2000,
+      "decode": 60
+    }
+  ],
+  "scenarios": [
+    {
+      "videos": 100,
+      "web_vcpu": 2,
+      "web_memory_gib": 4,
+      "control_vcpu": 0.5,
+      "control_memory_gib": 1,
+      "database": 120,
+      "redis": 60,
+      "network": 160,
+      "observability": 20,
+      "auth_secrets_dns": 15,
+      "backups": 20,
+      "staging_cpu": 100,
+      "analysis_concurrency": 2,
+      "tts_concurrency": 2,
+      "render_concurrency": 2
+    },
+    {
+      "videos": 1000,
+      "web_vcpu": 2,
+      "web_memory_gib": 4,
+      "control_vcpu": 0.5,
+      "control_memory_gib": 1,
+      "database": 160,
+      "redis": 90,
+      "network": 180,
+      "observability": 35,
+      "auth_secrets_dns": 30,
+      "backups": 30,
+      "staging_cpu": 100,
+      "analysis_concurrency": 2,
+      "tts_concurrency": 2,
+      "render_concurrency": 2
+    },
+    {
+      "videos": 10000,
+      "web_vcpu": 4,
+      "web_memory_gib": 8,
+      "control_vcpu": 1,
+      "control_memory_gib": 2,
+      "database": 300,
+      "redis": 180,
+      "network": 260,
+      "observability": 90,
+      "auth_secrets_dns": 80,
+      "backups": 60,
+      "staging_cpu": 150,
+      "analysis_concurrency": 8,
+      "tts_concurrency": 2,
+      "render_concurrency": 8
+    }
+  ],
+  "orchestration_seconds": 320,
+  "orchestration_vcpu": 1,
+  "orchestration_memory_gib": 2
+}

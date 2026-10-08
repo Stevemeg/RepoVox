@@ -1,0 +1,46 @@
+{
+  "as_of": "2026-10-08",
+  "scope": "Official metadata and small license texts only; no weights, GPU/model execution or evaluation. License snapshot is not commercial voice/dataset rights clearance.",
+  "models": [
+    {
+      "model_id": "Qwen/Qwen2.5-Coder-14B-Instruct",
+      "metadata_source": "https://huggingface.co/api/models/Qwen/Qwen2.5-Coder-14B-Instruct",
+      "observed_revision": "aedcc2d42b622764e023cf882b6652e646b95671",
+      "card_license_label": "apache-2.0",
+      "license_file": "LICENSE",
+      "license_text_sha256": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e",
+      "pinned_license_source": "https://huggingface.co/Qwen/Qwen2.5-Coder-14B-Instruct/resolve/aedcc2d42b622764e023cf882b6652e646b95671/LICENSE",
+      "weights_downloaded": false
+    },
+    {
+      "model_id": "Qwen/Qwen3-Coder-30B-A3B-Instruct",
+      "metadata_source": "https://huggingface.co/api/models/Qwen/Qwen3-Coder-30B-A3B-Instruct",
+      "observed_revision": "b2cff646eb4bb1d68355c01b18ae02e7cf42d120",
+      "card_license_label": "apache-2.0",
+      "license_file": "LICENSE",
+      "license_text_sha256": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e",
+      "pinned_license_source": "https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct/resolve/b2cff646eb4bb1d68355c01b18ae02e7cf42d120/LICENSE",
+      "weights_downloaded": false
+    },
+    {
+      "model_id": "mistralai/Devstral-Small-2507",
+      "metadata_source": "https://huggingface.co/api/models/mistralai/Devstral-Small-2507",
+      "observed_revision": "bd165ab26cebbcc2eea2c4ecbfc07f3ac42b3c39",
+      "card_license_label": "apache-2.0",
+      "license_file": null,
+      "license_text_sha256": null,
+      "pinned_license_source": null,
+      "weights_downloaded": false
+    },
+    {
+      "model_id": "hexgrad/Kokoro-82M",
+      "metadata_source": "https://huggingface.co/api/models/hexgrad/Kokoro-82M",
+      "observed_revision": "f3ff3571791e39611d31c381e3a41a3af07b4987",
+      "card_license_label": "apache-2.0",
+      "license_file": null,
+      "license_text_sha256": null,
+      "pinned_license_source": null,
+      "weights_downloaded": false
+    }
+  ]
+}

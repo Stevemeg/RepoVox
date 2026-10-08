@@ -1,0 +1,23 @@
+# Phase 0 model-strategy change impact
+
+Revision dated 2026-10-08 against `ba9ec7ef000378c325ebb367250331a59874aad5`; Phase 0 remains unapproved. The owner mandates **self-hosted inference as the primary production strategy** and self-hosted speech. Normal video generation requires no paid third-party LLM/TTS API. External AI evaluation requires explicit owner approval, permitted data and documented terms. No implementation/provisioning/training is authorized here.
+
+The complete pre-edit inventory is [pre-revision-reference-audit.json](pre-revision-reference-audit.json): 108 matches with original path/line/text for Claude/Haiku/Polly, provider/paid/billed language, Fargate and the prior unit target. Broad matches include still-valid generic abstractions; the inventory is historical evidence, **not current policy**. Existing documents, schemas, examples and tools were read before revision. No Git history or attribution changed.
+
+| Existing area | Preserve | Change and reason |
+| --- | --- | --- |
+| README / AGENTS | Product positioning, documentation workflow, sole-owner identity, no-phase-advance gate | Index Director/training/evaluation/speech documents; require self-host policy and revised A–K handoff. |
+| PRD | Public GitHub, three languages, 3–5min/720p, auth/dashboard/history, F-01–11, N-01 trust and all exclusions | Add Director release/license/evaluation gates; remove API-relative $0.50 target/$1 reserve; GPU admission and tokenizer-specific per-request caps. |
+| Overview / ADR-001 | Modular API, CPU analysis, PostgreSQL, Redis and trusted render roles | Add private GPU Director, separate CPU TTS and isolated training; no external AI arrow in normal path. |
+| Pipeline | Fourteen stage IDs, safe acquisition, static parsing, PKM/evidence, verdicts, trusted media | Static inference candidates before verifier; Director consumes locked verified PKM at stages 10/11, never sets verification; self-host TTS and resource metadata. |
+| Data model / ADR-002 | Owner FKs/RLS, states, outbox, fences, cancellation, cleanup, terminal history | `model_operations` replaces proposed provider-first entity; versioned model releases and compute ledger; self-host replay is bounded/reconciled, optional paid operations remain exceptional. No existing DB migration exists. |
+| Schema / examples | Synthetic provenance/range/hash/frame checks, unsupported claim exclusions | Schema v2; Director input/output, safe visual graphs and model/adapter/engine/token/GPU metadata; null specialization identifies an unchanged base, not trained Director. |
+| Threat model / ADR-003 | All S-01–14 boundaries, zero submitted-code execution, secrets/tenant/SSRF protection | Extend model-registry integrity, poisoned data, memorization, inference auth/cache, GPU DoS, training rights/deletion and artifact publication controls. |
+| Deployment / ADR-004 | CPU services, managed auth/DB/Redis/S3, HTTPS, migration/backup/rollback/retention | Fargate **CPU only** plus ECS on GPU EC2; compare dedicated GPU provider and cheaper private GPU VM/CPU host; training separate. |
+| Reliability | SLO measurement, recovery suite, logs/alerts, incident/restore/rollback | GPU saturation/readiness/OOM/model rollback, inference replay accounting and training isolation; no paid-send requirement on normal jobs. |
+| Costs / inputs / calculator | Reproducibility, full fixed hosting/storage/delivery, 100/1k/10k scenarios, quotas | Replace $0.24 API-centric marginal figure with warm GPU/idle/load/utilization, CPU TTS and separate research/training. API only economic comparator; finite or impossible break-even reported honestly. |
+| Roadmap | Independent pass/owner authorization between phases, deployed multi-user SaaS final gate | Add baseline evaluation, dataset/LoRA, comparative promotion, self-host deployment/TTS gates; specialization failure escalates launch decision. |
+| ADR-005 / new ADRs | Safe scene data, trusted Remotion/FFmpeg and replaceable boundaries | Self-host Director/TTS recommendation; base/adapters/data ownership distinction, evaluation and promotion gates, GPU capacity strategy. |
+| Prior verification record | Actual earlier commands and failures remain legitimate historical evidence | Mark earlier estimates/architecture superseded; new revision record reports only newly executed documentation/schema/cost/diagram checks. |
+
+Current residual references to Claude/Polly are confined to the historical inventory/verification and clearly labelled API economics comparison. Cloud compute is still billed infrastructure: self-hosting does not make GPU inference free. All artifacts/jobs remain owner-scoped; training is opt-in curated research, never automatic reuse of customer jobs.
