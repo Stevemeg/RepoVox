@@ -222,7 +222,10 @@ def main():
     assert actual == expected, 'State diagram differs from documented transition contract'
     log = subprocess.check_output(['git','log','--all','--format=%an|%ae|%cn|%ce%n%B'], cwd=ROOT, text=True)
     assert not re.search(r'^(?:Co-authored-by|Generated-by):', log, re.M | re.I), 'Unexpected attribution trailer'
-    email = subprocess.check_output(['git','config','user.email'],cwd=ROOT,text=True).strip()
+    # Read authentic baseline attribution; CI needs no invented/modified Git identity configuration.
+    roots = subprocess.check_output(['git','rev-list','--max-parents=0','HEAD'],cwd=ROOT,text=True).splitlines()
+    assert len(roots) == 1, 'Unexpected history roots'
+    email = subprocess.check_output(['git','show','-s','--format=%ae',roots[0]],cwd=ROOT,text=True).strip()
     for identity in re.findall(r'^([^|\n]+)\|([^|\n]+)\|([^|\n]+)\|([^|\n]+)$', log, re.M):
         assert identity == ('Stevemeg',email,'Stevemeg',email), f'Unexpected commit identity: {identity}'
     print(f'PASS: {len(REQUIRED)} required paths, {len(md_files)} Markdown files, {links} local links/anchors, {len(json_files)} JSON files')

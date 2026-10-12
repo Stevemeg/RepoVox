@@ -1,0 +1,8 @@
+.git
+.env
+.venv
+.artifacts
+**/node_modules
+**/.next
+**/__pycache__
+**/coverage

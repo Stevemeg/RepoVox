@@ -2,7 +2,41 @@
 
 Bring source code to life visually.
 
-**Status: Phase 0 documentation, awaiting independent validation.** No application features, paid integrations, cloud resources, benchmarks or production deployment exist. Decisions are implementation proposals; owner approvals are listed in the [roadmap](docs/delivery/roadmap.md).
+**Status: Phase 1 local foundation under implementation and verification.** Phase 0 was independently accepted at `e35d8ef8a8a53cb34e46271a9813b5332ea42c1f`; PR #1 remains open, so Phase 1 uses a stacked branch. No production deployment, real analysis, AI, speech or video generation exists. Phase 1 requires independent validation and cannot be merged or advanced by the implementation assistant.
+
+## Local development
+
+Requirements: Docker Desktop (Linux containers), Compose v2, Python 3.11+ and Node 24.18.0. Keep at least 15 GB free for builds. Generate distinct ignored local credentials and start the stack:
+
+```powershell
+python tools/phase1_env.py
+docker compose up -d --build
+docker compose ps -a
+```
+
+Open `http://localhost:3000` and choose Alex Chen or Sam Rivera. Create/view/delete owned GitHub repository locators. Project details can run labelled synthetic job fixtures; generation is unavailable. PostgreSQL is durable truth, Redis/Celery delivers notifications, and private SeaweedFS provides local S3 storage. Database/storage volumes survive `docker compose down`. [Detailed setup/reset](docs/development/local.md), [API](docs/development/api.md), [migrations](docs/development/migrations.md), [orchestration](docs/development/orchestration.md), [tests/CI](docs/development/testing.md), [Phase 1 evidence](docs/delivery/phase1-verification.md).
+
+## Application checks
+
+```powershell
+uv sync --frozen
+uv run ruff check apps/api tests tools/phase1*.py
+uv run ruff format --check apps/api tests tools/phase1*.py
+uv run mypy
+uv run pytest tests/unit -q
+uv run python tools/phase1_contracts.py --check
+uv run pip-audit --local
+npm --prefix apps/web ci
+npm --prefix apps/web run lint
+npm --prefix apps/web run typecheck
+npm --prefix apps/web test
+npm --prefix apps/web run build
+docker compose -p repovox-test up -d --build postgres redis storage storage-init migrate
+docker compose -p repovox-test run --rm --build tests
+docker compose -p repovox-test down --volumes
+```
+
+Integration tests use an explicitly disposable database with real PostgreSQL RLS, Redis and S3 operations; no mocked isolation proof or silent service skips. Read [test execution](docs/development/testing.md) before destructive test reset. Full production security, deletion/restore, managed identity and later media/AI gates remain in the approved Phase 0 roadmap.
 
 ## Reading order
 
@@ -38,4 +72,4 @@ npx --yes --package @mermaid-js/mermaid-cli@11.15.0 mmdc -p $diagramConfig -i do
 git diff --check
 ```
 
-Local checks validate paths, headings, JSON examples and contract invariants; Mermaid CLI renders diagrams separately. See [conventions and sole-contributor policy](AGENTS.md). Do not begin Phase 1 before independent validation and owner authorization.
+Documentation checks validate paths, headings, JSON examples and contract invariants; Mermaid CLI renders diagrams separately. See [conventions and sole-contributor policy](AGENTS.md). Application evidence is separate. Owner authorization permits Phase 1 only; do not merge or start Phase 2 without independent validation and the next authorization.

@@ -1,0 +1,136 @@
+name: repovox
+x-api: &api
+  build:
+    context: .
+    dockerfile: infrastructure/local/api.Dockerfile
+  environment: &environment
+    REPOVOX_ENVIRONMENT: development
+    REPOVOX_DEV_AUTH: 'true'
+    REPOVOX_FIXTURES: 'true'
+    REPOVOX_DATABASE_URL: postgresql+psycopg://rv_app:${APP_DATABASE_PASSWORD:?Generate .env}@postgres:5432/repovox
+    REPOVOX_SESSION_SECRET: ${SESSION_SECRET:?Generate .env}
+    REPOVOX_ORIGIN: http://localhost:3000
+    REPOVOX_REDIS_URL: redis://redis:6379/0
+    REPOVOX_STORAGE_ENDPOINT: http://storage:8333
+    REPOVOX_STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?Generate .env}
+    REPOVOX_STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?Generate .env}
+  restart: unless-stopped
+  stop_grace_period: 20s
+  depends_on:
+    migrate: {condition: service_completed_successfully}
+    storage-init: {condition: service_completed_successfully}
+    redis: {condition: service_healthy}
+
+services:
+  postgres:
+    image: postgres:16.13-alpine
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Generate .env}
+      MIGRATION_PASSWORD: ${MIGRATION_PASSWORD:?Generate .env}
+      APP_DATABASE_PASSWORD: ${APP_DATABASE_PASSWORD:?Generate .env}
+      WORKER_DATABASE_PASSWORD: ${WORKER_DATABASE_PASSWORD:?Generate .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infrastructure/local/init-db.sh:/docker-entrypoint-initdb.d/10-roles.sh:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d repovox']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  redis:
+    image: redis:7.4.9-alpine
+    command: ['redis-server', '--save', '', '--appendonly', 'no']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  storage-config:
+    build:
+      context: .
+      dockerfile: infrastructure/local/api.Dockerfile
+    command: ['python', 'tools/phase1_storage_config.py']
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Generate .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Generate .env}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?Generate .env}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?Generate .env}
+    volumes: [storage-config:/storage-config]
+  storage:
+    image: chrislusf/seaweedfs:4.17
+    command: ['server', '-filer', '-s3', '-s3.config=/etc/repovox/s3.json', '-dir=/data', '-ip=storage', '-volume.max=2', '-master.volumeSizeLimitMB=100']
+    volumes: [storage-data:/data, storage-config:/etc/repovox:ro]
+    depends_on: {storage-config: {condition: service_completed_successfully}}
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:9333/cluster/status']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  storage-init:
+    build:
+      context: .
+      dockerfile: infrastructure/local/api.Dockerfile
+    command: ['python', 'tools/phase1_storage_init.py']
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Generate .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Generate .env}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?Generate .env}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?Generate .env}
+    depends_on: {storage: {condition: service_healthy}}
+  migrate:
+    build:
+      context: .
+      dockerfile: infrastructure/local/api.Dockerfile
+    environment:
+      REPOVOX_MIGRATION_DATABASE_URL: postgresql+psycopg://rv_migrator:${MIGRATION_PASSWORD:?Generate .env}@postgres:5432/repovox
+    command: ['alembic', '-c', 'apps/api/alembic.ini', 'upgrade', 'head']
+    depends_on: {postgres: {condition: service_healthy}}
+  api:
+    <<: *api
+    ports: ['127.0.0.1:8000:8000']
+    healthcheck:
+      test: ['CMD', 'python', '-c', "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  worker:
+    <<: *api
+    environment:
+      <<: *environment
+      REPOVOX_DATABASE_URL: postgresql+psycopg://rv_worker:${WORKER_DATABASE_PASSWORD:?Generate .env}@postgres:5432/repovox
+      REPOVOX_WORKER_DATABASE_URL: postgresql+psycopg://rv_worker:${WORKER_DATABASE_PASSWORD:?Generate .env}@postgres:5432/repovox
+    command: ['celery', '-A', 'repovox.workers.tasks:celery', 'worker', '--loglevel=WARNING', '--concurrency=2']
+  dispatcher:
+    <<: *api
+    environment:
+      <<: *environment
+      REPOVOX_DATABASE_URL: postgresql+psycopg://rv_worker:${WORKER_DATABASE_PASSWORD:?Generate .env}@postgres:5432/repovox
+      REPOVOX_WORKER_DATABASE_URL: postgresql+psycopg://rv_worker:${WORKER_DATABASE_PASSWORD:?Generate .env}@postgres:5432/repovox
+    command: ['python', '-m', 'repovox.workers.dispatcher']
+  web:
+    build:
+      context: .
+      dockerfile: infrastructure/local/web.Dockerfile
+    environment: {REPOVOX_API_URL: 'http://api:8000'}
+    ports: ['127.0.0.1:3000:3000']
+    depends_on: {api: {condition: service_healthy}}
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:3000/sign-in').then(r=>{if(!r.ok)process.exit(1)})"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+  tests:
+    <<: *api
+    profiles: ['test']
+    restart: 'no'
+    environment:
+      <<: *environment
+      REPOVOX_ENVIRONMENT: test
+      REPOVOX_WORKER_DATABASE_URL: postgresql+psycopg://rv_worker:${WORKER_DATABASE_PASSWORD:?Generate .env}@postgres:5432/repovox
+      REPOVOX_TEST_ADMIN_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:?Generate .env}@postgres:5432/repovox
+    command: ['pytest', '-q', '--tb=short']
+volumes:
+  postgres-data:
+  storage-data:
+  storage-config:
