@@ -27,6 +27,7 @@ SeaweedFS stores immutable archives/analysis. Database/storage volumes survive
 `docker compose down`. [Analysis/API/limits](docs/development/analysis.md),
 [evaluation preparation](docs/development/evaluation-preparation.md),
 [Phase 2 verification](docs/delivery/phase2-verification.md),
+[independent-review corrections](docs/delivery/phase2-review-corrections.md),
 [local setup](docs/development/local.md), [tests](docs/development/testing.md) and
 [accepted Phase 1 evidence](docs/delivery/phase1-verification.md).
 

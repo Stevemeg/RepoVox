@@ -20,7 +20,8 @@ from repovox.evaluation.scoring import aggregate, compare, valid_citation
 
 def empty() -> Corpus:
     return Corpus(
-        version="eval-v1-preparation",
+        schema_version="evaluation-corpus-2.0",
+        version="eval-v2-preparation",
         status="UNFROZEN",
         reviewer_status="PENDING OWNER APPOINTMENT",
         appointment=None,
@@ -110,6 +111,11 @@ def test_intake_and_freeze_screen_uncited_source_without_creating_approval(tmp_p
     manifest = serialize(filter_sources(source, "example/tooling", "a" * 40, "b" * 64))
     (tmp_path / "source_manifest.json").write_bytes(manifest)
     family = Family(
+        gold_schema_version="gold-evaluation-1.0",
+        annotation_scope="partial",
+        symbols=[],
+        entrypoints=[],
+        safety_observations={},
         id="engineering-tooling",
         repository="example/tooling",
         commit_sha="a" * 40,

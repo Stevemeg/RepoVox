@@ -3,6 +3,8 @@
 [Approved targets and EVAL-ENTRY](../ai/evaluation-plan.md) · [Current manifest](../ai/evaluation-corpus.manifest.json) · [Schema](../ai/evaluation-corpus.schema.json) · [Cost assumptions](../operations/cost-model.md#research-and-specialization-budget)
 
 Status: UNFROZEN. Independent human reviewer: **PENDING OWNER APPOINTMENT**.
+Corpus contract is now `evaluation-corpus-2.0`, with canonical `gold-evaluation-1.0`
+annotations and `source-fact-1.0` matching. See [gold authoring and scoring](evaluation-gold.md).
 No official candidates, approved families, gold claims, gold edges, protected fixtures
 or frozen split currently exist. Dynamically created engineering fixtures and public
 live-smoke samples are not an evaluation corpus or approved independent gold.
@@ -25,8 +27,10 @@ It never produces human appointments, rights grants, labels or approvals.
    manifest hash, code fingerprints, reviewed family grouping/fork/template ancestry,
    language slice and split. Source bytes and hidden labels stay outside ordinary
    application storage. No source execution or dependency installs.
-3. Gold preparer manually writes atomic source-grounded claims, qualified edges,
-   purpose/scope, entries, expected abstentions, conflicts and adversarial expectations.
+3. Gold preparer manually writes source symbols, entrypoints, qualified edges and atomic
+   claim facts/expected verdicts in the canonical gold contract. Purpose, expected
+   abstentions, conflicts and adversarial observations needing semantic review are
+   recorded in the separately reviewed rubric/provenance and explicit safety observations.
    `validate_labels` checks file containment/hashes/line ranges and required support;
    it cannot establish semantic entailment. Do not use analyzer/model output as gold.
 4. Owner appoints an actual independent human and records appointment/rights evidence.
@@ -64,12 +68,13 @@ manifest invalidation alone does not prove physical or backup deletion/unlearnin
 
 ## Deterministic evaluator
 
-`repovox.evaluation.scoring` imports no analyzer modules. It compares independent symbol,
-import/graph and entry gold sets, preserves predicted/gold/paired denominators, counts
-false verification among reviewed claims, separately reports unmapped/unscored claims,
-unsupported rejection and
-checks citation SHA/file/hash/lines directly against original source. It reports coverage,
-parser/conflict/safety observations and aggregate counts. Semantic support, purpose,
+`repovox.evaluation.scoring` imports no analyzer modules. It validates the canonical
+gold inputs, compares symbol/import/graph/entry sets, and pairs atomic facts using
+original source identities rather than assuming equal IDs. It reports both pairing
+denominators, false verification among matched labelled facts, unscored predictions,
+unsupported rejection, precision/recall and original citation validity. Zero/partial
+pairing is INCOMPLETE, including in aggregates; complete pairing is not an acceptance
+PASS. It reports coverage, parser/conflict/safety observations. Semantic support, purpose,
 adversarial behavior and secret leakage observations require actual reviewed annotations
 and executed instrumentation; absent observations are not passes. No Director weights,
 paid evaluator, training or calibration is used.

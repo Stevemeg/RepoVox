@@ -1,0 +1,577 @@
+{
+  "$defs": {
+    "Attributes": {
+      "additionalProperties": false,
+      "properties": {
+        "alias": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Alias"
+        },
+        "binding": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Binding"
+        },
+        "dispatch": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dispatch"
+        },
+        "imported_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Imported Name"
+        },
+        "parameters": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parameters"
+        }
+      },
+      "title": "Attributes",
+      "type": "object"
+    },
+    "Citation": {
+      "additionalProperties": false,
+      "properties": {
+        "end_line": {
+          "minimum": 1,
+          "title": "End Line",
+          "type": "integer"
+        },
+        "file_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "File Sha256",
+          "type": "string"
+        },
+        "path": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "start_line": {
+          "minimum": 1,
+          "title": "Start Line",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "file_sha256",
+        "start_line",
+        "end_line"
+      ],
+      "title": "Citation",
+      "type": "object"
+    },
+    "EdgeFact": {
+      "additionalProperties": false,
+      "properties": {
+        "edge": {
+          "$ref": "#/$defs/EdgeIdentity"
+        },
+        "type": {
+          "const": "static_relationship",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "edge"
+      ],
+      "title": "EdgeFact",
+      "type": "object"
+    },
+    "EdgeIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "classification": {
+          "enum": [
+            "declared",
+            "resolved_static",
+            "unresolved",
+            "inferred"
+          ],
+          "title": "Classification",
+          "type": "string"
+        },
+        "relationship": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Relationship",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/SymbolIdentity"
+        },
+        "support": {
+          "items": {
+            "$ref": "#/$defs/SymbolIdentity"
+          },
+          "minItems": 1,
+          "title": "Support",
+          "type": "array"
+        },
+        "target": {
+          "$ref": "#/$defs/SymbolIdentity"
+        }
+      },
+      "required": [
+        "source",
+        "target",
+        "relationship",
+        "classification",
+        "support"
+      ],
+      "title": "EdgeIdentity",
+      "type": "object"
+    },
+    "GoldClaim": {
+      "additionalProperties": false,
+      "properties": {
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "minItems": 1,
+          "title": "Citations",
+          "type": "array"
+        },
+        "fact": {
+          "discriminator": {
+            "mapping": {
+              "static_relationship": "#/$defs/EdgeFact",
+              "symbol_syntax": "#/$defs/SymbolFact"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/SymbolFact"
+            },
+            {
+              "$ref": "#/$defs/EdgeFact"
+            }
+          ],
+          "title": "Fact"
+        },
+        "id": {
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "verified",
+            "inferred",
+            "documentation_only",
+            "unsupported"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "text",
+        "status",
+        "fact",
+        "citations"
+      ],
+      "title": "GoldClaim",
+      "type": "object"
+    },
+    "GoldEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "minItems": 1,
+          "title": "Citations",
+          "type": "array"
+        },
+        "classification": {
+          "enum": [
+            "declared",
+            "resolved_static",
+            "unresolved",
+            "inferred"
+          ],
+          "title": "Classification",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "relationship": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Relationship",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/SymbolIdentity"
+        },
+        "support": {
+          "items": {
+            "$ref": "#/$defs/SymbolIdentity"
+          },
+          "minItems": 1,
+          "title": "Support",
+          "type": "array"
+        },
+        "supported": {
+          "title": "Supported",
+          "type": "boolean"
+        },
+        "target": {
+          "$ref": "#/$defs/SymbolIdentity"
+        }
+      },
+      "required": [
+        "source",
+        "target",
+        "relationship",
+        "classification",
+        "support",
+        "id",
+        "supported",
+        "citations"
+      ],
+      "title": "GoldEdge",
+      "type": "object"
+    },
+    "GoldEntrypoint": {
+      "additionalProperties": false,
+      "properties": {
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "minItems": 1,
+          "title": "Citations",
+          "type": "array"
+        },
+        "id": {
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "rule": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Rule",
+          "type": "string"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target"
+        }
+      },
+      "required": [
+        "id",
+        "path",
+        "rule",
+        "citations"
+      ],
+      "title": "GoldEntrypoint",
+      "type": "object"
+    },
+    "GoldSymbol": {
+      "additionalProperties": false,
+      "properties": {
+        "attributes": {
+          "$ref": "#/$defs/Attributes"
+        },
+        "end_line": {
+          "minimum": 1,
+          "title": "End Line",
+          "type": "integer"
+        },
+        "file_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "File Sha256",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Kind",
+          "type": "string"
+        },
+        "language": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Language",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "path": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "rule": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Rule",
+          "type": "string"
+        },
+        "start_line": {
+          "minimum": 1,
+          "title": "Start Line",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "file_sha256",
+        "start_line",
+        "end_line",
+        "kind",
+        "name",
+        "language",
+        "rule",
+        "attributes",
+        "id"
+      ],
+      "title": "GoldSymbol",
+      "type": "object"
+    },
+    "SymbolFact": {
+      "additionalProperties": false,
+      "properties": {
+        "symbol": {
+          "$ref": "#/$defs/SymbolIdentity"
+        },
+        "type": {
+          "const": "symbol_syntax",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "symbol"
+      ],
+      "title": "SymbolFact",
+      "type": "object"
+    },
+    "SymbolIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "attributes": {
+          "$ref": "#/$defs/Attributes"
+        },
+        "end_line": {
+          "minimum": 1,
+          "title": "End Line",
+          "type": "integer"
+        },
+        "file_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "File Sha256",
+          "type": "string"
+        },
+        "kind": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Kind",
+          "type": "string"
+        },
+        "language": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Language",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "path": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "rule": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Rule",
+          "type": "string"
+        },
+        "start_line": {
+          "minimum": 1,
+          "title": "Start Line",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "file_sha256",
+        "start_line",
+        "end_line",
+        "kind",
+        "name",
+        "language",
+        "rule",
+        "attributes"
+      ],
+      "title": "SymbolIdentity",
+      "type": "object"
+    }
+  },
+  "$id": "https://repovox.invalid/contracts/gold-evaluation/1.0",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "annotation_scope": {
+      "enum": [
+        "complete",
+        "partial"
+      ],
+      "title": "Annotation Scope",
+      "type": "string"
+    },
+    "claims": {
+      "items": {
+        "$ref": "#/$defs/GoldClaim"
+      },
+      "title": "Claims",
+      "type": "array"
+    },
+    "commit_sha": {
+      "pattern": "^[a-f0-9]{40}$",
+      "title": "Commit Sha",
+      "type": "string"
+    },
+    "edges": {
+      "items": {
+        "$ref": "#/$defs/GoldEdge"
+      },
+      "title": "Edges",
+      "type": "array"
+    },
+    "entrypoints": {
+      "items": {
+        "$ref": "#/$defs/GoldEntrypoint"
+      },
+      "title": "Entrypoints",
+      "type": "array"
+    },
+    "gold_schema_version": {
+      "const": "gold-evaluation-1.0",
+      "title": "Gold Schema Version",
+      "type": "string"
+    },
+    "repository": {
+      "minLength": 1,
+      "title": "Repository",
+      "type": "string"
+    },
+    "safety_observations": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Safety Observations",
+      "type": "object"
+    },
+    "symbols": {
+      "items": {
+        "$ref": "#/$defs/GoldSymbol"
+      },
+      "title": "Symbols",
+      "type": "array"
+    }
+  },
+  "required": [
+    "gold_schema_version",
+    "repository",
+    "commit_sha",
+    "annotation_scope",
+    "symbols",
+    "entrypoints",
+    "edges",
+    "claims",
+    "safety_observations"
+  ],
+  "title": "GoldEvaluation",
+  "type": "object"
+}

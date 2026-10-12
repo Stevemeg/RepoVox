@@ -7,6 +7,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from repovox.evaluation.gold import GoldEvaluation, validate_gold_source
+
 
 def serialize(value: object) -> bytes:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
@@ -53,32 +55,8 @@ class GoldReview(Record):
     approved: bool
 
 
-class Citation(Record):
-    path: str
-    file_sha256: Hash
-    start_line: int = Field(ge=1)
-    end_line: int = Field(ge=1)
-
-
-class GoldClaim(Record):
-    id: str
-    text: str
-    status: Literal["verified", "inferred", "documentation_only", "unsupported"]
-    citations: list[Citation]
-
-
-class GoldEdge(Record):
-    source: str
-    target: str
-    relationship: str
-    supported: bool
-    citations: list[Citation]
-
-
-class Family(Record):
+class Family(GoldEvaluation):
     id: str = Field(pattern=r"^[a-z][a-z0-9-]{0,79}$")
-    repository: str
-    commit_sha: str = Field(pattern=r"^[a-f0-9]{40}$")
     language_slice: Literal["python", "javascript_typescript", "mixed"]
     split: Literal["TOOLING_FIXTURE", "EVAL_DEV", "EVAL_TEST"]
     hidden: bool
@@ -89,14 +67,13 @@ class Family(Record):
     content_fingerprints: list[Hash]
     rights: Rights
     screening: Literal["pending", "clear", "rejected"]
-    claims: list[GoldClaim]
-    edges: list[GoldEdge]
     adversarial_variants: list[str]
     gold_review: GoldReview | None
     withdrawn: bool = False
 
 
 class Corpus(Record):
+    schema_version: Literal["evaluation-corpus-2.0"]
     version: str
     status: Literal["UNFROZEN", "FROZEN", "WITHDRAWN"]
     reviewer_status: str
@@ -155,30 +132,9 @@ def permitted(family: Family) -> bool:
 
 
 def validate_labels(family: Family, source: Path) -> None:
-    citations = [c for claim in family.claims for c in claim.citations] + [
-        c for edge in family.edges for c in edge.citations
-    ]
-    if len({c.id for c in family.claims}) != len(family.claims):
-        raise ValueError("duplicate_gold_id")
-    for claim in family.claims:
-        if claim.status != "unsupported" and not claim.citations:
-            raise ValueError("gold_missing_source")
-    for edge in family.edges:
-        if edge.supported and not edge.citations:
-            raise ValueError("edge_missing_source")
-    for citation in citations:
-        path = (source / citation.path).resolve()
-        if not path.is_relative_to(source.resolve()) or not path.is_file() or path.is_symlink():
-            raise ValueError("gold_invalid_path")
-        body = path.read_bytes()
-        lines = body.split(b"\n")
-        if checksum(
-            body
-        ) != citation.file_sha256 or not 1 <= citation.start_line <= citation.end_line <= len(
-            lines
-        ):
-            raise ValueError("gold_invalid_citation")
-    # Entailment still requires the appointed human; hash/range validity does not approve labels.
+    # Revalidation also protects callers using model_copy/model_construct.
+    validated = Family.model_validate(family.model_dump())
+    validate_gold_source(validated, source)
 
 
 def screen_source(family: Family, source: Path) -> list[str]:
@@ -263,6 +219,8 @@ def freeze(
         seen_ids.update([family.id, *family.derivatives])
         if not permitted(family) or family.screening != "clear" or family.withdrawn:
             raise ValueError("rights_or_screening_incomplete")
+        if family.annotation_scope != "complete":
+            raise ValueError("partial_gold_annotation_scope")
         review = family.gold_review
         if (
             review is None

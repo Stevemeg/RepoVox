@@ -1,5 +1,6 @@
 {
-  "version": "eval-v1-preparation",
+  "schema_version": "evaluation-corpus-2.0",
+  "version": "eval-v2-preparation",
   "status": "UNFROZEN",
   "reviewer_status": "PENDING OWNER APPOINTMENT",
   "appointment": null,

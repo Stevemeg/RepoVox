@@ -15,6 +15,7 @@ uv run ruff check apps/api tests tools/phase1*.py tools/phase2*.py
 uv run ruff format --check apps/api tests tools/phase1*.py tools/phase2*.py
 uv run mypy
 uv run pytest tests/unit -q
+uv run pytest tests/unit/test_evaluation_path.py -q
 uv run python tools/phase2_contracts.py --check
 uv run python tools/phase2_corpus.py docs/ai/evaluation-corpus.manifest.json
 docker compose -p repovox-test run --rm --build tests

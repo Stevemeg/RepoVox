@@ -6,6 +6,7 @@ from pathlib import Path
 
 from repovox.analysis.contracts import PAYLOADS, Envelope
 from repovox.evaluation.corpus import Corpus
+from repovox.evaluation.gold import GoldEvaluation
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--check", action="store_true")
@@ -24,9 +25,16 @@ for kind, model in PAYLOADS.items():
             "then": {"properties": {"payload": payload}},
         }
     )
+corpus = Corpus.model_json_schema()
+corpus["$schema"] = "https://json-schema.org/draft/2020-12/schema"
+corpus["$id"] = "https://repovox.invalid/contracts/evaluation-corpus/2.0"
+gold = GoldEvaluation.model_json_schema()
+gold["$schema"] = "https://json-schema.org/draft/2020-12/schema"
+gold["$id"] = "https://repovox.invalid/contracts/gold-evaluation/1.0"
 for destination, value in [
     (root / "docs/architecture/analysis.schema.json", schema),
-    (root / "docs/ai/evaluation-corpus.schema.json", Corpus.model_json_schema()),
+    (root / "docs/ai/evaluation-corpus.schema.json", corpus),
+    (root / "docs/ai/gold-evaluation.schema.json", gold),
 ]:
     body = json.dumps(value, indent=2, sort_keys=True) + "\n"
     if args.check:

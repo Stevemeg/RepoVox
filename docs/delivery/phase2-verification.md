@@ -1,5 +1,8 @@
 # Phase 2 verification and independent review handoff
 
+Historical submission reviewed at `b35d93d`. Evaluation-tooling findings R2-01/R2-02
+and their superseding verification are recorded in [review corrections](phase2-review-corrections.md).
+
 Date: 2026-10-12. This records observed engineering results, not independent acceptance
 or production readiness. The official corpus remains UNFROZEN. No Phase 3 work, model
 download/training, media generation, deployment, paid infrastructure or merge occurred.
