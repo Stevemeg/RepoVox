@@ -156,6 +156,38 @@ describe("Workspace", () => {
     expect(screen.getByRole("button", { name: /Sam Rivera/ })).toBeVisible();
     expect(screen.getByText(/Development identities only/)).toBeVisible();
   });
+  it("keeps the create dialog keyboard usable", async () => {
+    navigation.path = "/projects";
+    render(<Workspace />);
+    await screen.findByRole("heading", { name: "Projects" });
+    await userEvent.click(
+      screen.getAllByRole("button", { name: "New project" })[0],
+    );
+    expect(screen.getByLabelText("Project name")).toHaveFocus();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", { name: "New project" })[0],
+    ).toHaveFocus();
+  });
+  it("signs out and clears session state without an expiration error", async () => {
+    render(<Workspace />);
+    await screen.findByRole("button", { name: "Sign out" });
+    fetcher.mockImplementation((url: string) =>
+      Promise.resolve(
+        url.endsWith("/sign-out")
+          ? new Response(null, { status: 204 })
+          : respond({ error: { code: "session_required" } }, 401),
+      ),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() =>
+      expect(navigation.replace).toHaveBeenCalledWith("/sign-in"),
+    );
+    expect(
+      screen.queryByText("Your session expired. Sign in to continue."),
+    ).not.toBeInTheDocument();
+  });
 });
 it("sends CSRF and reports unauthorized API response", async () => {
   document.cookie = "rv_csrf=test-csrf;path=/";

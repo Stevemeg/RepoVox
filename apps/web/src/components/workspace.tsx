@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   Box,
@@ -87,6 +87,7 @@ export function Workspace() {
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [expired, setExpired] = useState(false);
+  const sessionGeneration = useRef(0);
   const signIn = path === "/sign-in";
   const projectId = path.startsWith("/projects/") ? path.split("/")[2] : null;
   const jobId = path.startsWith("/jobs/") ? path.split("/")[2] : null;
@@ -115,26 +116,32 @@ export function Workspace() {
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
+      const generation = sessionGeneration.current;
       try {
         const user = await api<Account>("/auth/session", { signal });
         const [ownedProjects, ownedJobs] = await Promise.all([
           api<Project[]>("/projects", { signal }),
           api<Job[]>("/jobs", { signal }),
         ]);
-        if (signal?.aborted) return;
+        const detail = jobId
+          ? await api<Job>(`/jobs/${jobId}`, { signal })
+          : null;
+        if (signal?.aborted || generation !== sessionGeneration.current) return;
         setAccount(user);
         setProjects(ownedProjects);
         setJobs(ownedJobs);
-        if (jobId) setSelectedJob(await api<Job>(`/jobs/${jobId}`, { signal }));
+        setSelectedJob(detail);
         if (signIn) router.replace("/");
       } catch (cause) {
         if (
           !signal?.aborted &&
+          generation === sessionGeneration.current &&
           !(signIn && cause instanceof ApiError && cause.status === 401)
         )
           handleError(cause);
       } finally {
-        if (!signal?.aborted) setLoading(false);
+        if (!signal?.aborted && generation === sessionGeneration.current)
+          setLoading(false);
       }
     },
     [jobId, signIn, router, handleError],
@@ -153,12 +160,49 @@ export function Workspace() {
     return () => clearInterval(timer);
   }, [account, signIn, load]);
 
-  async function act(action: () => Promise<unknown>) {
+  useEffect(() => {
+    if (!showForm) return;
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
+    if (!dialog) return;
+    const active = document.activeElement as HTMLElement | null;
+    const previous = dialog.contains(active)
+      ? document.querySelector<HTMLElement>(".content button.primary")
+      : active;
+    const controls = () =>
+      Array.from(
+        dialog.querySelectorAll<HTMLElement>("input, button:not(:disabled)"),
+      );
+    controls()[0]?.focus();
+    function keyboard(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setShowForm(false);
+      }
+      if (event.key !== "Tab") return;
+      const elements = controls();
+      const first = elements[0],
+        last = elements.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    }
+    document.addEventListener("keydown", keyboard);
+    return () => {
+      document.removeEventListener("keydown", keyboard);
+      previous?.focus();
+    };
+  }, [showForm]);
+
+  async function act(action: () => Promise<unknown>, refresh = true) {
     setBusy(true);
     setError("");
     try {
       await action();
-      await load();
+      if (refresh) await load();
     } catch (cause) {
       handleError(cause);
     } finally {
@@ -360,9 +404,14 @@ export function Workspace() {
               onClick={() =>
                 void act(async () => {
                   await api("/auth/sign-out", { method: "POST" });
+                  sessionGeneration.current += 1;
                   setAccount(null);
+                  setProjects([]);
+                  setJobs([]);
+                  setSelectedJob(null);
+                  setExpired(false);
                   router.replace("/sign-in");
-                })
+                }, false)
               }
             >
               <LogOut size={17} />

@@ -23,12 +23,26 @@ async function forward(
     if (value) headers.set(name, value);
   }
   const mutating = !["GET", "HEAD"].includes(request.method);
-  const body = mutating ? await request.text() : undefined;
-  if (body && Buffer.byteLength(body) > 16384)
-    return NextResponse.json(
-      { error: { code: "request_too_large" } },
-      { status: 413 },
-    );
+  let body: string | undefined;
+  if (mutating && request.body) {
+    const reader = request.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > 16384) {
+        await reader.cancel();
+        return NextResponse.json(
+          { error: { code: "request_too_large" } },
+          { status: 413 },
+        );
+      }
+      chunks.push(value);
+    }
+    body = Buffer.concat(chunks).toString("utf-8");
+  }
   try {
     const upstream = await fetch(
       `${process.env.REPOVOX_API_URL || "http://localhost:8000"}/v1/${route}`,

@@ -32,7 +32,7 @@ CREATE TABLE repository_snapshots (
  project_id uuid NOT NULL, commit_sha text NOT NULL CHECK(commit_sha ~ '^[a-f0-9]{40}$'),
  synthetic boolean NOT NULL, acquisition_version text NOT NULL, pipeline_version text NOT NULL,
  metadata jsonb NOT NULL DEFAULT '{}', created_at timestamptz NOT NULL DEFAULT now(),
- UNIQUE(owner_id,id), UNIQUE(owner_id,project_id,commit_sha,acquisition_version),
+ UNIQUE(owner_id,id), UNIQUE(owner_id,project_id,id), UNIQUE(owner_id,project_id,commit_sha,acquisition_version),
  FOREIGN KEY(owner_id,project_id) REFERENCES projects(owner_id,id)
 );
 CREATE TABLE generation_jobs (
@@ -50,6 +50,7 @@ CREATE TABLE generation_jobs (
  UNIQUE(owner_id,id), UNIQUE(owner_id,idempotency_key),
  FOREIGN KEY(owner_id,project_id) REFERENCES projects(owner_id,id),
  FOREIGN KEY(owner_id,snapshot_id) REFERENCES repository_snapshots(owner_id,id),
+ FOREIGN KEY(owner_id,project_id,snapshot_id) REFERENCES repository_snapshots(owner_id,project_id,id),
  FOREIGN KEY(owner_id,prior_job_id) REFERENCES generation_jobs(owner_id,id)
 );
 CREATE TABLE job_stages (

@@ -73,6 +73,13 @@ jobs:
           cd apps/web
           npx playwright install --with-deps chromium
           npm run test:e2e
+      - name: Preserve synthetic desktop/mobile UI evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1-ui
+          path: apps/web/test-results/ui/*.png
+          retention-days: 7
+          if-no-files-found: error
       - name: Service status
         if: always()
         run: docker compose ps -a

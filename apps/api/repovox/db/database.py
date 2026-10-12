@@ -7,7 +7,17 @@ from sqlalchemy import Connection, Engine, create_engine, text
 
 
 def make_engine(url: str) -> Engine:
-    return create_engine(url, pool_size=5, max_overflow=5, pool_pre_ping=True, pool_timeout=5)
+    return create_engine(
+        url,
+        pool_size=5,
+        max_overflow=5,
+        pool_pre_ping=True,
+        pool_timeout=5,
+        connect_args={
+            "connect_timeout": 5,
+            "options": "-c statement_timeout=5000 -c idle_in_transaction_session_timeout=10000",
+        },
+    )
 
 
 def verify_role(engine: Engine, expected: str) -> None:

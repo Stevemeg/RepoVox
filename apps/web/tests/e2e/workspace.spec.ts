@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 test("local sign-in, create project, fixture history, delete and sign-out", async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/projects");
   await expect(page).toHaveURL(/sign-in/);
   await page.getByRole("button", { name: /Alex Chen/ }).click();
@@ -11,6 +12,18 @@ test("local sign-in, create project, fixture history, delete and sign-out", asyn
   await expect(
     page.getByRole("button", { name: /Generate video/ }),
   ).toBeDisabled();
+  await page.screenshot({
+    path: "test-results/ui/desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 375, height: 850 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({ path: "test-results/ui/mobile.png", fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByRole("link", { name: /^Projects/ }).click();
   await page.getByRole("button", { name: "New project" }).first().click();
   const title = `Browser fixture ${Date.now()}`;
