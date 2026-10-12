@@ -886,12 +886,17 @@ footer {
   .generation-note {
     padding: 20px;
     gap: 13px;
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr);
+    align-items: start;
   }
   .generation-note > div {
     flex: 1;
   }
   .generation-note button {
-    margin-left: 34px;
+    margin-left: 0;
+    grid-column: 2;
+    width: fit-content;
   }
   .project-grid {
     grid-template-columns: 1fr;

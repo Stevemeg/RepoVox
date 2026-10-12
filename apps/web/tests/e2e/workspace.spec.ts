@@ -18,6 +18,11 @@ test("local sign-in, create project, fixture history, delete and sign-out", asyn
   });
   await page.setViewportSize({ width: 375, height: 850 });
   expect(
+    await page
+      .locator(".generation-note > div")
+      .evaluate((element) => element.getBoundingClientRect().width),
+  ).toBeGreaterThan(220);
+  expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),

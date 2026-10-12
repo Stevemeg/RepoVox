@@ -90,11 +90,15 @@ def test_sessions_expiration_logout_tampering(
 
 
 def test_rls_missing_owner_pool_and_composite_fk(
-    clients: tuple[TestClient, TestClient], app_engine: Engine
+    clients: tuple[TestClient, TestClient], app_engine: Engine, admin: Engine
 ) -> None:
     a, b = clients
     pa, pb = project(a, "A"), project(b, "B")
     ja, jb = admit(a, pa), admit(b, pb)
+    with admin.connect() as c:
+        foreign_snapshot = c.scalar(
+            text("SELECT snapshot_id FROM generation_jobs WHERE id=:id"), {"id": jb["id"]}
+        )
     verify_role(app_engine, "rv_app")
     with app_engine.connect() as c:
         assert (
@@ -118,7 +122,16 @@ def test_rls_missing_owner_pool_and_composite_fk(
             )
             assert c.scalar(text("SELECT id FROM users WHERE id=:id"), {"id": B}) is None
             assert (
-                c.scalar(text("SELECT id FROM repository_snapshots WHERE id=:id"), {"id": jb["id"]})
+                c.scalar(
+                    text("SELECT id FROM repository_snapshots WHERE id=:id"),
+                    {"id": foreign_snapshot},
+                )
+                is None
+            )
+            assert (
+                c.scalar(
+                    text("SELECT id FROM job_stages WHERE id=:id"), {"id": jb["stages"][1]["id"]}
+                )
                 is None
             )
         with app_engine.connect() as c:
