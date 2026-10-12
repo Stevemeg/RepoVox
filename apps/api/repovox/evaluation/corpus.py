@@ -181,9 +181,8 @@ def validate_labels(family: Family, source: Path) -> None:
     # Entailment still requires the appointed human; hash/range validity does not approve labels.
 
 
-def intake(corpus: Corpus, family: Family, source: Path) -> Corpus:
-    if corpus.status != "UNFROZEN" or any(f.id == family.id for f in corpus.families):
-        raise ValueError("intake_requires_new_unfrozen_family")
+def screen_source(family: Family, source: Path) -> list[str]:
+    """Recheck the complete source inventory, including files without gold citations."""
     from repovox.analysis.filtering import filter_sources
 
     manifest_path = source.parent / "source_manifest.json"
@@ -200,15 +199,22 @@ def intake(corpus: Corpus, family: Family, source: Path) -> Corpus:
     actual = {(f["path"], f["file_sha256"], f["bytes"]) for f in screened["files"]}
     if expected != actual:
         raise ValueError("intake_source_changed")
-    candidate = family.model_copy(deep=True)
-    candidate.screening = "clear"
-    candidate.content_fingerprints = sorted(
+    return sorted(
         {
             f["file_sha256"]
             for f in screened["files"]
             if f["bytes"] >= 64 and f["status"] == "eligible"
         }
     )
+
+
+def intake(corpus: Corpus, family: Family, source: Path) -> Corpus:
+    if corpus.status != "UNFROZEN" or any(f.id == family.id for f in corpus.families):
+        raise ValueError("intake_requires_new_unfrozen_family")
+    fingerprints = screen_source(family, source)
+    candidate = family.model_copy(deep=True)
+    candidate.screening = "clear"
+    candidate.content_fingerprints = fingerprints
     validate_labels(candidate, source)
     result = corpus.model_copy(deep=True)
     result.families.append(candidate)
@@ -270,6 +276,8 @@ def freeze(
         source = sources.get(family.id)
         if source is None:
             raise ValueError("actual_gold_source_required")
+        if screen_source(family, source) != family.content_fingerprints:
+            raise ValueError("contamination_fingerprints_changed")
         validate_labels(family, source)
         manifest = source.parent / "source_manifest.json"
         if (

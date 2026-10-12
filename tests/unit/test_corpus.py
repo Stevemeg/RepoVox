@@ -1,7 +1,20 @@
 from pathlib import Path
 
 import pytest
-from repovox.evaluation.corpus import Corpus, CustodianStore, allowed, counts, freeze, withdraw
+from repovox.evaluation.corpus import (
+    Corpus,
+    CustodianStore,
+    Family,
+    Rights,
+    allowed,
+    checksum,
+    counts,
+    freeze,
+    intake,
+    screen_source,
+    serialize,
+    withdraw,
+)
 from repovox.evaluation.scoring import aggregate, compare, valid_citation
 
 
@@ -85,3 +98,53 @@ def test_evaluator_checks_bytes_instead_of_analyzer_status(tmp_path: Path) -> No
     assert not valid_citation(citation, tmp_path, "a" * 40)
     citation["path"] = "../forged.py"
     assert not valid_citation(citation, tmp_path, "a" * 40)
+
+
+def test_intake_and_freeze_screen_uncited_source_without_creating_approval(tmp_path: Path) -> None:
+    from repovox.analysis.filtering import filter_sources
+
+    source = tmp_path / "source"
+    source.mkdir()
+    file = source / "main.py"
+    file.write_bytes(b"def candidate():\n    return 1\n" + b"# synthetic tooling data\n" * 4)
+    manifest = serialize(filter_sources(source, "example/tooling", "a" * 40, "b" * 64))
+    (tmp_path / "source_manifest.json").write_bytes(manifest)
+    family = Family(
+        id="engineering-tooling",
+        repository="example/tooling",
+        commit_sha="a" * 40,
+        language_slice="python",
+        split="TOOLING_FIXTURE",
+        hidden=False,
+        newly_owner_authored=False,
+        derivatives=[],
+        family_grouping_evidence_sha256=None,
+        source_manifest_sha256=checksum(manifest),
+        content_fingerprints=[],
+        rights=Rights(
+            basis="pending",
+            license_id="UNAPPROVED TOOLING FIXTURE",
+            license_text_sha256=None,
+            permission_evidence_sha256=None,
+            attribution="Engineering fixture; no corpus admission or gold review.",
+            retention_days=1,
+            reviewer_access_permitted=False,
+            redistribution_permitted=False,
+            approved_by_owner=False,
+        ),
+        screening="pending",
+        claims=[],
+        edges=[],
+        adversarial_variants=[],
+        gold_review=None,
+    )
+    corpus = intake(empty(), family, source)
+    stored = corpus.families[0]
+    assert stored.screening == "clear" and len(stored.content_fingerprints) == 1
+    assert counts(corpus)["approved"] == 0 and stored.gold_review is None
+    assert screen_source(stored, source) == stored.content_fingerprints
+    file.write_bytes(b"def changed():\n    return 2\n")
+    with pytest.raises(ValueError, match="intake_source_changed"):
+        screen_source(stored, source)
+    with pytest.raises(ValueError, match="independent_human_appointment_required"):
+        freeze(corpus)
