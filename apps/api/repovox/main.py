@@ -4,6 +4,7 @@ import re
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -25,6 +26,12 @@ from repovox.services.jobs import Jobs
 from repovox.services.projects import Projects
 
 logger = logging.getLogger("repovox")
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    logger.addHandler(handler)
+logger.setLevel(logging.INFO)
+logger.propagate = False
 SAFE_DB_CODES = {
     "not_found": 404,
     "unauthorized": 401,
@@ -89,6 +96,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             json.dumps(
                 {
                     "event": "http",
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "severity": "INFO",
+                    "service": "api",
+                    "environment": config.environment,
+                    "version": "0.1.0",
                     "request_id": request.state.request_id,
                     "method": request.method,
                     "status": response.status_code,

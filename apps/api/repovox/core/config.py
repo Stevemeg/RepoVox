@@ -5,7 +5,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="REPOVOX_", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="REPOVOX_", extra="ignore", hide_input_in_errors=True
+    )
 
     environment: Literal["development", "test", "production"] = "production"
     dev_auth: bool = False

@@ -12,4 +12,4 @@ RUN uv sync --frozen --no-cache && useradd --create-home --uid 10001 repovox && 
 ENV PATH="/workspace/.venv/bin:$PATH" PYTHONUNBUFFERED=1
 ENV PYTEST_ADDOPTS="-o cache_dir=/tmp/repovox-pytest-cache"
 USER repovox
-CMD ["uvicorn", "repovox.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "repovox.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]

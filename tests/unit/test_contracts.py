@@ -42,7 +42,7 @@ def test_canonicalization_and_identity_fields() -> None:
     [("production", True, True), ("production", False, False), ("development", False, False)],
 )
 def test_production_fail_closed(environment: str, dev_auth: bool, fixtures: bool) -> None:
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError) as failure:
         Settings(
             environment=environment,
             dev_auth=dev_auth,
@@ -52,3 +52,5 @@ def test_production_fail_closed(environment: str, dev_auth: bool, fixtures: bool
             storage_access_key="local",
             storage_secret_key="local",
         )
+    assert "postgresql+psycopg://" not in str(failure.value)
+    assert "x" * 40 not in str(failure.value)
