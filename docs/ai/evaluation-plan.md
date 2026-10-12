@@ -6,6 +6,13 @@ Proposed tests, 2026-10-08; no benchmarks executed. [PRD N-01](../product/prd.md
 
 **EVAL-ENTRY: before the first baseline benchmark**, collect and independently prepare evaluation corpus `eval-v1`. This is evaluation-fixture preparation during Phase 2, not the later Phase 4 model-training dataset. No corpus or appointed reviewer exists today. Baseline outputs must never become their own gold labels.
 
+Phase 2B preparation: [candidate catalog](evaluation-candidate-catalog.md),
+[rights procedure](evaluation-rights.md), [hidden proposals](evaluation-hidden-specifications.md),
+[reviewer appointment packet](../development/evaluation-reviewer-packet.md),
+[batch plan](../development/evaluation-batches.md) and [machine readiness](evaluation-readiness.json).
+Seven candidates remain pending; every official approved count is zero. Preparation
+tooling and synthetic freeze tests do not establish independent approval or official freeze.
+
 ## Evaluation corpus preparation and freeze
 
 1. Maintainer curates commit-pinned, rights-reviewed sources and owner-authored hidden fixtures with repository-family IDs. Record license text/hash, actual evaluation-use permission basis, attribution, permitted reviewer access/retention, capture date and takedown/deletion lineage. Public access alone grants no assumed use rights. No customer/private/secret-bearing data; do not execute submitted code. Unclear permission excludes the family before benchmarking.

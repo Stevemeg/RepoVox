@@ -2,6 +2,10 @@
 
 Proposed pathway, 2026-10-08. No dataset collected, weights downloaded, training run or adapter produced. [Evaluation](evaluation-plan.md) · [Licenses](model-selection.md) · [Security](../security/threat-model.md) · [Research costs](../operations/cost-model.md#research-and-specialization-budget)
 
+[Phase 2B preparation](../development/evaluation-batches.md) creates evaluation tooling
+and pending candidate metadata only. Both evaluation pools and their descendants remain
+excluded from fine-tuning/calibration. No training data or model work is authorized.
+
 ## Stage A: Baseline
 
 Freeze upstream model revision/license/tokenizer, prompt, schema, quantization and engine. Before the first benchmark, complete the independent rights-reviewed evaluation corpus, source-based gold review, hidden fixtures and frozen family splits under EVAL-ENTRY in the evaluation plan. Then evaluate the unchanged base under the applicable Phase 3 rubric, before **training-dataset collection** or fine-tuning commitments. Independent evaluation-fixture collection necessarily precedes the baseline; it is not Stage B training data. Record outcome as `base_only`; adapter/checkpoint/dataset metadata null. PASS means technical-trust/safety criteria and feasible measured latency/memory at approved cost, not superiority to a paid API. FAIL triggers prompt/context/alternative-base review; no paid fallback. Only owner-authorized, independently validated phase advances to dataset work.

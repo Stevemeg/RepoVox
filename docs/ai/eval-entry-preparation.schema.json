@@ -1,0 +1,468 @@
+{
+  "$defs": {
+    "Candidate": {
+      "additionalProperties": false,
+      "properties": {
+        "ancestry": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Ancestry",
+          "type": "array"
+        },
+        "ancestry_basis": {
+          "title": "Ancestry Basis",
+          "type": "string"
+        },
+        "attribution": {
+          "title": "Attribution",
+          "type": "string"
+        },
+        "commit_sha": {
+          "pattern": "^[a-f0-9]{40}$",
+          "title": "Commit Sha",
+          "type": "string"
+        },
+        "complexity": {
+          "title": "Complexity",
+          "type": "string"
+        },
+        "family_id": {
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+          "title": "Family Id",
+          "type": "string"
+        },
+        "language_basis": {
+          "title": "Language Basis",
+          "type": "string"
+        },
+        "language_slice": {
+          "enum": [
+            "python",
+            "javascript_typescript",
+            "mixed"
+          ],
+          "title": "Language Slice",
+          "type": "string"
+        },
+        "license_id": {
+          "title": "License Id",
+          "type": "string"
+        },
+        "license_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "License Path"
+        },
+        "license_text_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "License Text Sha256"
+        },
+        "owner_approval_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Owner Approval Sha256"
+        },
+        "permission_basis": {
+          "title": "Permission Basis",
+          "type": "string"
+        },
+        "permission_evidence_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Permission Evidence Sha256"
+        },
+        "preliminary_coverage": {
+          "title": "Preliminary Coverage",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "redistribution": {
+          "enum": [
+            "pending",
+            "permitted",
+            "restricted"
+          ],
+          "title": "Redistribution",
+          "type": "string"
+        },
+        "repository": {
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$",
+          "title": "Repository",
+          "type": "string"
+        },
+        "retention": {
+          "title": "Retention",
+          "type": "string"
+        },
+        "reviewer_access": {
+          "enum": [
+            "pending",
+            "permitted",
+            "restricted"
+          ],
+          "title": "Reviewer Access",
+          "type": "string"
+        },
+        "rights_review_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Rights Review Sha256"
+        },
+        "rights_status": {
+          "enum": [
+            "pending",
+            "rejected",
+            "rights_reviewed",
+            "owner_approved"
+          ],
+          "title": "Rights Status",
+          "type": "string"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "family_id",
+        "repository",
+        "url",
+        "commit_sha",
+        "language_slice",
+        "language_basis",
+        "license_id",
+        "license_path",
+        "license_text_sha256",
+        "permission_basis",
+        "permission_evidence_sha256",
+        "attribution",
+        "redistribution",
+        "reviewer_access",
+        "retention",
+        "ancestry",
+        "ancestry_basis",
+        "complexity",
+        "preliminary_coverage",
+        "rights_status",
+        "rights_review_sha256",
+        "owner_approval_sha256",
+        "reason"
+      ],
+      "title": "Candidate",
+      "type": "object"
+    },
+    "Catalog": {
+      "additionalProperties": false,
+      "properties": {
+        "candidates": {
+          "items": {
+            "$ref": "#/$defs/Candidate"
+          },
+          "title": "Candidates",
+          "type": "array"
+        },
+        "captured_on": {
+          "title": "Captured On",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "evaluation-candidates-1.0",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "captured_on",
+        "candidates"
+      ],
+      "title": "Catalog",
+      "type": "object"
+    },
+    "HiddenAuthorship": {
+      "additionalProperties": false,
+      "properties": {
+        "author_id": {
+          "const": "Stevemeg",
+          "title": "Author Id",
+          "type": "string"
+        },
+        "family_id": {
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+          "title": "Family Id",
+          "type": "string"
+        },
+        "genuinely_owner_authored": {
+          "const": true,
+          "title": "Genuinely Owner Authored",
+          "type": "boolean"
+        },
+        "newly_authored": {
+          "const": true,
+          "title": "Newly Authored",
+          "type": "boolean"
+        },
+        "owner_declaration_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Owner Declaration Sha256",
+          "type": "string"
+        },
+        "provenance_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Provenance Sha256",
+          "type": "string"
+        },
+        "reviewer_confirmation_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Reviewer Confirmation Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "family_id",
+        "author_id",
+        "genuinely_owner_authored",
+        "newly_authored",
+        "provenance_sha256",
+        "owner_declaration_sha256",
+        "reviewer_confirmation_sha256"
+      ],
+      "title": "HiddenAuthorship",
+      "type": "object"
+    },
+    "ReviewSeal": {
+      "additionalProperties": false,
+      "properties": {
+        "annotation_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Annotation Sha256",
+          "type": "string"
+        },
+        "approval_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Approval Sha256",
+          "type": "string"
+        },
+        "claim_ids": {
+          "items": {
+            "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+            "type": "string"
+          },
+          "title": "Claim Ids",
+          "type": "array"
+        },
+        "edge_ids": {
+          "items": {
+            "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+            "type": "string"
+          },
+          "title": "Edge Ids",
+          "type": "array"
+        },
+        "family_id": {
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+          "title": "Family Id",
+          "type": "string"
+        },
+        "preparer_id": {
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+          "title": "Preparer Id",
+          "type": "string"
+        },
+        "reviewer_id": {
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+          "title": "Reviewer Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "family_id",
+        "annotation_sha256",
+        "preparer_id",
+        "reviewer_id",
+        "claim_ids",
+        "edge_ids",
+        "approval_sha256"
+      ],
+      "title": "ReviewSeal",
+      "type": "object"
+    },
+    "VariantReview": {
+      "additionalProperties": false,
+      "properties": {
+        "approval_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Approval Sha256",
+          "type": "string"
+        },
+        "expectations_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Expectations Sha256",
+          "type": "string"
+        },
+        "expected_outcome": {
+          "enum": [
+            "qualified_extraction",
+            "abstention",
+            "intake_rejection"
+          ],
+          "title": "Expected Outcome",
+          "type": "string"
+        },
+        "family_id": {
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+          "title": "Family Id",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "materialized_manifest_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Materialized Manifest Sha256",
+          "type": "string"
+        },
+        "parent_commit_sha": {
+          "pattern": "^[a-f0-9]{40}$",
+          "title": "Parent Commit Sha",
+          "type": "string"
+        },
+        "preparer_id": {
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+          "title": "Preparer Id",
+          "type": "string"
+        },
+        "recipe_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Recipe Sha256",
+          "type": "string"
+        },
+        "reviewer_id": {
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+          "title": "Reviewer Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "family_id",
+        "parent_commit_sha",
+        "recipe_sha256",
+        "materialized_manifest_sha256",
+        "expected_outcome",
+        "expectations_sha256",
+        "preparer_id",
+        "reviewer_id",
+        "approval_sha256"
+      ],
+      "title": "VariantReview",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "budget_approval_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Budget Approval Sha256",
+      "type": "string"
+    },
+    "catalog": {
+      "$ref": "#/$defs/Catalog"
+    },
+    "hidden_authorship": {
+      "items": {
+        "$ref": "#/$defs/HiddenAuthorship"
+      },
+      "title": "Hidden Authorship",
+      "type": "array"
+    },
+    "operational_access_review_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Operational Access Review Sha256",
+      "type": "string"
+    },
+    "retention_access_approval_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Retention Access Approval Sha256",
+      "type": "string"
+    },
+    "reviews": {
+      "items": {
+        "$ref": "#/$defs/ReviewSeal"
+      },
+      "title": "Reviews",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "eval-entry-preparation-1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "variants": {
+      "items": {
+        "$ref": "#/$defs/VariantReview"
+      },
+      "title": "Variants",
+      "type": "array"
+    },
+    "worker_uid": {
+      "minimum": 1,
+      "title": "Worker Uid",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schema_version",
+    "catalog",
+    "reviews",
+    "variants",
+    "hidden_authorship",
+    "worker_uid",
+    "operational_access_review_sha256",
+    "budget_approval_sha256",
+    "retention_access_approval_sha256"
+  ],
+  "title": "GatePacket",
+  "type": "object"
+}

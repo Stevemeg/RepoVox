@@ -12,6 +12,15 @@ RepoVox is solo-maintained by GitHub owner **Stevemeg**. Codex is the implementa
 
 ## No premature phase advancement
 
+Phase 2 engineering was independently accepted at
+`b60ba5484a0710caf64c310e910110d625a01768`. Owner authorized Phase 2B evaluation
+preparation on 2026-10-12: use `phase2/eval-entry` from that exact SHA and target
+`phase2/repository-intelligence` while PR #3 remains unmerged. Preserve the accepted
+engineering; no models/training/paid services/merge/Phase 3. Complete the Phase 2B
+A–M handoff. Official corpus remains UNFROZEN until genuine rights, hidden authorship,
+independent human review, approved custodian controls and every existing count gate
+are satisfied. Reviewer appointment and other owner decisions remain pending.
+
 Phase 1 was independently accepted at `ec09b733ab3ceffe592ad96d07902b92596dfd1b`.
 The owner explicitly authorized Phase 2 on 2026-10-12: secure static GitHub analysis
 through Stage 9 and evaluation preparation only. Use `phase2/repository-intelligence`
