@@ -277,13 +277,13 @@ BEGIN
  PERFORM pg_advisory_xact_lock(712031);
  SELECT * INTO q FROM quota_accounts WHERE owner_id=o FOR UPDATE;
  IF NOT FOUND THEN RAISE EXCEPTION 'unauthorized'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM projects WHERE id=pid AND owner_id=o AND deleted_at IS NULL) THEN
+  RAISE EXCEPTION 'not_found';
+ END IF;
  SELECT * INTO existing FROM generation_jobs WHERE owner_id=o AND idempotency_key=idem;
  IF FOUND THEN
   IF existing.request_digest<>digest THEN RAISE EXCEPTION 'idempotency_conflict'; END IF;
   RETURN existing.id;
- END IF;
- IF NOT EXISTS(SELECT 1 FROM projects WHERE id=pid AND owner_id=o AND deleted_at IS NULL) THEN
-  RAISE EXCEPTION 'not_found';
  END IF;
  IF prior IS NOT NULL AND NOT EXISTS(SELECT 1 FROM generation_jobs WHERE id=prior AND owner_id=o
   AND project_id=pid AND state IN ('failed','cancelled')) THEN RAISE EXCEPTION 'invalid_retry'; END IF;

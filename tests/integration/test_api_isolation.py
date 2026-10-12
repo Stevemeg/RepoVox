@@ -60,6 +60,12 @@ def test_crud_csrf_session_and_cross_tenant(
     assert a.delete(f"/v1/projects/{pid}").status_code == 202
     assert a.get(f"/v1/projects/{pid}").status_code == 404
     assert a.get(f"/v1/jobs/{job['id']}").status_code == 404
+    replay = a.post(
+        f"/v1/development/projects/{pid}/fixture-jobs",
+        json={"fixture": "normal"},
+        headers={"idempotency-key": "fixture-1"},
+    )
+    assert replay.status_code == 404
     with admin.connect() as c:
         assert c.scalar(text("SELECT count(*) FROM deletion_requests")) == 1
 
