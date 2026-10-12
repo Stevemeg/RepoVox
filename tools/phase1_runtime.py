@@ -1,12 +1,15 @@
 """Local-only recovery smoke. Operates only the RepoVox Compose project."""
 
+import os
 import subprocess
 import time
 
 import httpx
 
 origin = "http://localhost:3000"
-client = httpx.Client(base_url="http://localhost:8000", headers={"origin": origin}, timeout=10)
+api_url = os.environ.get("REPOVOX_RUNTIME_API_URL", "http://localhost:8000")
+assert api_url in {"http://localhost:8000", "http://localhost:8001"}, "Local test API only"
+client = httpx.Client(base_url=api_url, headers={"origin": origin}, timeout=10)
 
 
 def compose(*arguments: str) -> None:

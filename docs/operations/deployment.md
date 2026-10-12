@@ -1,5 +1,23 @@
 # Production deployment design
 
+## Phase 2 local execution and retention
+
+No cloud/staging/production deployment is performed in Phase 2. Local worker containers
+use UID 10001, a read-only base, 1 CPU/2 GiB memory/128 PIDs, dropped capabilities,
+no-new-privileges and bounded 2 GiB noexec/nosuid/nodev tmpfs. Parser subprocesses add
+mandatory Linux Landlock/seccomp and rlimits; acquisition uses its dedicated pinned
+GitHub transport. [ADR-0011](../adr/0011-parser-process-isolation.md) records boundaries
+and finite local evidence limits.
+
+Analysis archives and bodies expire at job admission +24 hours. API visibility fails
+closed at expiry/tombstone; reconciliation deletes expired terminal job prefixes,
+including upload orphans. Terminal-job scratch cleanup accepts only DB-resolved job
+UUID prefixes inside the canonical OS temp root; handled runs remove fresh scratch
+immediately. Interrupted tmpfs is additionally bounded and disappears with the container.
+This does not establish complete account/backup deletion or production restore/IAM
+guarantees. Protected evaluation source/gold requires a separate appointed custodian,
+external restricted store and independently reviewed access/retention/withdrawal records.
+
 Revised proposal, 2026-10-08; **nothing provisioned/deployed, no GPU purchased**. [Architecture](../architecture/overview.md) | [Director](../ai/director-architecture.md) | [Speech](../ai/speech-strategy.md) | [Reliability](reliability.md) | [Costs](cost-model.md)
 
 ## Hosting comparison

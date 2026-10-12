@@ -1,6 +1,21 @@
 {
   "components": {
     "schemas": {
+      "AnalysisInput": {
+        "additionalProperties": false,
+        "properties": {
+          "processing_acknowledged": {
+            "const": true,
+            "title": "Processing Acknowledged",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "processing_acknowledged"
+        ],
+        "title": "AnalysisInput",
+        "type": "object"
+      },
       "AttemptView": {
         "properties": {
           "attempt_no": {
@@ -124,6 +139,17 @@
       },
       "JobSummary": {
         "properties": {
+          "commit_sha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit Sha"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -166,6 +192,17 @@
             "title": "Id",
             "type": "string"
           },
+          "pipeline_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pipeline Version"
+          },
           "project_id": {
             "format": "uuid",
             "title": "Project Id",
@@ -181,6 +218,17 @@
               }
             ],
             "title": "Project Title"
+          },
+          "repository_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository Url"
           },
           "state": {
             "title": "State",
@@ -218,6 +266,17 @@
             },
             "title": "Attempts",
             "type": "array"
+          },
+          "commit_sha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit Sha"
           },
           "created_at": {
             "format": "date-time",
@@ -268,6 +327,17 @@
             "title": "Id",
             "type": "string"
           },
+          "pipeline_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pipeline Version"
+          },
           "prior_job_id": {
             "anyOf": [
               {
@@ -295,6 +365,17 @@
               }
             ],
             "title": "Project Title"
+          },
+          "repository_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository Url"
           },
           "stages": {
             "items": {
@@ -703,6 +784,53 @@
         "summary": "Sign Out"
       }
     },
+    "/v1/development/jobs/{job_id}/analysis": {
+      "get": {
+        "operationId": "analysis_result_v1_development_jobs__job_id__analysis_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Analysis Result V1 Development Jobs  Job Id  Analysis Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "summary": "Analysis Result"
+      }
+    },
     "/v1/development/jobs/{job_id}/retry": {
       "post": {
         "operationId": "retry_v1_development_jobs__job_id__retry_post",
@@ -755,6 +883,70 @@
           }
         ],
         "summary": "Retry"
+      }
+    },
+    "/v1/development/projects/{project_id}/analysis-jobs": {
+      "post": {
+        "operationId": "analysis_job_v1_development_projects__project_id__analysis_jobs_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalysisInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "summary": "Analysis Job"
       }
     },
     "/v1/development/projects/{project_id}/fixture-jobs": {

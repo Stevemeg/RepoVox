@@ -1,5 +1,13 @@
 # Delivery roadmap and phase gates
 
+Current authority, 2026-10-12: owner accepted Phase 0 `e35d8ef8a8a53cb34e46271a9813b5332ea42c1f`
+and Phase 1 `ec09b733ab3ceffe592ad96d07902b92596dfd1b`, then authorized Phase 2 static
+analysis/evaluation preparation. PRs remain unmerged. The proposal below is preserved
+historically; its old approval wording does not override this explicit authorization.
+Phase 2 still requires independent technical validation and the actual EVAL-ENTRY
+corpus freeze. The reviewer is PENDING OWNER APPOINTMENT; engineering fixtures and live
+smokes do not count as gold. No merge, deployment, training or Phase 3 is authorized.
+
 Revised proposal, 2026-10-08. Sole maintainer Stevemeg; implementation assistant Codex; independent validator ChatGPT. Follow [AGENTS](../../AGENTS.md). Phase 0 remains **unapproved**. No next-phase implementation, paid experiment, training run or provisioning is authorized by these proposals. Independent validation and owner authorization required between phases.
 
 ## Implementation phases

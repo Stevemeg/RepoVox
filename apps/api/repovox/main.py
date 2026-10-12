@@ -16,6 +16,7 @@ from sqlalchemy.exc import DBAPIError
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
+from repovox.analysis.transport import GitHubHTTP
 from repovox.api.routes import router
 from repovox.auth.session import DevelopmentSessions
 from repovox.core.config import Settings
@@ -60,7 +61,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.engine = engine
     app.state.sessions = DevelopmentSessions(engine, config)
     app.state.projects = Projects(engine)
-    app.state.jobs = Jobs(engine, config.fixtures)
+    token = config.github_token.get_secret_value() if config.github_token else None
+    app.state.jobs = Jobs(engine, config.fixtures, config.analysis, GitHubHTTP(token))
     app.state.services = Services(config, app.state.sessions, app.state.projects, app.state.jobs)
 
     def error(request: Request, code: str, status: int) -> JSONResponse:

@@ -17,6 +17,7 @@ import {
   Workflow,
 } from "lucide-react";
 import { Account, api, ApiError, errorMessage, Job, Project } from "@/lib/api";
+import { AnalysisPanel } from "@/components/analysis-panel";
 
 export function Badge({ state }: { state: string }) {
   return (
@@ -57,10 +58,7 @@ export function GenerationNotice() {
           repository locators and trusted development fixtures.
         </p>
       </div>
-      <button
-        disabled
-        title="Secure repository acquisition is not implemented yet"
-      >
+      <button disabled title="Video generation is unavailable in this phase">
         Generate video <ArrowRight size={15} />
       </button>
     </div>
@@ -87,6 +85,7 @@ export function Workspace() {
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [expired, setExpired] = useState(false);
+  const [processingAcknowledged, setProcessingAcknowledged] = useState(false);
   const sessionGeneration = useRef(0);
   const signIn = path === "/sign-in";
   const projectId = path.startsWith("/projects/") ? path.split("/")[2] : null;
@@ -323,7 +322,8 @@ export function Workspace() {
             <div>
               <strong>{j.project_title || "Development fixture"}</strong>
               <small>
-                Synthetic · {j.id.slice(0, 8)} · {date(j.created_at)}
+                {j.synthetic ? "Synthetic" : "Static analysis"} ·{" "}
+                {j.id.slice(0, 8)} · {date(j.created_at)}
               </small>
             </div>
             <Badge state={j.state} />
@@ -548,6 +548,47 @@ export function Workspace() {
                     contents or ownership have been verified.
                   </p>
                   <div className="actions">
+                    {account.analysis_enabled && (
+                      <div>
+                        <p>
+                          Development analysis downloads a public GitHub
+                          snapshot into local private storage for up to 24
+                          hours. Source is screened and parsed as data. No
+                          training or video generation occurs.
+                        </p>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={processingAcknowledged}
+                            onChange={(event) =>
+                              setProcessingAcknowledged(event.target.checked)
+                            }
+                          />{" "}
+                          I acknowledge this local source processing.
+                        </label>
+                        <button
+                          disabled={busy || !processingAcknowledged}
+                          onClick={() =>
+                            void act(() =>
+                              api(
+                                `/development/projects/${project.id}/analysis-jobs`,
+                                {
+                                  method: "POST",
+                                  headers: {
+                                    "Idempotency-Key": crypto.randomUUID(),
+                                  },
+                                  body: JSON.stringify({
+                                    processing_acknowledged: true,
+                                  }),
+                                },
+                              ),
+                            )
+                          }
+                        >
+                          Analyze repository (development)
+                        </button>
+                      </div>
+                    )}
                     {account.fixtures_enabled && (
                       <button
                         disabled={busy}
@@ -608,8 +649,9 @@ export function Workspace() {
           {section === "jobs" && !jobId && (
             <>
               <div className="notice">
-                All Phase 1 jobs are synthetic fixtures. They do not analyze
-                repositories or generate videos.
+                Synthetic fixtures do not analyze repositories or generate
+                videos. Development analysis has a separate label. Video
+                generation remains unavailable.
               </div>
               <section className="panel">{jobRows(jobs)}</section>
             </>
@@ -619,19 +661,32 @@ export function Workspace() {
               <section className="panel details">
                 <div className="panel-heading">
                   <h2>
-                    Synthetic fixture <span>{selectedJob.id.slice(0, 8)}</span>
+                    {selectedJob.synthetic
+                      ? "Synthetic fixture"
+                      : "Repository analysis"}{" "}
+                    <span>{selectedJob.id.slice(0, 8)}</span>
                   </h2>
                   <Badge state={selectedJob.state} />
                 </div>
                 <p>
-                  Trusted development fixture · No repository acquisition, AI,
-                  audio or video processing.
+                  {selectedJob.synthetic
+                    ? "Trusted development fixture · No repository acquisition, AI, audio or video processing."
+                    : "Development static analysis · No AI, audio or video processing."}
                 </p>
+                {!selectedJob.synthetic && (
+                  <p>
+                    {selectedJob.repository_url}
+                    <br />
+                    Pinned commit: <code>{selectedJob.commit_sha}</code>
+                  </p>
+                )}
                 {selectedJob.error_code && (
                   <p className="notice">
                     {selectedJob.error_code === "phase1_fixture_boundary"
                       ? "The fixture finished its infrastructure demonstration. The generation pipeline is unavailable in Phase 1."
-                      : `Status code: ${selectedJob.error_code}`}
+                      : selectedJob.error_code === "phase2_pipeline_boundary"
+                        ? "Stages 1–9 reached the Phase 2 boundary. Verified static analysis is available below; no video was generated."
+                        : `Status code: ${selectedJob.error_code}`}
                   </p>
                 )}
                 <div className="actions">
@@ -648,7 +703,9 @@ export function Workspace() {
                         )
                       }
                     >
-                      Cancel fixture
+                      {selectedJob.synthetic
+                        ? "Cancel fixture"
+                        : "Cancel analysis"}
                     </button>
                   )}
                   {["failed", "cancelled"].includes(selectedJob.state) && (
@@ -663,11 +720,17 @@ export function Workspace() {
                         )
                       }
                     >
-                      Retry as a new fixture
+                      {selectedJob.synthetic
+                        ? "Retry as a new fixture"
+                        : "Retry pinned analysis"}
                     </button>
                   )}
                 </div>
               </section>
+              {!selectedJob.synthetic &&
+                selectedJob.error_code === "phase2_pipeline_boundary" && (
+                  <AnalysisPanel jobId={selectedJob.id} />
+                )}
               <section className="panel">
                 <div className="panel-heading">
                   <h2>Pipeline stages</h2>
@@ -707,7 +770,20 @@ export function Workspace() {
                 <h2>Usage ledger</h2>
                 {selectedJob.usage?.map((u, i) => (
                   <p key={i}>
-                    {u.event_type} · {u.units} fixture unit
+                    {u.event_type} · {u.units}{" "}
+                    {selectedJob.synthetic
+                      ? "fixture unit"
+                      : "reservation unit"}
+                    {!selectedJob.synthetic &&
+                      Object.entries(u.measurements).map(([key, value]) => (
+                        <span key={key}>
+                          {" "}
+                          · {key}:{" "}
+                          {typeof value === "number"
+                            ? value.toFixed(3)
+                            : String(value)}
+                        </span>
+                      ))}
                   </p>
                 ))}
               </section>
@@ -733,7 +809,11 @@ export function Workspace() {
           )}
           <footer>
             RepoVox <span>·</span> Bring source code to life visually{" "}
-            <span className="footer-phase">Phase 1 · Local foundation</span>
+            <span className="footer-phase">
+              {account.analysis_enabled
+                ? "Phase 2 · Static analysis"
+                : "Phase 1 · Local foundation"}
+            </span>
           </footer>
         </main>
       </div>

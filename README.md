@@ -2,7 +2,12 @@
 
 Bring source code to life visually.
 
-**Status: Phase 1 local foundation under implementation and verification.** Phase 0 was independently accepted at `e35d8ef8a8a53cb34e46271a9813b5332ea42c1f`; PR #1 remains open, so Phase 1 uses a stacked branch. No production deployment, real analysis, AI, speech or video generation exists. Phase 1 requires independent validation and cannot be merged or advanced by the implementation assistant.
+**Status: Phase 2 engineering ready for independent technical review; EVAL-ENTRY pending.**
+Accepted Phase 0 `e35d8ef8a8a53cb34e46271a9813b5332ea42c1f` and Phase 1
+`ec09b733ab3ceffe592ad96d07902b92596dfd1b` remain in history. PRs #1/#2 are
+unmerged; Phase 2 is stacked on Phase 1. Development analysis executes Stages 1–9;
+video generation, models, deployment and Phase 3 remain disabled. Independent human
+reviewer is PENDING OWNER APPOINTMENT; the official evaluation corpus is UNFROZEN.
 
 ## Local development
 
@@ -14,17 +19,29 @@ docker compose up -d --build
 docker compose ps -a
 ```
 
-Open `http://localhost:3000` and choose Alex Chen or Sam Rivera. Create/view/delete owned GitHub repository locators. Project details can run labelled synthetic job fixtures; generation is unavailable. PostgreSQL is durable truth, Redis/Celery delivers notifications, and private SeaweedFS provides local S3 storage. Database/storage volumes survive `docker compose down`. [Detailed setup/reset](docs/development/local.md), [API](docs/development/api.md), [migrations](docs/development/migrations.md), [orchestration](docs/development/orchestration.md), [tests/CI](docs/development/testing.md), [Phase 1 evidence](docs/delivery/phase1-verification.md).
+Open `http://localhost:3000` and choose Alex Chen or Sam Rivera. Create/view/delete
+owned GitHub locators, run retained labelled synthetic fixtures, or acknowledge local
+source processing and start development analysis. Linux parser isolation is mandatory.
+PostgreSQL remains durable truth, Redis/Celery delivers notifications, and private
+SeaweedFS stores immutable archives/analysis. Database/storage volumes survive
+`docker compose down`. [Analysis/API/limits](docs/development/analysis.md),
+[evaluation preparation](docs/development/evaluation-preparation.md),
+[Phase 2 verification](docs/delivery/phase2-verification.md),
+[independent-review corrections](docs/delivery/phase2-review-corrections.md),
+[local setup](docs/development/local.md), [tests](docs/development/testing.md) and
+[accepted Phase 1 evidence](docs/delivery/phase1-verification.md).
 
 ## Application checks
 
 ```powershell
 uv sync --frozen
-uv run ruff check apps/api tests tools/phase1*.py
-uv run ruff format --check apps/api tests tools/phase1*.py
+uv run ruff check apps/api tests tools/phase1*.py tools/phase2*.py
+uv run ruff format --check apps/api tests tools/phase1*.py tools/phase2*.py
 uv run mypy
 uv run pytest tests/unit -q
 uv run python tools/phase1_contracts.py --check
+uv run python tools/phase2_contracts.py --check
+uv run python tools/phase2_corpus.py docs/ai/evaluation-corpus.manifest.json
 uv run pip-audit --local
 npm --prefix apps/web ci
 npm --prefix apps/web run lint
@@ -72,4 +89,7 @@ npx --yes --package @mermaid-js/mermaid-cli@11.15.0 mmdc -p $diagramConfig -i do
 git diff --check
 ```
 
-Documentation checks validate paths, headings, JSON examples and contract invariants; Mermaid CLI renders diagrams separately. See [conventions and sole-contributor policy](AGENTS.md). Application evidence is separate. Owner authorization permits Phase 1 only; do not merge or start Phase 2 without independent validation and the next authorization.
+Documentation checks validate paths, headings, JSON examples and contract invariants;
+Mermaid rendering is separate. See [sole-contributor policy and current phase authority](AGENTS.md).
+Owner authorized Phase 2 engineering only. Stop at independent review; do not merge,
+deploy, train or begin Phase 3. The evaluation corpus must be actually reviewed/frozen.

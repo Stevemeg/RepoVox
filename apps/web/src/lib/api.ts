@@ -4,6 +4,7 @@ export type Account = {
   email: string;
   environment: string;
   fixtures_enabled: boolean;
+  analysis_enabled?: boolean;
 };
 export type Project = {
   id: string;
@@ -31,6 +32,8 @@ export type Job = {
   error_code: string | null;
   created_at: string;
   deadline: string;
+  commit_sha?: string;
+  repository_url?: string;
   stages?: Stage[];
   history?: { version: number; state: string; created_at: string }[];
   attempts?: {

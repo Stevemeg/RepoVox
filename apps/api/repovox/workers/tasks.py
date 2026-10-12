@@ -4,6 +4,8 @@ from uuid import UUID
 
 from celery import Celery
 
+from repovox.analysis.runner import AnalysisRunner
+from repovox.analysis.transport import GitHubHTTP
 from repovox.core.config import Settings
 from repovox.db.database import make_engine, verify_role
 from repovox.storage import S3Storage
@@ -34,7 +36,10 @@ def runtime() -> Orchestrator:
         raise RuntimeError("Worker database URL required")
     engine = make_engine(settings.worker_database_url.get_secret_value())
     verify_role(engine, "rv_worker")
-    return Orchestrator(engine, S3Storage(settings))
+    storage = S3Storage(settings)
+    token = settings.github_token.get_secret_value() if settings.github_token else None
+    analysis = AnalysisRunner(engine, storage, GitHubHTTP(token)) if settings.analysis else None
+    return Orchestrator(engine, storage, analysis)
 
 
 @celery.task(name="repovox.stage")

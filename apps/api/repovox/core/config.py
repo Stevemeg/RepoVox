@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     environment: Literal["development", "test", "production"] = "production"
     dev_auth: bool = False
     fixtures: bool = False
+    analysis: bool = False
+    github_token: SecretStr | None = None
     database_url: SecretStr
     worker_database_url: SecretStr | None = None
     session_secret: SecretStr = Field(min_length=32)

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const allowed =
-  /^(auth\/(session|sign-out|development\/sign-in)|projects(\/[a-f0-9-]+(\/jobs)?)?|jobs(\/[a-f0-9-]+(\/cancel)?)?|development\/(projects\/[a-f0-9-]+\/fixture-jobs|jobs\/[a-f0-9-]+\/retry))$/;
+  /^(auth\/(session|sign-out|development\/sign-in)|projects(\/[a-f0-9-]+(\/jobs)?)?|jobs(\/[a-f0-9-]+(\/cancel)?)?|development\/(projects\/[a-f0-9-]+\/(fixture-jobs|analysis-jobs)|jobs\/[a-f0-9-]+\/(retry|analysis)))$/;
 async function forward(
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> },
@@ -52,7 +52,10 @@ async function forward(
         body,
         cache: "no-store",
         redirect: "error",
-        signal: AbortSignal.timeout(10000),
+        // Resolution has a 10-second aggregate limit; leave bounded DB publication time.
+        signal: AbortSignal.timeout(
+          route.endsWith("/analysis-jobs") ? 15000 : 10000,
+        ),
       },
     );
     const response = new NextResponse(upstream.body, {

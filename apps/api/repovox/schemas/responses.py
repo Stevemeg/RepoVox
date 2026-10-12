@@ -58,6 +58,9 @@ class JobSummary(BaseModel):
     created_at: datetime
     finished_at: datetime | None
     deadline: datetime
+    commit_sha: str | None = None
+    repository_url: str | None = None
+    pipeline_version: str | None = None
 
 
 class JobView(JobSummary):

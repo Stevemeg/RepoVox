@@ -1,5 +1,33 @@
 # Phase 1 testing
 
+## Phase 2 additions
+
+All accepted Phase 0/1 suites remain. The expected migration revision advances to 0002;
+the additive migration test separately proves 0001 data preservation. Offline adversarial
+tests use actual Tree-sitter parsers and controlled archive/HTTPS inputs. Linux service
+integration exercises actual PostgreSQL/RLS, Redis/Celery, private S3, sandbox denial,
+source/claim publication, cancellation/restart/fencing and actual killed worker processes.
+Trusted fault probes never execute submitted code. Lease/backoff clocks are advanced
+explicitly in fault tests to keep CI finite; this is not a measured recovery SLA.
+
+```powershell
+uv run ruff check apps/api tests tools/phase1*.py tools/phase2*.py
+uv run ruff format --check apps/api tests tools/phase1*.py tools/phase2*.py
+uv run mypy
+uv run pytest tests/unit -q
+uv run pytest tests/unit/test_evaluation_path.py -q
+uv run python tools/phase2_contracts.py --check
+uv run python tools/phase2_corpus.py docs/ai/evaluation-corpus.manifest.json
+docker compose -p repovox-test run --rm --build tests
+```
+
+Optional live GitHub smoke runs `tools/phase2_live.py` inside the constrained Linux image.
+Select each permitted source individually, retain its actual pinned license and record
+SHA/coverage/claims/citation/errors/resource observations. It cannot admit official
+evaluation families or bypass archive/secret/coverage failures. Generated reports,
+upstream licenses and source excerpts stay outside Git. [Analysis](analysis.md),
+[evaluation preparation](evaluation-preparation.md) describe the actual boundaries.
+
 [Verification record](../delivery/phase1-verification.md) · [Local runtime](local.md) · [Migration isolation](migrations.md)
 
 ## Host checks
@@ -29,6 +57,10 @@ UV and npm lockfiles resolve exact versions. Missing service/administrator varia
 ## Disposable real-service tests
 
 Integration tests truncate their database and inject failures. Keep them isolated from your development records:
+
+If this disposable project already runs a full stack, stop its `worker` and `dispatcher`
+before the suite. Queue assertions require exclusive consumers; restart these services
+afterward for browser/runtime smoke tests. CI runs the suite before starting consumers.
 
 ```powershell
 docker compose -p repovox-test up -d --build postgres redis storage storage-init migrate
