@@ -2,7 +2,7 @@
 
 Bring source code to life visually.
 
-**Status: Phase 2 static repository analysis under implementation and verification.**
+**Status: Phase 2 engineering ready for independent technical review; EVAL-ENTRY pending.**
 Accepted Phase 0 `e35d8ef8a8a53cb34e46271a9813b5332ea42c1f` and Phase 1
 `ec09b733ab3ceffe592ad96d07902b92596dfd1b` remain in history. PRs #1/#2 are
 unmerged; Phase 2 is stacked on Phase 1. Development analysis executes Stages 1–9;
@@ -26,6 +26,7 @@ PostgreSQL remains durable truth, Redis/Celery delivers notifications, and priva
 SeaweedFS stores immutable archives/analysis. Database/storage volumes survive
 `docker compose down`. [Analysis/API/limits](docs/development/analysis.md),
 [evaluation preparation](docs/development/evaluation-preparation.md),
+[Phase 2 verification](docs/delivery/phase2-verification.md),
 [local setup](docs/development/local.md), [tests](docs/development/testing.md) and
 [accepted Phase 1 evidence](docs/delivery/phase1-verification.md).
 

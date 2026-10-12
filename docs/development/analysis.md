@@ -12,6 +12,9 @@ exact `https://github.com/owner/repository`, optional `.git` and trailing slash.
 No credentials/ports/query/fragment/encoded path/alternate host/Unicode host/tree/blob
 URL is accepted. GitHub metadata must be public and match the canonical locator.
 Default branch is resolved once to forty lowercase hexadecimal SHA characters.
+The browser BFF explicitly allows these admission/result routes. Admission's proxy
+timeout is 15 seconds around the 10-second aggregate GitHub resolution and bounded DB
+publication; other routes retain their existing 10-second timeout and strict allowlist.
 
 Identical idempotency requests return the persisted job without another lookup.
 Explicit retry uses the prior immutable snapshot, even if HEAD changes. New analysis
