@@ -5,8 +5,9 @@
 Status: UNFROZEN. Independent human reviewer: **PENDING OWNER APPOINTMENT**.
 Corpus contract is now `evaluation-corpus-2.0`, with canonical `gold-evaluation-1.0`
 annotations and `source-fact-1.0` matching. See [gold authoring and scoring](evaluation-gold.md).
-No official candidates, approved families, gold claims, gold edges, protected fixtures
-or frozen split currently exist. Dynamically created engineering fixtures and public
+No official admitted families, gold claims, gold edges, protected fixtures
+or frozen split currently exist. The [Phase 2B catalog](../ai/evaluation-candidate-catalog.md)
+contains seven preliminary candidates, all pending rights/owner approval. Dynamically created engineering fixtures and public
 live-smoke samples are not an evaluation corpus or approved independent gold.
 
 `repovox.evaluation.corpus` supplies strict rights/family/citation/review/appointment/
@@ -15,6 +16,18 @@ checks, count gates, separate split/purpose access policy and withdrawal report
 invalidation. `tools/phase2_corpus.py` inspects manifests, validates source citation
 hashes/ranges, requests freeze only when prerequisites exist, and records withdrawal.
 It never produces human appointments, rights grants, labels or approvals.
+
+Phase 2B adds separate `eval-entry-preparation-1.0` and `evaluation-candidates-1.0`
+contracts, digest-sealed complete human review receipts, hidden authorship and materialized
+variant evidence, actual POSIX boundary checks and metadata-only versus verified dry-run
+readiness. Existing corpus/gold/source-fact contracts and scorer remain unchanged.
+See [authoring](evaluation-authoring.md), [reviewer packet](evaluation-reviewer-packet.md),
+[batch plan](evaluation-batches.md), [protected storage](evaluation-storage.md),
+[contamination](evaluation-contamination.md), [adversarial plan](evaluation-adversarial-plan.md),
+[readiness](../ai/evaluation-readiness.json) and [owner decisions](../delivery/phase2b-decisions.md).
+Freeze now requires the actual protected preparation packet in addition to the accepted
+source/provenance checks. Neither schemas nor arbitrary evidence hashes authenticate
+human approval; custodian/owner verification of private records remains mandatory.
 
 ## Repeatable intake and review
 

@@ -1,5 +1,11 @@
 # Production deployment design
 
+Phase 2B [protected evaluation storage](../development/evaluation-storage.md) remains an
+offline owner-authorized custodian boundary, separate from application workers and
+public Git. No official store, reviewer access or backup was provisioned; synthetic
+POSIX probes are separately reported. Actual source-specific rights/retention/access
+decisions are pending in the [decision register](../delivery/phase2b-decisions.md).
+
 ## Phase 2 local execution and retention
 
 No cloud/staging/production deployment is performed in Phase 2. Local worker containers

@@ -1,0 +1,18 @@
+{
+  "schema_version": "evaluation-effort-1.0",
+  "period": "2026-10-12 Phase 2B preparation",
+  "actual_cash_cost_usd": 0,
+  "paid_services_used": false,
+  "measured_preparation_human_hours": null,
+  "measured_license_review_human_hours": null,
+  "measured_annotation_human_hours": null,
+  "measured_independent_review_human_hours": null,
+  "measured_adjudication_human_hours": null,
+  "human_review_completed_families": 0,
+  "official_family_observations": [],
+  "pilot_throughput": null,
+  "remaining_hours_estimate": null,
+  "imputed_labor_cost_usd": null,
+  "observation_basis": "No actual human time sheets or approved pilot exist. Null means unmeasured, not free labor. License screening and synthetic automation are implementation-assistant work, not measured human review.",
+  "estimation_policy": "After Batch C, forecast remaining labor by measured family/slice/complexity, claim/edge/variant counts and adjudication, disclose pilot sample uncertainty. Prior Phase 0 numbers remain unmeasured hypotheses. Automated wall time never substitutes for human labor."
+}

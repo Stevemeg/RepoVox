@@ -29,6 +29,12 @@ No invented schedule. Phase dependencies are sequential, though bounded implemen
 
 ## Requirements traceability
 
+Phase 2 engineering accepted at `b60ba548`; Phase 2B prepares the N-01/EVAL-ENTRY
+corpus gate through [staged batches](../development/evaluation-batches.md).
+[Readiness](../ai/evaluation-readiness.json) and [owner decisions](phase2b-decisions.md)
+remain blocked on actual human/rights/authorship/storage prerequisites. No Phase 3
+advancement, model benchmark or official freeze is implied by engineering tests.
+
 | Requirement | Design evidence | Implementation gate |
 | --- | --- | --- |
 | F-01 auth/dashboard | [Overview](../architecture/overview.md), [ownership](../architecture/data-model.md), S-09/11 | Phase 1 isolation; Phase 6/7 real sessions |

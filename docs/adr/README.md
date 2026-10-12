@@ -17,3 +17,4 @@ All proposed for Phase 0 review, dated 2026-10-08. Acceptance follows independen
 | [007](0007-model-promotion.md) | Training/evaluation promotion gates |
 | [008](0008-gpu-serving.md) | Warm private GPU serving and isolated training |
 | [009](0009-local-object-storage.md) | Local Phase 1 S3-compatible storage choice; production architecture preserved |
+| [013](0013-eval-entry-preparation-evidence.md) | Phase 2B preparation evidence, sealed human review and protected freeze supplement |

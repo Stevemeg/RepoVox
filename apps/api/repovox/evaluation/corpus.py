@@ -97,7 +97,18 @@ class Corpus(Record):
 
 def counts(corpus: Corpus) -> dict[str, int]:
     families = [f for f in corpus.families if f.split != "TOOLING_FIXTURE" and not f.withdrawn]
-    approved = [f for f in families if permitted(f) and f.gold_review and f.gold_review.approved]
+    approved = [
+        f
+        for f in families
+        if permitted(f)
+        and f.screening == "clear"
+        and f.annotation_scope == "complete"
+        and f.gold_review
+        and f.gold_review.approved
+        and f.gold_review.preparer_id.casefold() != f.gold_review.reviewer_id.casefold()
+        and corpus.appointment
+        and f.gold_review.reviewer_id == corpus.appointment.reviewer_id
+    ]
     return {
         "candidates": len(families),
         "approved": len(approved),
@@ -114,6 +125,9 @@ def counts(corpus: Corpus) -> dict[str, int]:
         "mixed": sum(f.split == "EVAL_TEST" and f.language_slice == "mixed" for f in approved),
         "adversarial_variants": sum(
             len(f.adversarial_variants) for f in approved if f.split == "EVAL_TEST"
+        ),
+        "adversarial_families": sum(
+            bool(f.adversarial_variants) for f in approved if f.split == "EVAL_TEST"
         ),
         "gold_claims": sum(sum(bool(c.citations) for c in f.claims) for f in approved),
         "supported_gold_edges": sum(sum(e.supported for e in f.edges) for f in approved),
@@ -178,8 +192,13 @@ def intake(corpus: Corpus, family: Family, source: Path) -> Corpus:
 
 
 def freeze(
-    corpus: Corpus, sources: dict[str, Path] | None = None, provenance: Path | None = None
+    corpus: Corpus,
+    sources: dict[str, Path] | None = None,
+    provenance: Path | None = None,
+    preparation: Path | None = None,
 ) -> Corpus:
+    # Preserve the accepted 2.0 contract; revalidate objects changed with model_copy.
+    corpus = Corpus.model_validate(corpus.model_dump())
     if corpus.status != "UNFROZEN" or corpus.appointment is None:
         raise ValueError("independent_human_appointment_required")
     if not all(
@@ -214,7 +233,12 @@ def freeze(
     for family in corpus.families:
         if family.split == "TOOLING_FIXTURE":
             continue
-        if family.id in seen_ids or any(d in seen_ids for d in family.derivatives):
+        aliases = [family.id, *family.derivatives]
+        if (
+            len(set(aliases)) != len(aliases)
+            or family.id in seen_ids
+            or any(d in seen_ids for d in family.derivatives)
+        ):
             raise ValueError("family_overlap")
         seen_ids.update([family.id, *family.derivatives])
         if not permitted(family) or family.screening != "clear" or family.withdrawn:
@@ -265,17 +289,14 @@ def freeze(
             if variant in variants:
                 raise ValueError("duplicate_variant")
             variants.add(variant)
-    target = {
-        "development": 20,
-        "held_out": 60,
-        "hidden_owner_authored": 10,
-        "python": 20,
-        "javascript_typescript": 20,
-        "mixed": 20,
-        "adversarial_variants": 100,
-        "gold_claims": 600,
-        "supported_gold_edges": 120,
-    }
+    from repovox.evaluation.preparation import TARGETS, validate_preparation
+
+    if preparation is None:
+        raise ValueError("protected_preparation_packet_required")
+    validate_preparation(
+        corpus, sources, provenance, preparation, Path(__file__).resolve().parents[4]
+    )
+    target = TARGETS
     actual = counts(corpus)
     if any(actual[key] < minimum for key, minimum in target.items()):
         raise ValueError("eval_entry_counts_incomplete")

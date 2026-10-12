@@ -1,5 +1,11 @@
 # Self-hosted production and research cost model
 
+Phase 2B [effort observations](../ai/evaluation-effort.json) record zero actual cash
+spend and unmeasured human preparation/review hours. No approved pilot throughput exists.
+The [batch plan](../development/evaluation-batches.md) requires measured annotation,
+rights, review and adjudication effort before extrapolation. This does not change the
+Phase 0 arithmetic or convert its labor assumptions into observed results.
+
 Planning revision, 2026-10-08. USD, 730-hour month, no tax/discount/credits. This replaces the previous API-centric approximately $0.24 marginal estimate; that number is historical and is not the revised product cost. No GPU was benchmarked, rented or provisioned. [Inputs](cost-inputs.json) and [offline calculator](../../tools/cost_model.py) are authoritative arithmetic; workload and unquoted prices are estimates. [Deployment](deployment.md) | [Training](../ai/training-strategy.md)
 
 ## Prices and assumptions

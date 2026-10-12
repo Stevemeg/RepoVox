@@ -28,6 +28,7 @@ parser.add_argument("--family")
 parser.add_argument("--output", type=Path)
 parser.add_argument("--provenance", type=Path)
 parser.add_argument("--candidate", type=Path)
+parser.add_argument("--preparation", type=Path)
 args = parser.parse_args()
 try:
     corpus = Corpus.model_validate_json(args.manifest.read_bytes())
@@ -45,7 +46,7 @@ try:
         sources = (
             {f.id: args.source / f.id / "source" for f in corpus.families} if args.source else None
         )
-        corpus = freeze(corpus, sources, args.provenance)
+        corpus = freeze(corpus, sources, args.provenance, args.preparation)
     elif args.action == "withdraw":
         if not args.family:
             raise ValueError("family_required")
@@ -55,9 +56,21 @@ try:
             raise ValueError("gold_or_freeze_output_must_be_outside_git")
         if corpus.families and os.name != "posix":
             raise ValueError("protected_corpus_requires_posix_access_boundary")
+        output = corpus.model_dump()
+        if args.action == "freeze":
+            from repovox.evaluation.corpus import checksum
+
+            if args.preparation is None:
+                raise ValueError("protected_preparation_packet_required")
+            output = {
+                "schema_version": "eval-entry-freeze-record-1.0",
+                "corpus": output,
+                "preparation_sha256": checksum(args.preparation.read_bytes()),
+                "independent_gate_approval": "REQUIRED_SEPARATELY",
+            }
         with args.output.open("xb") as target:
             os.chmod(target.name, 0o600)
-            target.write(serialize(corpus.model_dump()))
+            target.write(serialize(output))
     print(
         json.dumps(
             {"status": corpus.status, "reviewer": corpus.reviewer_status, "counts": counts(corpus)}

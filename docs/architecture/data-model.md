@@ -1,5 +1,11 @@
 # Persistence and job orchestration
 
+Phase 2B offline candidate/review states and immutable approval lineage are described
+in [evaluation authoring](../development/evaluation-authoring.md) and
+[batches](../development/evaluation-batches.md). These do not create application routes,
+worker gold access or a new database migration; withdrawal still invalidates dependent
+evaluation reports. Accepted durable-job/analysis behavior is preserved.
+
 ## Phase 2 implementation delta
 
 Migration 0002 extends the accepted 0001 tables without resets. Real snapshots retain

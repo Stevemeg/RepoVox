@@ -1,0 +1,1010 @@
+{
+  "schema_version": "adversarial-plan-1.0",
+  "version": "phase2b-proposal-1",
+  "planned_variant_slots": 100,
+  "planned_parent_slots": 20,
+  "materialized_official_variants": 0,
+  "approved_variants": 0,
+  "variants": [
+    {
+      "slot_id": "ADV-001",
+      "parent_slot": "HELDOUT-01",
+      "parent_family_id": null,
+      "category": "readme_contradiction",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-002",
+      "parent_slot": "HELDOUT-01",
+      "parent_family_id": null,
+      "category": "renamed_symbol",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-003",
+      "parent_slot": "HELDOUT-01",
+      "parent_family_id": null,
+      "category": "invalid_commit",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-004",
+      "parent_slot": "HELDOUT-01",
+      "parent_family_id": null,
+      "category": "unsupported_language",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-005",
+      "parent_slot": "HELDOUT-01",
+      "parent_family_id": null,
+      "category": "oversized_source",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-006",
+      "parent_slot": "HELDOUT-02",
+      "parent_family_id": null,
+      "category": "fake_architecture",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-007",
+      "parent_slot": "HELDOUT-02",
+      "parent_family_id": null,
+      "category": "misleading_comment",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-008",
+      "parent_slot": "HELDOUT-02",
+      "parent_family_id": null,
+      "category": "incomplete_repository",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-009",
+      "parent_slot": "HELDOUT-02",
+      "parent_family_id": null,
+      "category": "prompt_injection",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-010",
+      "parent_slot": "HELDOUT-02",
+      "parent_family_id": null,
+      "category": "nested_content",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-011",
+      "parent_slot": "HELDOUT-03",
+      "parent_family_id": null,
+      "category": "ambiguous_import",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-012",
+      "parent_slot": "HELDOUT-03",
+      "parent_family_id": null,
+      "category": "invented_function",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-013",
+      "parent_slot": "HELDOUT-03",
+      "parent_family_id": null,
+      "category": "multiple_entrypoints",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-014",
+      "parent_slot": "HELDOUT-03",
+      "parent_family_id": null,
+      "category": "secret_canary",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-015",
+      "parent_slot": "HELDOUT-03",
+      "parent_family_id": null,
+      "category": "stale_hash",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-016",
+      "parent_slot": "HELDOUT-04",
+      "parent_family_id": null,
+      "category": "unresolved_call",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-017",
+      "parent_slot": "HELDOUT-04",
+      "parent_family_id": null,
+      "category": "forged_location",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-018",
+      "parent_slot": "HELDOUT-04",
+      "parent_family_id": null,
+      "category": "malformed_source",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-019",
+      "parent_slot": "HELDOUT-04",
+      "parent_family_id": null,
+      "category": "suspicious_configuration",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-020",
+      "parent_slot": "HELDOUT-04",
+      "parent_family_id": null,
+      "category": "forged_verification",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-021",
+      "parent_slot": "HELDOUT-05",
+      "parent_family_id": null,
+      "category": "renamed_symbol",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-022",
+      "parent_slot": "HELDOUT-05",
+      "parent_family_id": null,
+      "category": "invalid_commit",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-023",
+      "parent_slot": "HELDOUT-05",
+      "parent_family_id": null,
+      "category": "unsupported_language",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-024",
+      "parent_slot": "HELDOUT-05",
+      "parent_family_id": null,
+      "category": "oversized_source",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-025",
+      "parent_slot": "HELDOUT-05",
+      "parent_family_id": null,
+      "category": "readme_contradiction",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-026",
+      "parent_slot": "HELDOUT-06",
+      "parent_family_id": null,
+      "category": "misleading_comment",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-027",
+      "parent_slot": "HELDOUT-06",
+      "parent_family_id": null,
+      "category": "incomplete_repository",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-028",
+      "parent_slot": "HELDOUT-06",
+      "parent_family_id": null,
+      "category": "prompt_injection",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-029",
+      "parent_slot": "HELDOUT-06",
+      "parent_family_id": null,
+      "category": "nested_content",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-030",
+      "parent_slot": "HELDOUT-06",
+      "parent_family_id": null,
+      "category": "fake_architecture",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-031",
+      "parent_slot": "HELDOUT-07",
+      "parent_family_id": null,
+      "category": "invented_function",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-032",
+      "parent_slot": "HELDOUT-07",
+      "parent_family_id": null,
+      "category": "multiple_entrypoints",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-033",
+      "parent_slot": "HELDOUT-07",
+      "parent_family_id": null,
+      "category": "secret_canary",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-034",
+      "parent_slot": "HELDOUT-07",
+      "parent_family_id": null,
+      "category": "stale_hash",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-035",
+      "parent_slot": "HELDOUT-07",
+      "parent_family_id": null,
+      "category": "ambiguous_import",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-036",
+      "parent_slot": "HELDOUT-08",
+      "parent_family_id": null,
+      "category": "forged_location",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-037",
+      "parent_slot": "HELDOUT-08",
+      "parent_family_id": null,
+      "category": "malformed_source",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-038",
+      "parent_slot": "HELDOUT-08",
+      "parent_family_id": null,
+      "category": "suspicious_configuration",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-039",
+      "parent_slot": "HELDOUT-08",
+      "parent_family_id": null,
+      "category": "forged_verification",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-040",
+      "parent_slot": "HELDOUT-08",
+      "parent_family_id": null,
+      "category": "unresolved_call",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-041",
+      "parent_slot": "HELDOUT-09",
+      "parent_family_id": null,
+      "category": "invalid_commit",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-042",
+      "parent_slot": "HELDOUT-09",
+      "parent_family_id": null,
+      "category": "unsupported_language",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-043",
+      "parent_slot": "HELDOUT-09",
+      "parent_family_id": null,
+      "category": "oversized_source",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-044",
+      "parent_slot": "HELDOUT-09",
+      "parent_family_id": null,
+      "category": "readme_contradiction",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-045",
+      "parent_slot": "HELDOUT-09",
+      "parent_family_id": null,
+      "category": "renamed_symbol",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-046",
+      "parent_slot": "HELDOUT-10",
+      "parent_family_id": null,
+      "category": "incomplete_repository",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-047",
+      "parent_slot": "HELDOUT-10",
+      "parent_family_id": null,
+      "category": "prompt_injection",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-048",
+      "parent_slot": "HELDOUT-10",
+      "parent_family_id": null,
+      "category": "nested_content",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-049",
+      "parent_slot": "HELDOUT-10",
+      "parent_family_id": null,
+      "category": "fake_architecture",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-050",
+      "parent_slot": "HELDOUT-10",
+      "parent_family_id": null,
+      "category": "misleading_comment",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-051",
+      "parent_slot": "HELDOUT-11",
+      "parent_family_id": null,
+      "category": "multiple_entrypoints",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-052",
+      "parent_slot": "HELDOUT-11",
+      "parent_family_id": null,
+      "category": "secret_canary",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-053",
+      "parent_slot": "HELDOUT-11",
+      "parent_family_id": null,
+      "category": "stale_hash",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-054",
+      "parent_slot": "HELDOUT-11",
+      "parent_family_id": null,
+      "category": "ambiguous_import",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-055",
+      "parent_slot": "HELDOUT-11",
+      "parent_family_id": null,
+      "category": "invented_function",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-056",
+      "parent_slot": "HELDOUT-12",
+      "parent_family_id": null,
+      "category": "malformed_source",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-057",
+      "parent_slot": "HELDOUT-12",
+      "parent_family_id": null,
+      "category": "suspicious_configuration",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-058",
+      "parent_slot": "HELDOUT-12",
+      "parent_family_id": null,
+      "category": "forged_verification",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-059",
+      "parent_slot": "HELDOUT-12",
+      "parent_family_id": null,
+      "category": "unresolved_call",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-060",
+      "parent_slot": "HELDOUT-12",
+      "parent_family_id": null,
+      "category": "forged_location",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-061",
+      "parent_slot": "HELDOUT-13",
+      "parent_family_id": null,
+      "category": "unsupported_language",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-062",
+      "parent_slot": "HELDOUT-13",
+      "parent_family_id": null,
+      "category": "oversized_source",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-063",
+      "parent_slot": "HELDOUT-13",
+      "parent_family_id": null,
+      "category": "readme_contradiction",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-064",
+      "parent_slot": "HELDOUT-13",
+      "parent_family_id": null,
+      "category": "renamed_symbol",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-065",
+      "parent_slot": "HELDOUT-13",
+      "parent_family_id": null,
+      "category": "invalid_commit",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-066",
+      "parent_slot": "HELDOUT-14",
+      "parent_family_id": null,
+      "category": "prompt_injection",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-067",
+      "parent_slot": "HELDOUT-14",
+      "parent_family_id": null,
+      "category": "nested_content",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-068",
+      "parent_slot": "HELDOUT-14",
+      "parent_family_id": null,
+      "category": "fake_architecture",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-069",
+      "parent_slot": "HELDOUT-14",
+      "parent_family_id": null,
+      "category": "misleading_comment",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-070",
+      "parent_slot": "HELDOUT-14",
+      "parent_family_id": null,
+      "category": "incomplete_repository",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-071",
+      "parent_slot": "HELDOUT-15",
+      "parent_family_id": null,
+      "category": "secret_canary",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-072",
+      "parent_slot": "HELDOUT-15",
+      "parent_family_id": null,
+      "category": "stale_hash",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-073",
+      "parent_slot": "HELDOUT-15",
+      "parent_family_id": null,
+      "category": "ambiguous_import",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-074",
+      "parent_slot": "HELDOUT-15",
+      "parent_family_id": null,
+      "category": "invented_function",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-075",
+      "parent_slot": "HELDOUT-15",
+      "parent_family_id": null,
+      "category": "multiple_entrypoints",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-076",
+      "parent_slot": "HELDOUT-16",
+      "parent_family_id": null,
+      "category": "suspicious_configuration",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-077",
+      "parent_slot": "HELDOUT-16",
+      "parent_family_id": null,
+      "category": "forged_verification",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-078",
+      "parent_slot": "HELDOUT-16",
+      "parent_family_id": null,
+      "category": "unresolved_call",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-079",
+      "parent_slot": "HELDOUT-16",
+      "parent_family_id": null,
+      "category": "forged_location",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-080",
+      "parent_slot": "HELDOUT-16",
+      "parent_family_id": null,
+      "category": "malformed_source",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-081",
+      "parent_slot": "HELDOUT-17",
+      "parent_family_id": null,
+      "category": "oversized_source",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-082",
+      "parent_slot": "HELDOUT-17",
+      "parent_family_id": null,
+      "category": "readme_contradiction",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-083",
+      "parent_slot": "HELDOUT-17",
+      "parent_family_id": null,
+      "category": "renamed_symbol",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-084",
+      "parent_slot": "HELDOUT-17",
+      "parent_family_id": null,
+      "category": "invalid_commit",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-085",
+      "parent_slot": "HELDOUT-17",
+      "parent_family_id": null,
+      "category": "unsupported_language",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-086",
+      "parent_slot": "HELDOUT-18",
+      "parent_family_id": null,
+      "category": "nested_content",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-087",
+      "parent_slot": "HELDOUT-18",
+      "parent_family_id": null,
+      "category": "fake_architecture",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-088",
+      "parent_slot": "HELDOUT-18",
+      "parent_family_id": null,
+      "category": "misleading_comment",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-089",
+      "parent_slot": "HELDOUT-18",
+      "parent_family_id": null,
+      "category": "incomplete_repository",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-090",
+      "parent_slot": "HELDOUT-18",
+      "parent_family_id": null,
+      "category": "prompt_injection",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-091",
+      "parent_slot": "HELDOUT-19",
+      "parent_family_id": null,
+      "category": "stale_hash",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-092",
+      "parent_slot": "HELDOUT-19",
+      "parent_family_id": null,
+      "category": "ambiguous_import",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-093",
+      "parent_slot": "HELDOUT-19",
+      "parent_family_id": null,
+      "category": "invented_function",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-094",
+      "parent_slot": "HELDOUT-19",
+      "parent_family_id": null,
+      "category": "multiple_entrypoints",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-095",
+      "parent_slot": "HELDOUT-19",
+      "parent_family_id": null,
+      "category": "secret_canary",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-096",
+      "parent_slot": "HELDOUT-20",
+      "parent_family_id": null,
+      "category": "forged_verification",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-097",
+      "parent_slot": "HELDOUT-20",
+      "parent_family_id": null,
+      "category": "unresolved_call",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-098",
+      "parent_slot": "HELDOUT-20",
+      "parent_family_id": null,
+      "category": "forged_location",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-099",
+      "parent_slot": "HELDOUT-20",
+      "parent_family_id": null,
+      "category": "malformed_source",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    },
+    {
+      "slot_id": "ADV-100",
+      "parent_slot": "HELDOUT-20",
+      "parent_family_id": null,
+      "category": "suspicious_configuration",
+      "recipe_version": "pending-independent-specification",
+      "expected_outcome": null,
+      "status": "PLANNED",
+      "approved": false
+    }
+  ]
+}

@@ -1,0 +1,220 @@
+{
+  "$defs": {
+    "Candidate": {
+      "additionalProperties": false,
+      "properties": {
+        "ancestry": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Ancestry",
+          "type": "array"
+        },
+        "ancestry_basis": {
+          "title": "Ancestry Basis",
+          "type": "string"
+        },
+        "attribution": {
+          "title": "Attribution",
+          "type": "string"
+        },
+        "commit_sha": {
+          "pattern": "^[a-f0-9]{40}$",
+          "title": "Commit Sha",
+          "type": "string"
+        },
+        "complexity": {
+          "title": "Complexity",
+          "type": "string"
+        },
+        "family_id": {
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+          "title": "Family Id",
+          "type": "string"
+        },
+        "language_basis": {
+          "title": "Language Basis",
+          "type": "string"
+        },
+        "language_slice": {
+          "enum": [
+            "python",
+            "javascript_typescript",
+            "mixed"
+          ],
+          "title": "Language Slice",
+          "type": "string"
+        },
+        "license_id": {
+          "title": "License Id",
+          "type": "string"
+        },
+        "license_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "License Path"
+        },
+        "license_text_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "License Text Sha256"
+        },
+        "owner_approval_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Owner Approval Sha256"
+        },
+        "permission_basis": {
+          "title": "Permission Basis",
+          "type": "string"
+        },
+        "permission_evidence_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Permission Evidence Sha256"
+        },
+        "preliminary_coverage": {
+          "title": "Preliminary Coverage",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "redistribution": {
+          "enum": [
+            "pending",
+            "permitted",
+            "restricted"
+          ],
+          "title": "Redistribution",
+          "type": "string"
+        },
+        "repository": {
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$",
+          "title": "Repository",
+          "type": "string"
+        },
+        "retention": {
+          "title": "Retention",
+          "type": "string"
+        },
+        "reviewer_access": {
+          "enum": [
+            "pending",
+            "permitted",
+            "restricted"
+          ],
+          "title": "Reviewer Access",
+          "type": "string"
+        },
+        "rights_review_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Rights Review Sha256"
+        },
+        "rights_status": {
+          "enum": [
+            "pending",
+            "rejected",
+            "rights_reviewed",
+            "owner_approved"
+          ],
+          "title": "Rights Status",
+          "type": "string"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "family_id",
+        "repository",
+        "url",
+        "commit_sha",
+        "language_slice",
+        "language_basis",
+        "license_id",
+        "license_path",
+        "license_text_sha256",
+        "permission_basis",
+        "permission_evidence_sha256",
+        "attribution",
+        "redistribution",
+        "reviewer_access",
+        "retention",
+        "ancestry",
+        "ancestry_basis",
+        "complexity",
+        "preliminary_coverage",
+        "rights_status",
+        "rights_review_sha256",
+        "owner_approval_sha256",
+        "reason"
+      ],
+      "title": "Candidate",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "candidates": {
+      "items": {
+        "$ref": "#/$defs/Candidate"
+      },
+      "title": "Candidates",
+      "type": "array"
+    },
+    "captured_on": {
+      "title": "Captured On",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "evaluation-candidates-1.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "captured_on",
+    "candidates"
+  ],
+  "title": "Catalog",
+  "type": "object"
+}

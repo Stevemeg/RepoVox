@@ -1,0 +1,75 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "annotation_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Annotation Sha256",
+      "type": "string"
+    },
+    "approved": {
+      "const": true,
+      "title": "Approved",
+      "type": "boolean"
+    },
+    "claim_ids": {
+      "items": {
+        "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+        "type": "string"
+      },
+      "title": "Claim Ids",
+      "type": "array"
+    },
+    "edge_ids": {
+      "items": {
+        "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+        "type": "string"
+      },
+      "title": "Edge Ids",
+      "type": "array"
+    },
+    "family_id": {
+      "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+      "title": "Family Id",
+      "type": "string"
+    },
+    "preparer_id": {
+      "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+      "title": "Preparer Id",
+      "type": "string"
+    },
+    "reviewer_id": {
+      "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+      "title": "Reviewer Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "gold-review-receipt-1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_checked": {
+      "const": true,
+      "title": "Source Checked",
+      "type": "boolean"
+    },
+    "unresolved_disagreements": {
+      "const": 0,
+      "title": "Unresolved Disagreements",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "family_id",
+    "annotation_sha256",
+    "preparer_id",
+    "reviewer_id",
+    "claim_ids",
+    "edge_ids",
+    "schema_version",
+    "source_checked",
+    "approved",
+    "unresolved_disagreements"
+  ],
+  "title": "ReviewReceipt",
+  "type": "object"
+}
