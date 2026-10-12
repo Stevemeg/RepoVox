@@ -1,5 +1,11 @@
 # Database migrations and roles
 
+Phase 2 current revision is `0002`. It applies additively over accepted `0001` and keeps
+all user/project/job data. A real PostgreSQL migration test first seeds a separate 0001
+database, upgrades it and checks unchanged records/forced RLS. No destructive downgrade
+is provided. Back up actual development data before applying reviewed migrations;
+only explicitly disposable test databases/Compose projects are reset by test commands.
+
 [Approved ownership model](../architecture/data-model.md) · [Setup](local.md) · [Tests](testing.md)
 
 Alembic revision `0001` creates the Phase 1 relational foundation. The local PostgreSQL bootstrap creates `rv_migrator` (DDL), `rv_app` (API), `rv_worker` (procedure execution only) and `rv_executor` (NOLOGIN internal procedure owner). No runtime login is a table owner, superuser or BYPASSRLS. Startup checks enforce role and migration revision. Only the local bootstrap administrator has superuser access. Migration credentials are absent from API/worker containers.

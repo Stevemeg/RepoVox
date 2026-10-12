@@ -1,0 +1,13 @@
+{
+  "version": "eval-v1-preparation",
+  "status": "UNFROZEN",
+  "reviewer_status": "PENDING OWNER APPOINTMENT",
+  "appointment": null,
+  "families": [],
+  "access_policy_sha256": null,
+  "contamination_manifest_sha256": null,
+  "deletion_policy_sha256": null,
+  "freeze_sha256": null,
+  "dependent_reports": [],
+  "invalidated_reports": []
+}

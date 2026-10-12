@@ -1,9 +1,9 @@
-name: Phase 1 quality gates
+name: Phase 1 and 2 quality gates
 on:
   pull_request:
-    branches: [main, phase0/foundation]
+    branches: [main, phase0/foundation, phase1/saas-foundation]
   push:
-    branches: [phase1/saas-foundation]
+    branches: [phase1/saas-foundation, phase2/repository-intelligence]
 permissions:
   contents: read
 concurrency:
@@ -22,8 +22,8 @@ jobs:
         run: |
           python -m pip install uv==0.11.29
           uv sync --frozen
-      - run: uv run ruff check apps/api tests tools/phase1*.py
-      - run: uv run ruff format --check apps/api tests tools/phase1*.py
+      - run: uv run ruff check apps/api tests tools/phase1*.py tools/phase2*.py
+      - run: uv run ruff format --check apps/api tests tools/phase1*.py tools/phase2*.py
       - run: uv run mypy
       - run: uv run pytest tests/unit -q
       - name: Accepted Phase 0 documentation and contracts
@@ -32,6 +32,8 @@ jobs:
           uv run python tools/cost_model.py --check
           uv run python -m unittest discover -s tools -p 'test_*.py' -v
           uv run python tools/phase1_contracts.py --check
+          uv run python tools/phase2_contracts.py --check
+          uv run python tools/phase2_corpus.py docs/ai/evaluation-corpus.manifest.json
       - run: uv run pip-audit --local
   frontend:
     runs-on: ubuntu-24.04

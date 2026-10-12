@@ -4,15 +4,34 @@ version = "0.1.0"
 description = "RepoVox local SaaS foundation"
 requires-python = ">=3.11,<3.14"
 dependencies = [
-  "fastapi>=0.115,<1", "uvicorn>=0.34,<1", "pydantic-settings>=2.8,<3",
-  "sqlalchemy>=2.0.40,<2.1", "psycopg[binary]>=3.2,<4", "alembic>=1.15,<2",
-  "celery[redis]>=5.5,<6", "boto3>=1.37,<2", "itsdangerous>=2.2,<3",
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.34,<1",
+  "pydantic-settings>=2.8,<3",
+  "sqlalchemy>=2.0.40,<2.1",
+  "psycopg[binary]>=3.2,<4",
+  "alembic>=1.15,<2",
+  "celery[redis]>=5.5,<6",
+  "boto3>=1.37,<2",
+  "itsdangerous>=2.2,<3",
+  "tree-sitter==0.25.2",
+  "tree-sitter-python==0.25.0",
+  "tree-sitter-javascript==0.25.0",
+  "tree-sitter-typescript==0.23.2",
+  "jsonschema==4.26.0",
 ]
 
 [dependency-groups]
-dev = ["pytest>=8.3,<10", "httpx>=0.28,<1", "ruff>=0.11,<1", "mypy>=1.15,<2",
-       "boto3-stubs[s3]>=1.37,<2", "types-redis>=4.6,<5", "pip-audit>=2.9,<3",
-       "jsonschema==4.26.0"]
+dev = [
+    "pytest>=8.3,<10",
+    "httpx>=0.28,<1",
+    "ruff>=0.11,<1",
+    "mypy>=1.15,<2",
+    "boto3-stubs[s3]>=1.37,<2",
+    "types-redis>=4.6,<5",
+    "pip-audit>=2.9,<3",
+    "jsonschema==4.26.0",
+    "trustme==1.2.1",
+]
 
 [build-system]
 requires = ["hatchling==1.27.0"]
@@ -28,7 +47,7 @@ addopts = "-ra"
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-include = ["apps/api/**/*.py", "tests/**/*.py", "tools/phase1*.py"]
+include = ["apps/api/**/*.py", "tests/**/*.py", "tools/phase1*.py", "tools/phase2*.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

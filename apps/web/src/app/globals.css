@@ -958,3 +958,18 @@ footer {
     grid-template-columns: 100px 1fr;
   }
 }
+
+.details dd,
+.details code {
+  overflow-wrap: anywhere;
+}
+.details pre {
+  max-width: 100%;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 12px;
+  background: #f6f7f8;
+  font-size: 12px;
+  line-height: 1.5;
+}

@@ -1,0 +1,523 @@
+{
+  "$defs": {
+    "Appointment": {
+      "additionalProperties": false,
+      "properties": {
+        "owner_appointment_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Owner Appointment Sha256",
+          "type": "string"
+        },
+        "reviewer_id": {
+          "title": "Reviewer Id",
+          "type": "string"
+        },
+        "rights_access_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Rights Access Sha256",
+          "type": "string"
+        },
+        "type": {
+          "const": "actual_human",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reviewer_id",
+        "type",
+        "owner_appointment_sha256",
+        "rights_access_sha256"
+      ],
+      "title": "Appointment",
+      "type": "object"
+    },
+    "Citation": {
+      "additionalProperties": false,
+      "properties": {
+        "end_line": {
+          "minimum": 1,
+          "title": "End Line",
+          "type": "integer"
+        },
+        "file_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "File Sha256",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "start_line": {
+          "minimum": 1,
+          "title": "Start Line",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "file_sha256",
+        "start_line",
+        "end_line"
+      ],
+      "title": "Citation",
+      "type": "object"
+    },
+    "Family": {
+      "additionalProperties": false,
+      "properties": {
+        "adversarial_variants": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Adversarial Variants",
+          "type": "array"
+        },
+        "claims": {
+          "items": {
+            "$ref": "#/$defs/GoldClaim"
+          },
+          "title": "Claims",
+          "type": "array"
+        },
+        "commit_sha": {
+          "pattern": "^[a-f0-9]{40}$",
+          "title": "Commit Sha",
+          "type": "string"
+        },
+        "content_fingerprints": {
+          "items": {
+            "pattern": "^[a-f0-9]{64}$",
+            "type": "string"
+          },
+          "title": "Content Fingerprints",
+          "type": "array"
+        },
+        "derivatives": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Derivatives",
+          "type": "array"
+        },
+        "edges": {
+          "items": {
+            "$ref": "#/$defs/GoldEdge"
+          },
+          "title": "Edges",
+          "type": "array"
+        },
+        "family_grouping_evidence_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Family Grouping Evidence Sha256"
+        },
+        "gold_review": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GoldReview"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hidden": {
+          "title": "Hidden",
+          "type": "boolean"
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9-]{0,79}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "language_slice": {
+          "enum": [
+            "python",
+            "javascript_typescript",
+            "mixed"
+          ],
+          "title": "Language Slice",
+          "type": "string"
+        },
+        "newly_owner_authored": {
+          "title": "Newly Owner Authored",
+          "type": "boolean"
+        },
+        "repository": {
+          "title": "Repository",
+          "type": "string"
+        },
+        "rights": {
+          "$ref": "#/$defs/Rights"
+        },
+        "screening": {
+          "enum": [
+            "pending",
+            "clear",
+            "rejected"
+          ],
+          "title": "Screening",
+          "type": "string"
+        },
+        "source_manifest_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Source Manifest Sha256",
+          "type": "string"
+        },
+        "split": {
+          "enum": [
+            "TOOLING_FIXTURE",
+            "EVAL_DEV",
+            "EVAL_TEST"
+          ],
+          "title": "Split",
+          "type": "string"
+        },
+        "withdrawn": {
+          "default": false,
+          "title": "Withdrawn",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "repository",
+        "commit_sha",
+        "language_slice",
+        "split",
+        "hidden",
+        "newly_owner_authored",
+        "derivatives",
+        "family_grouping_evidence_sha256",
+        "source_manifest_sha256",
+        "content_fingerprints",
+        "rights",
+        "screening",
+        "claims",
+        "edges",
+        "adversarial_variants",
+        "gold_review"
+      ],
+      "title": "Family",
+      "type": "object"
+    },
+    "GoldClaim": {
+      "additionalProperties": false,
+      "properties": {
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "title": "Citations",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "verified",
+            "inferred",
+            "documentation_only",
+            "unsupported"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "text",
+        "status",
+        "citations"
+      ],
+      "title": "GoldClaim",
+      "type": "object"
+    },
+    "GoldEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "title": "Citations",
+          "type": "array"
+        },
+        "relationship": {
+          "title": "Relationship",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "supported": {
+          "title": "Supported",
+          "type": "boolean"
+        },
+        "target": {
+          "title": "Target",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "target",
+        "relationship",
+        "supported",
+        "citations"
+      ],
+      "title": "GoldEdge",
+      "type": "object"
+    },
+    "GoldReview": {
+      "additionalProperties": false,
+      "properties": {
+        "adjudication_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Adjudication Sha256",
+          "type": "string"
+        },
+        "approval_evidence_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Approval Evidence Sha256",
+          "type": "string"
+        },
+        "approved": {
+          "title": "Approved",
+          "type": "boolean"
+        },
+        "preparer_id": {
+          "title": "Preparer Id",
+          "type": "string"
+        },
+        "reviewer_id": {
+          "title": "Reviewer Id",
+          "type": "string"
+        },
+        "source_review_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Source Review Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "preparer_id",
+        "reviewer_id",
+        "source_review_sha256",
+        "adjudication_sha256",
+        "approval_evidence_sha256",
+        "approved"
+      ],
+      "title": "GoldReview",
+      "type": "object"
+    },
+    "Rights": {
+      "additionalProperties": false,
+      "properties": {
+        "approved_by_owner": {
+          "title": "Approved By Owner",
+          "type": "boolean"
+        },
+        "attribution": {
+          "title": "Attribution",
+          "type": "string"
+        },
+        "basis": {
+          "enum": [
+            "owner_authored",
+            "explicit_evaluation_permission",
+            "license_reviewed",
+            "pending"
+          ],
+          "title": "Basis",
+          "type": "string"
+        },
+        "license_id": {
+          "title": "License Id",
+          "type": "string"
+        },
+        "license_text_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "License Text Sha256"
+        },
+        "permission_evidence_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Permission Evidence Sha256"
+        },
+        "redistribution_permitted": {
+          "title": "Redistribution Permitted",
+          "type": "boolean"
+        },
+        "retention_days": {
+          "maximum": 365,
+          "minimum": 1,
+          "title": "Retention Days",
+          "type": "integer"
+        },
+        "reviewer_access_permitted": {
+          "title": "Reviewer Access Permitted",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "basis",
+        "license_id",
+        "license_text_sha256",
+        "permission_evidence_sha256",
+        "attribution",
+        "retention_days",
+        "reviewer_access_permitted",
+        "redistribution_permitted",
+        "approved_by_owner"
+      ],
+      "title": "Rights",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "access_policy_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Access Policy Sha256"
+    },
+    "appointment": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Appointment"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "contamination_manifest_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Contamination Manifest Sha256"
+    },
+    "deletion_policy_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Deletion Policy Sha256"
+    },
+    "dependent_reports": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Dependent Reports",
+      "type": "array"
+    },
+    "families": {
+      "items": {
+        "$ref": "#/$defs/Family"
+      },
+      "title": "Families",
+      "type": "array"
+    },
+    "freeze_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Freeze Sha256"
+    },
+    "invalidated_reports": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Invalidated Reports",
+      "type": "array"
+    },
+    "reviewer_status": {
+      "title": "Reviewer Status",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "UNFROZEN",
+        "FROZEN",
+        "WITHDRAWN"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "version": {
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "version",
+    "status",
+    "reviewer_status",
+    "appointment",
+    "families",
+    "access_policy_sha256",
+    "contamination_manifest_sha256",
+    "deletion_policy_sha256",
+    "freeze_sha256",
+    "dependent_reports",
+    "invalidated_reports"
+  ],
+  "title": "Corpus",
+  "type": "object"
+}

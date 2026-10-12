@@ -1,5 +1,8 @@
 # Architectural decisions
 
+Phase 2 proposals: [ADR-0010 static boundary](0010-phase2-static-analysis-boundary.md)
+and [ADR-0011 parser isolation](0011-parser-process-isolation.md).
+
 All proposed for Phase 0 review, dated 2026-10-08. Acceptance follows independent validation; exact dependency/model versions require later compatibility checks.
 
 | ADR | Decision |

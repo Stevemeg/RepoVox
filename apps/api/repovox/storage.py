@@ -1,6 +1,6 @@
 import hashlib
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Literal, Protocol
 from uuid import UUID
 
 import boto3
@@ -18,12 +18,13 @@ class ObjectRef:
     job: UUID
     artifact: UUID
     checksum: str
+    area: Literal["fixture", "analysis"] = "fixture"
 
     @property
     def key(self) -> str:
         return (
             f"development/{self.owner}/{self.snapshot}/{self.job}"
-            f"/fixture/{self.artifact}/{self.checksum}"
+            f"/{self.area}/{self.artifact}/{self.checksum}"
         )
 
 
@@ -57,13 +58,14 @@ class S3Storage:
             raise DomainError("not_found", 404)
 
     def write(self, ref: ObjectRef, body: bytes) -> None:
-        if len(body) > 4096 or hashlib.sha256(body).hexdigest() != ref.checksum:
+        maximum = 4096 if ref.area == "fixture" else 100 * 1024**2
+        if len(body) > maximum or hashlib.sha256(body).hexdigest() != ref.checksum:
             raise DomainError("invalid_object")
         self.client.put_object(
             Bucket=self.bucket,
             Key=ref.key,
             Body=body,
-            ContentType="application/json",
+            ContentType="application/json" if ref.area == "fixture" else "application/octet-stream",
             IfNoneMatch="*",
             Metadata={"sha256": ref.checksum},
         )
@@ -73,10 +75,11 @@ class S3Storage:
         response = self.client.get_object(Bucket=self.bucket, Key=ref.key)
         stream = response["Body"]
         try:
-            body = stream.read(4097)
+            maximum = 4096 if ref.area == "fixture" else 100 * 1024**2
+            body = stream.read(maximum + 1)
         finally:
             stream.close()
-        if len(body) > 4096 or hashlib.sha256(body).hexdigest() != ref.checksum:
+        if len(body) > maximum or hashlib.sha256(body).hexdigest() != ref.checksum:
             raise DomainError("object_corrupt")
         return body
 

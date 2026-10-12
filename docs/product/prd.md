@@ -45,6 +45,15 @@ Explicitly defer private repositories, arbitrary documents, AI avatars, team adm
 
 ## Nonfunctional requirements and success metrics
 
+Phase 2 development analysis adds conservative local safety ceilings without changing
+the approved archive/source/90% coverage caps: path depth 32, 280 MiB decompressed tar
+including headers/padding, 20,032 archive members, 10,000 structural/context facts,
+20,000 atomic claims, 64 MiB parser JSON output and 100 MiB immutable object bodies.
+These internal limits reject excess rather than truncate evidence. Native parsing has
+a one-second/file watchdog and traversal bounds; parent stage/lease deadlines remain
+authoritative. No video admission or production-readiness claim follows from analysis.
+See [implementation boundaries](../development/analysis.md).
+
 Targets are unmeasured proposals. Supported admitted-job cohort excludes deliberate rejection, owner cancellation and upstream repository removal; report excluded rates separately. No achieved SLA/benchmark claims.
 
 | ID | Target | Measurement / acceptance |

@@ -8,7 +8,13 @@ from fastapi.security import APIKeyCookie
 from repovox.auth.session import Identity, digest
 from repovox.core.errors import DomainError
 from repovox.core.services import Services
-from repovox.schemas.requests import FixtureInput, ProjectInput, ProjectUpdate, SignIn
+from repovox.schemas.requests import (
+    AnalysisInput,
+    FixtureInput,
+    ProjectInput,
+    ProjectUpdate,
+    SignIn,
+)
 from repovox.schemas.responses import JobSummary, JobView, ProjectView
 
 router = APIRouter(prefix="/v1")
@@ -74,6 +80,7 @@ def session(request: Request, identity: ReadIdentity) -> dict[str, Any]:
         "email": identity.email,
         "environment": services(request).settings.environment,
         "fixtures_enabled": services(request).settings.fixtures,
+        "analysis_enabled": services(request).settings.analysis,
     }
 
 
@@ -132,6 +139,26 @@ def generation_unavailable(project_id: UUID, request: Request, identity: WriteId
 
 
 @router.post(
+    "/development/projects/{project_id}/analysis-jobs", status_code=202, response_model=JobView
+)
+def analysis_job(
+    project_id: UUID,
+    body: AnalysisInput,
+    request: Request,
+    identity: WriteIdentity,
+    idempotency_key: Annotated[str, Header()],
+) -> dict[str, Any]:
+    return services(request).jobs.admit_analysis(identity.owner_id, project_id, idempotency_key)
+
+
+@router.get("/development/jobs/{job_id}/analysis")
+def analysis_result(job_id: UUID, request: Request, identity: ReadIdentity) -> dict[str, Any]:
+    return services(request).jobs.analysis_result(
+        identity.owner_id, job_id, services(request).settings
+    )
+
+
+@router.post(
     "/development/projects/{project_id}/fixture-jobs", status_code=202, response_model=JobView
 )
 def fixture_job(
@@ -164,6 +191,10 @@ def retry(
     idempotency_key: Annotated[str, Header()],
 ) -> dict[str, Any]:
     old = services(request).jobs.get(identity.owner_id, job_id)
+    if not old["synthetic"]:
+        return services(request).jobs.admit_analysis(
+            identity.owner_id, old["project_id"], idempotency_key, job_id
+        )
     return services(request).jobs.admit(
         identity.owner_id, old["project_id"], idempotency_key, old["fixture"], job_id
     )

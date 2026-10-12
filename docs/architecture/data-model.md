@@ -1,5 +1,24 @@
 # Persistence and job orchestration
 
+## Phase 2 implementation delta
+
+Migration 0002 extends the accepted 0001 tables without resets. Real snapshots retain
+full SHA/public canonical metadata and immutable validation digest; job mode is either
+the retained synthetic fixture or `phase2-static-v1` analysis. Artifacts bind owner,
+job, stage and snapshot through composite FKs and forced RLS. Stage input/output hashes,
+byte count, parser/rule versions and expiry are indexed metadata; large original archives
+and strict JSON bodies remain private objects. `analysis_results` is immutable and binds
+the exact Stage 9 artifact/job/snapshot. The separate `evaluation` schema has no ordinary
+application/worker grants.
+
+Stage 1 is real commit resolution at admission. Stages 2–9 preserve existing attempts,
+leases, fences, quota reservations and outbox ordering. Publication transaction validates
+the complete upstream SHA/pipeline/output-digest chain and current DB clock/fence before
+advancing. Stage 9 inserts `verified_static_analysis` and terminates generation as failed
+with `phase2_pipeline_boundary`; no terminal reset, generation success or MP4 insert is
+allowed. Details: [ADR-0010](../adr/0010-phase2-static-analysis-boundary.md),
+[actual behavior](../development/analysis.md), [evaluation boundary](../development/evaluation-preparation.md).
+
 Proposed, 2026-10-08. [Pipeline](pipeline.md) · [Reliability](../operations/reliability.md) · [Ownership tests](../security/threat-model.md#security-acceptance-suite) · [Retention](../operations/deployment.md#retention-and-deletion)
 
 ## Entities and ownership
