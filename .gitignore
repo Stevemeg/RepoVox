@@ -6,3 +6,12 @@ __pycache__/
 node_modules/
 .venv/
 .artifacts/
+uv-cache/
+.next/
+coverage/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.tsbuildinfo
+playwright-report/
+test-results/

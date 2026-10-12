@@ -12,3 +12,4 @@ All proposed for Phase 0 review, dated 2026-10-08. Acceptance follows independen
 | [006](0006-director-ownership.md) | Model authority and base/data/adapter ownership |
 | [007](0007-model-promotion.md) | Training/evaluation promotion gates |
 | [008](0008-gpu-serving.md) | Warm private GPU serving and isolated training |
+| [009](0009-local-object-storage.md) | Local Phase 1 S3-compatible storage choice; production architecture preserved |

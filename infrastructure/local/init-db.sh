@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+psql --username "$POSTGRES_USER" --dbname postgres \
+  -v migrator="$MIGRATION_PASSWORD" -v app="$APP_DATABASE_PASSWORD" -v worker="$WORKER_DATABASE_PASSWORD" <<'SQL'
+CREATE ROLE rv_executor NOLOGIN NOSUPERUSER NOBYPASSRLS;
+CREATE ROLE rv_migrator LOGIN NOINHERIT NOSUPERUSER NOBYPASSRLS PASSWORD :'migrator';
+CREATE ROLE rv_app LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD :'app';
+CREATE ROLE rv_worker LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD :'worker';
+GRANT rv_executor TO rv_migrator;
+CREATE DATABASE repovox OWNER rv_migrator;
+REVOKE ALL ON DATABASE repovox FROM PUBLIC;
+GRANT CONNECT ON DATABASE repovox TO rv_migrator,rv_app,rv_worker;
+SQL

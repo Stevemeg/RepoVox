@@ -1,0 +1,87 @@
+name: Phase 1 quality gates
+on:
+  pull_request:
+    branches: [main, phase0/foundation]
+  push:
+    branches: [phase1/saas-foundation]
+permissions:
+  contents: read
+concurrency:
+  group: phase1-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  python:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Install controlled tooling and locked dependencies
+        run: |
+          python -m pip install uv==0.11.29
+          uv sync --frozen
+      - run: uv run ruff check apps/api tests tools/phase1*.py
+      - run: uv run ruff format --check apps/api tests tools/phase1*.py
+      - run: uv run mypy
+      - run: uv run pytest tests/unit -q
+      - name: Accepted Phase 0 documentation and contracts
+        run: |
+          uv run python tools/check_docs.py
+          uv run python tools/cost_model.py --check
+          uv run python -m unittest discover -s tools -p 'test_*.py' -v
+          uv run python tools/phase1_contracts.py --check
+      - run: uv run pip-audit --local
+  frontend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults: {run: {working-directory: apps/web}}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '24.18.0', cache: npm, cache-dependency-path: apps/web/package-lock.json}
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm audit --audit-level=high
+  integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate ephemeral local credentials
+        run: python tools/phase1_env.py
+      - name: Fresh migration and real-service integration tests
+        run: |
+          docker compose up -d --build postgres redis storage storage-init migrate
+          docker compose run --rm --build tests
+      - name: Boot complete local stack
+        run: |
+          docker compose up -d --build --wait api web worker dispatcher
+          python -m pip install httpx==0.28.1
+          python tools/phase1_runtime.py
+      - uses: actions/setup-node@v4
+        with: {node-version: '24.18.0'}
+      - name: Browser interaction test
+        run: |
+          npm --prefix apps/web ci
+          cd apps/web
+          npx playwright install --with-deps chromium
+          npm run test:e2e
+      - name: Service status
+        if: always()
+        run: docker compose ps -a
+      - name: Remove ephemeral services and volumes
+        if: always()
+        run: docker compose down --volumes
+  secrets:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - name: Scan Git history for credentials
+        run: docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.0 git /repo --redact --exit-code 1
