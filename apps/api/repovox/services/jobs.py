@@ -22,7 +22,7 @@ class Jobs:
                 "j.finished_at,j.deadline,p.title AS project_title FROM generation_jobs j "
                 "JOIN projects p ON p.id=j.project_id AND p.owner_id=j.owner_id "
                 "WHERE j.owner_id=:owner AND p.deleted_at IS NULL "
-                "AND (:project IS NULL OR j.project_id=CAST(:project AS uuid)) "
+                "AND (CAST(:project AS uuid) IS NULL OR j.project_id=CAST(:project AS uuid)) "
                 "ORDER BY j.created_at DESC LIMIT 100",
                 owner=owner,
                 project=project,

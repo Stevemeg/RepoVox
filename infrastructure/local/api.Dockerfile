@@ -10,5 +10,6 @@ COPY tests tests
 COPY README.md AGENTS.md ./
 RUN uv sync --frozen --no-cache && useradd --create-home --uid 10001 repovox && mkdir /storage-config && chown repovox /storage-config
 ENV PATH="/workspace/.venv/bin:$PATH" PYTHONUNBUFFERED=1
+ENV PYTEST_ADDOPTS="-o cache_dir=/tmp/repovox-pytest-cache"
 USER repovox
 CMD ["uvicorn", "repovox.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]

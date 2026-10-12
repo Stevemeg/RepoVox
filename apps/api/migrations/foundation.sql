@@ -494,6 +494,7 @@ DO $$ DECLARE f record; BEGIN
   EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC',f.signature);
  END LOOP;
 END $$;
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA rv FROM PUBLIC,rv_app,rv_worker;
 GRANT EXECUTE ON FUNCTION rv.owner() TO rv_app;
 GRANT EXECUTE ON FUNCTION rv.dev_identity(text,text),rv.admit(uuid,text,text,text,uuid),rv.cancel(uuid),rv.delete_project(uuid) TO rv_app;
 GRANT EXECUTE ON FUNCTION rv.claim(uuid,text),rv.heartbeat(uuid,bigint),rv.finish(uuid,bigint,uuid,text,text),

@@ -95,6 +95,13 @@ def test_rls_missing_owner_pool_and_composite_fk(
     ja, jb = admit(a, pa), admit(b, pb)
     verify_role(app_engine, "rv_app")
     with app_engine.connect() as c:
+        assert (
+            c.scalar(
+                text("SELECT has_function_privilege(current_user,'rv.claim(uuid,text)','EXECUTE')")
+            )
+            is False
+        )
+        assert c.scalar(text("SELECT pg_has_role(current_user,'rv_executor','MEMBER')")) is False
         assert c.scalar(text("SELECT count(*) FROM projects")) == 0
         assert c.scalar(text("SELECT count(*) FROM generation_jobs")) == 0
     for _ in range(12):
