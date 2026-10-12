@@ -7,7 +7,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: phase1-${{ github.ref }}
+  group: phase1-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
   python:
@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-        with: {fetch-depth: 0}
+        with: {fetch-depth: 0, ref: '${{ github.event.pull_request.head.sha || github.sha }}'}
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
       - name: Install controlled tooling and locked dependencies
@@ -39,6 +39,7 @@ jobs:
     defaults: {run: {working-directory: apps/web}}
     steps:
       - uses: actions/checkout@v4
+        with: {ref: '${{ github.event.pull_request.head.sha || github.sha }}'}
       - uses: actions/setup-node@v4
         with: {node-version: '24.18.0', cache: npm, cache-dependency-path: apps/web/package-lock.json}
       - run: npm ci
@@ -52,6 +53,7 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with: {ref: '${{ github.event.pull_request.head.sha || github.sha }}'}
       - name: Generate ephemeral local credentials
         run: python tools/phase1_env.py
       - name: Fresh migration and real-service integration tests
@@ -82,6 +84,6 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-        with: {fetch-depth: 0}
+        with: {fetch-depth: 0, ref: '${{ github.event.pull_request.head.sha || github.sha }}'}
       - name: Scan Git history for credentials
         run: docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.0 git /repo --redact --exit-code 1

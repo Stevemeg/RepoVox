@@ -41,7 +41,9 @@ def test_crud_csrf_session_and_cross_tenant(
     assert b.get(f"/v1/jobs/{job['id']}").status_code == 404
     assert b.post(f"/v1/jobs/{job['id']}/cancel").status_code == 404
     assert b.get(f"/v1/projects/{pid}/jobs").status_code == 404
-    assert b.get("/v1/jobs").json() == []
+    response = b.get("/v1/jobs")
+    assert response.status_code == 200, response.text
+    assert response.json() == []
     response = a.post(f"/v1/projects/{pid}/jobs", json={"commit_sha": "a" * 40, "synthetic": True})
     assert (
         response.status_code == 503
@@ -144,6 +146,48 @@ def test_rls_missing_owner_pool_and_composite_fk(
     with pytest.raises(DBAPIError):
         with app_engine.begin() as c:
             c.execute(text("SELECT * FROM rv.claim(:id,'intruder')"), {"id": ja["stages"][1]["id"]})
+    with pytest.raises(DBAPIError, match="not_found"):
+        with tenant(app_engine, A) as c:
+            c.execute(text("SELECT rv.delete_project(:id)"), {"id": pb})
+
+
+def test_migration_rls_and_worker_grants(admin: Engine, orchestrator) -> None:
+    with admin.connect() as c:
+        assert c.scalar(text("SELECT version_num FROM alembic_version")) == "0001"
+        unsafe = c.execute(
+            text(
+                "SELECT relname FROM pg_class WHERE relnamespace='public'::regnamespace "
+                "AND relkind='r' AND relname<>'alembic_version' "
+                "AND (NOT relrowsecurity OR NOT relforcerowsecurity)"
+            )
+        ).all()
+        assert unsafe == []
+        assert (
+            c.scalar(
+                text(
+                    "SELECT count(*) FROM pg_roles WHERE rolname IN "
+                    "('rv_app','rv_worker','rv_migrator','rv_executor') "
+                    "AND (rolsuper OR rolbypassrls)"
+                )
+            )
+            == 0
+        )
+    with orchestrator.engine.connect() as c:
+        assert c.scalar(text("SELECT current_user")) == "rv_worker"
+        assert (
+            c.scalar(text("SELECT has_table_privilege(current_user,'generation_jobs','SELECT')"))
+            is False
+        )
+        assert (
+            c.scalar(
+                text(
+                    "SELECT has_function_privilege(current_user,"
+                    "'rv.admit(uuid,text,text,text,uuid)','EXECUTE')"
+                )
+            )
+            is False
+        )
+        assert c.scalar(text("SELECT pg_has_role(current_user,'rv_executor','MEMBER')")) is False
 
 
 def test_concurrent_projects_and_owner_context(clients: tuple[TestClient, TestClient]) -> None:

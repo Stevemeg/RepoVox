@@ -491,15 +491,17 @@ END $$;
 DO $$ DECLARE f record; BEGIN
  FOR f IN SELECT oid::regprocedure AS signature FROM pg_proc WHERE pronamespace='rv'::regnamespace LOOP
   EXECUTE format('ALTER FUNCTION %s OWNER TO rv_executor',f.signature);
-  EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC',f.signature);
  END LOOP;
 END $$;
+-- NOINHERIT migrator can transfer ownership, but must SET ROLE to revoke as the new owner.
+SET LOCAL ROLE rv_executor;
 REVOKE ALL ON ALL FUNCTIONS IN SCHEMA rv FROM PUBLIC,rv_app,rv_worker;
 GRANT EXECUTE ON FUNCTION rv.owner() TO rv_app;
 GRANT EXECUTE ON FUNCTION rv.dev_identity(text,text),rv.admit(uuid,text,text,text,uuid),rv.cancel(uuid),rv.delete_project(uuid) TO rv_app;
 GRANT EXECUTE ON FUNCTION rv.claim(uuid,text),rv.heartbeat(uuid,bigint),rv.finish(uuid,bigint,uuid,text,text),
  rv.fail(uuid,bigint,boolean),rv.reconcile(),rv.dispatch_batch(),rv.published(uuid),
  rv.cleanup_scope(uuid),rv.cleanup_done(uuid) TO rv_worker;
+RESET ROLE;
 REVOKE CREATE ON SCHEMA rv FROM rv_executor;
 SET LOCAL ROLE rv_executor;
 INSERT INTO users(id,owner_id,issuer,auth_subject,display_name,email) VALUES
