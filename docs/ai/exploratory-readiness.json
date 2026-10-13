@@ -1,0 +1,107 @@
+{
+  "schema_version": "exploratory-readiness-1.0",
+  "track": "AI_AUDITED_EXPLORATORY",
+  "as_of": "2026-10-13",
+  "policy": {
+    "reviewer_role": "INDEPENDENT_AI_TECHNICAL_REVIEWER",
+    "independently_human_reviewed": false,
+    "official_eval_entry_contribution": false,
+    "held_out_benchmark": false,
+    "full_corpus_freeze": false,
+    "production_accuracy_certification": false,
+    "training_authorized": false
+  },
+  "source_families_authorized": 3,
+  "source_families_rights_screened": 3,
+  "source_families_analyzed": 3,
+  "eligible_language_slices": {
+    "python": 1,
+    "javascript_typescript": 1,
+    "mixed": 1
+  },
+  "blind_packets_sealed": 3,
+  "prediction_packets_sealed": 3,
+  "independent_ai_references_received": 0,
+  "independent_ai_reviewed_claims": 0,
+  "independent_ai_reviewed_edges": 0,
+  "comparison_reports": 0,
+  "official_human_reviewed_claims_contributed": 0,
+  "official_supported_edges_contributed": 0,
+  "official_corpus_status": "UNFROZEN",
+  "official_freeze_eligible": false,
+  "official_manifest_unchanged": true,
+  "source_files_in_selected_analysis": 9,
+  "selected_source_bytes": 35122,
+  "selected_parser_errors": 0,
+  "whole_repository_parser_coverage": "NOT_MEASURED_SUCCESSFULLY; Click full scope hit existing fact limit; all final jobs explicitly scoped",
+  "source_packet_redactions": 0,
+  "protected_storage": "LOCAL_EXPLORATORY_POSIX_BOUNDARY_DEMONSTRATED; NOT_OFFICIAL_CUSTODIAN",
+  "reference_status": "PENDING_MANUAL_BLIND_CHATGPT_HANDOFF",
+  "scoring_status": "NOT_RUN",
+  "sources": [
+    {
+      "repository": "pallets/click",
+      "commit_sha": "2247b35ea1c47c727d7a06e51fa280e12a863ff6",
+      "license": "BSD-3-Clause AND PSF-2.0 for optparse-derived parser content",
+      "whole_eligible_files": 91,
+      "whole_eligible_bytes": 1003633,
+      "selected_source_files": 3,
+      "selected_source_bytes": 21069,
+      "parsed_selected_bytes": 21069,
+      "durable_job_seconds": 14.362808,
+      "A_sha256": "26f5d897e2e15807a2446eb60e919bf1b19b8f5b56c7903ed589d6c198c13d52",
+      "B_sha256": "1119842c478a9c13d13c063d0b8a7bc5c9e74f28364c1e721fe65326b932ea2b"
+    },
+    {
+      "repository": "sindresorhus/p-limit",
+      "commit_sha": "a8a6fbec4e0e866d6d779b10889bb4f5567e70eb",
+      "license": "MIT",
+      "whole_eligible_files": 6,
+      "whole_eligible_bytes": 35785,
+      "selected_source_files": 2,
+      "selected_source_bytes": 8513,
+      "parsed_selected_bytes": 8513,
+      "durable_job_seconds": 2.828136,
+      "A_sha256": "dffc75c3ebcc68419f47803db32d0b4fb3df9a108b30752aad95502df7702c74",
+      "B_sha256": "aa6c0a9b1e1c65cf040ab415be03c9632205e982ddbb5ccf0258eed8332e7df2"
+    },
+    {
+      "repository": "jupyterlite/echo-kernel",
+      "commit_sha": "16221829f0ba38374db8f2b8fda10f989d1a6cdd",
+      "license": "BSD-3-Clause",
+      "whole_eligible_files": 5,
+      "whole_eligible_bytes": 5561,
+      "selected_source_files": 4,
+      "selected_source_bytes": 5540,
+      "parsed_selected_bytes": 5540,
+      "durable_job_seconds": 2.71406,
+      "A_sha256": "56a5d551ef1fe24bc1e5c8dff7561d44b0324faf9ff0fae0da601dc2f04e9cf8",
+      "B_sha256": "f024544e33fc2929fb30c24960c5d4158a5467b610adefd8433838eb4835d0c0"
+    }
+  ],
+  "excluded_sources": [
+    {
+      "repository": "stevemeg/ai-job-agent",
+      "commit_sha": "e5cb0dfe1c79e7ba75a4a1416f7b25b5ce46ac8f",
+      "reason": "Owner explicitly excluded: third-party employer job-description permission absent",
+      "archives_acquired": 0
+    }
+  ],
+  "effort": {
+    "actual_cash_spent": 0,
+    "currency": "USD",
+    "rights_human_hours": null,
+    "annotation_hours": null,
+    "human_review_hours": null,
+    "adjudication_hours": null,
+    "labor_projection": "UNAVAILABLE; no measured independent-review throughput"
+  },
+  "final_status": "READY FOR BLIND INDEPENDENT AI REVIEW",
+  "limitations": [
+    "Scoped parser success is not independent correctness",
+    "Local clock/hash evidence is not authenticated reviewer identity",
+    "No backup/restore verification",
+    "Normal API/worker identities denied real exploratory files; host/root trusted",
+    "Official human reviewer and EVAL-ENTRY prerequisites remain pending"
+  ]
+}

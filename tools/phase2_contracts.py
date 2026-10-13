@@ -6,6 +6,7 @@ from pathlib import Path
 
 from repovox.analysis.contracts import PAYLOADS, Envelope
 from repovox.evaluation.corpus import Corpus
+from repovox.evaluation.exploratory import AIReference, BlindPacket, PredictionPacket
 from repovox.evaluation.gold import GoldEvaluation
 from repovox.evaluation.preparation import Catalog, GatePacket, ReviewReceipt
 
@@ -39,6 +40,12 @@ for destination, value in [
     (root / "docs/ai/evaluation-candidates.schema.json", Catalog.model_json_schema()),
     (root / "docs/ai/eval-entry-preparation.schema.json", GatePacket.model_json_schema()),
     (root / "docs/ai/gold-review-receipt.schema.json", ReviewReceipt.model_json_schema()),
+    (root / "docs/ai/exploratory-blind-source.schema.json", BlindPacket.model_json_schema()),
+    (
+        root / "docs/ai/exploratory-sealed-prediction.schema.json",
+        PredictionPacket.model_json_schema(),
+    ),
+    (root / "docs/ai/exploratory-ai-reference.schema.json", AIReference.model_json_schema()),
 ]:
     body = json.dumps(value, indent=2, sort_keys=True) + "\n"
     if args.check:

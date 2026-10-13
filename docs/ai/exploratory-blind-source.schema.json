@@ -1,0 +1,223 @@
+{
+  "$defs": {
+    "Policy": {
+      "additionalProperties": false,
+      "properties": {
+        "full_corpus_freeze": {
+          "const": false,
+          "default": false,
+          "title": "Full Corpus Freeze",
+          "type": "boolean"
+        },
+        "held_out_benchmark": {
+          "const": false,
+          "default": false,
+          "title": "Held Out Benchmark",
+          "type": "boolean"
+        },
+        "independently_human_reviewed": {
+          "const": false,
+          "default": false,
+          "title": "Independently Human Reviewed",
+          "type": "boolean"
+        },
+        "official_eval_entry_contribution": {
+          "const": false,
+          "default": false,
+          "title": "Official Eval Entry Contribution",
+          "type": "boolean"
+        },
+        "production_accuracy_certification": {
+          "const": false,
+          "default": false,
+          "title": "Production Accuracy Certification",
+          "type": "boolean"
+        },
+        "reviewer_role": {
+          "const": "INDEPENDENT_AI_TECHNICAL_REVIEWER",
+          "default": "INDEPENDENT_AI_TECHNICAL_REVIEWER",
+          "title": "Reviewer Role",
+          "type": "string"
+        },
+        "track": {
+          "const": "AI_AUDITED_EXPLORATORY",
+          "default": "AI_AUDITED_EXPLORATORY",
+          "title": "Track",
+          "type": "string"
+        },
+        "training_authorized": {
+          "const": false,
+          "default": false,
+          "title": "Training Authorized",
+          "type": "boolean"
+        }
+      },
+      "title": "Policy",
+      "type": "object"
+    },
+    "SourceExcerpt": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "end_line": {
+          "minimum": 1,
+          "title": "End Line",
+          "type": "integer"
+        },
+        "file_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "File Sha256",
+          "type": "string"
+        },
+        "language": {
+          "title": "Language",
+          "type": "string"
+        },
+        "numbered_excerpt": {
+          "title": "Numbered Excerpt",
+          "type": "string"
+        },
+        "path": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "permalink": {
+          "title": "Permalink",
+          "type": "string"
+        },
+        "redactions": {
+          "items": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "type": "object"
+          },
+          "title": "Redactions",
+          "type": "array"
+        },
+        "start_line": {
+          "minimum": 1,
+          "title": "Start Line",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "file_sha256",
+        "start_line",
+        "end_line",
+        "bytes",
+        "language",
+        "numbered_excerpt",
+        "redactions",
+        "permalink"
+      ],
+      "title": "SourceExcerpt",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "commit_sha": {
+      "pattern": "^[a-f0-9]{40}$",
+      "title": "Commit Sha",
+      "type": "string"
+    },
+    "eligible_language_files": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "title": "Eligible Language Files",
+      "type": "object"
+    },
+    "excerpts": {
+      "items": {
+        "$ref": "#/$defs/SourceExcerpt"
+      },
+      "title": "Excerpts",
+      "type": "array"
+    },
+    "inventory": {
+      "items": {
+        "additionalProperties": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            }
+          ]
+        },
+        "type": "object"
+      },
+      "title": "Inventory",
+      "type": "array"
+    },
+    "limitations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Limitations",
+      "type": "array"
+    },
+    "policy": {
+      "$ref": "#/$defs/Policy"
+    },
+    "repository": {
+      "title": "Repository",
+      "type": "string"
+    },
+    "rights_evidence_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Rights Evidence Sha256",
+      "type": "string"
+    },
+    "rights_summary": {
+      "title": "Rights Summary",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "exploratory-blind-source-1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "selected_source_bytes": {
+      "title": "Selected Source Bytes",
+      "type": "integer"
+    },
+    "whole_eligible_source_bytes": {
+      "title": "Whole Eligible Source Bytes",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schema_version",
+    "policy",
+    "repository",
+    "commit_sha",
+    "rights_evidence_sha256",
+    "rights_summary",
+    "inventory",
+    "excerpts",
+    "eligible_language_files",
+    "selected_source_bytes",
+    "whole_eligible_source_bytes",
+    "limitations"
+  ],
+  "title": "BlindPacket",
+  "type": "object"
+}

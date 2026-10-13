@@ -83,6 +83,10 @@ class AnalysisRunner:
     def __init__(self, engine: Engine, storage: S3Storage, http: GitHubHTTP | None = None) -> None:
         self.engine, self.storage, self.http = engine, storage, http or GitHubHTTP()
 
+    def preparation_filter(self, manifest: dict[str, Any]) -> dict[str, Any]:
+        """Default full scope; explicit exploratory runner narrows AFTER security scans."""
+        return manifest
+
     def run(self, lease: dict[str, Any], heartbeat: Callable[[], bool]) -> bool:
         ordinal = lease["ordinal"]
         started = time.monotonic()
@@ -191,6 +195,8 @@ class AnalysisRunner:
                         checkpoint,
                         {3: 25, 4: 110, 5: 25, 6: 80, 7: 25, 8: 25, 9: 80}[ordinal],
                     )
+                    if ordinal == 3:
+                        payload = self.preparation_filter(payload)
                     envelope = {
                         "schema_version": "2.2",
                         "kind": STAGES[ordinal],
