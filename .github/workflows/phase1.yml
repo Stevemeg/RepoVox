@@ -1,9 +1,9 @@
 name: Phase 1 and 2 quality gates
 on:
   pull_request:
-    branches: [main, phase0/foundation, phase1/saas-foundation, phase2/repository-intelligence]
+    branches: [main, phase0/foundation, phase1/saas-foundation, phase2/repository-intelligence, phase2/eval-entry]
   push:
-    branches: [phase1/saas-foundation, phase2/repository-intelligence, phase2/eval-entry]
+    branches: [phase1/saas-foundation, phase2/repository-intelligence, phase2/eval-entry, phase2/ai-audited-pilot]
 permissions:
   contents: read
 concurrency:

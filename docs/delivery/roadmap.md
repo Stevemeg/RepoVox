@@ -61,6 +61,11 @@ advancement, model benchmark or official freeze is implied by engineering tests.
 
 ## Owner decisions before implementation/provisioning
 
+Phase 2C-A is a separately authorized [AI exploratory preparation](phase2c-a-verification.md)
+track after accepted Phase 2B. Blind ChatGPT review is pending; no model experiment,
+official dataset freeze, scaling, spending, merge or Phase 3 is authorized. The official
+EVAL-ENTRY gates and Phase 2B decision register remain unchanged.
+
 1. Approve V1 static scope, English voice/templates, evidence uncertainty/rejection limits and revised unmeasured warm p95 <=35min target. Initial requirements remain public GitHub Python/JS/TS, 3-5min narrated downloadable720pMP4 for developers.
 2. Review actual base/software/voice license texts/notices and independently licensed dataset/adapter permissions; provisional Qwen2.5-Coder-14B + Kokoro are evaluation choices, not cleared deployment assets. No commercial voice rights assumed solely from model license.
 3. Approve region (proposed us-east-1), GPU capacity/quote/data residency, one-host generation availability risk versus funded standby, private networking and Chromium sandbox viability.

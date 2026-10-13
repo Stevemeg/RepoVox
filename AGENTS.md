@@ -12,6 +12,18 @@ RepoVox is solo-maintained by GitHub owner **Stevemeg**. Codex is the implementa
 
 ## No premature phase advancement
 
+Phase 2B engineering was independently accepted at
+`e87a95c4763331e3cb73211eb02f7acbc738941a`. Owner authorized Phase 2C-A
+`AI_AUDITED_EXPLORATORY`: free local rights-screened static analysis and a manual,
+blind ChatGPT source-review handoff only. Use `phase2/ai-audited-pilot` stacked on
+`phase2/eval-entry`. Click/p-limit pins are authorized; ai-job-agent is explicitly
+excluded for third-party job-description rights; owner separately approved
+jupyterlite/echo-kernel `16221829f0ba38374db8f2b8fda10f989d1a6cdd` as replacement.
+No AI reference may count toward official human-reviewed EVAL-ENTRY. Preserve all
+official manifests/counts and UNFROZEN status. Stop at Package A readiness, before
+prediction reveal or comparison. No paid services, training, Director experiments,
+merges, deployment or Phase 3. See [exploratory handoff](docs/development/exploratory-handoff.md).
+
 Phase 2 engineering was independently accepted at
 `b60ba5484a0710caf64c310e910110d625a01768`. Owner authorized Phase 2B evaluation
 preparation on 2026-10-12: use `phase2/eval-entry` from that exact SHA and target

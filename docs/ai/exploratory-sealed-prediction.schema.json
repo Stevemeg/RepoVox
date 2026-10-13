@@ -1,0 +1,147 @@
+{
+  "$defs": {
+    "Policy": {
+      "additionalProperties": false,
+      "properties": {
+        "full_corpus_freeze": {
+          "const": false,
+          "default": false,
+          "title": "Full Corpus Freeze",
+          "type": "boolean"
+        },
+        "held_out_benchmark": {
+          "const": false,
+          "default": false,
+          "title": "Held Out Benchmark",
+          "type": "boolean"
+        },
+        "independently_human_reviewed": {
+          "const": false,
+          "default": false,
+          "title": "Independently Human Reviewed",
+          "type": "boolean"
+        },
+        "official_eval_entry_contribution": {
+          "const": false,
+          "default": false,
+          "title": "Official Eval Entry Contribution",
+          "type": "boolean"
+        },
+        "production_accuracy_certification": {
+          "const": false,
+          "default": false,
+          "title": "Production Accuracy Certification",
+          "type": "boolean"
+        },
+        "reviewer_role": {
+          "const": "INDEPENDENT_AI_TECHNICAL_REVIEWER",
+          "default": "INDEPENDENT_AI_TECHNICAL_REVIEWER",
+          "title": "Reviewer Role",
+          "type": "string"
+        },
+        "track": {
+          "const": "AI_AUDITED_EXPLORATORY",
+          "default": "AI_AUDITED_EXPLORATORY",
+          "title": "Track",
+          "type": "string"
+        },
+        "training_authorized": {
+          "const": false,
+          "default": false,
+          "title": "Training Authorized",
+          "type": "boolean"
+        }
+      },
+      "title": "Policy",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "commit_sha": {
+      "pattern": "^[a-f0-9]{40}$",
+      "title": "Commit Sha",
+      "type": "string"
+    },
+    "metrics": {
+      "additionalProperties": true,
+      "title": "Metrics",
+      "type": "object"
+    },
+    "original_artifacts": {
+      "items": {
+        "additionalProperties": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            }
+          ]
+        },
+        "type": "object"
+      },
+      "title": "Original Artifacts",
+      "type": "array"
+    },
+    "policy": {
+      "$ref": "#/$defs/Policy"
+    },
+    "reference_included": {
+      "const": false,
+      "default": false,
+      "title": "Reference Included",
+      "type": "boolean"
+    },
+    "repository": {
+      "title": "Repository",
+      "type": "string"
+    },
+    "rights_evidence_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Rights Evidence Sha256",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "exploratory-sealed-prediction-1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "selected_scope": {
+      "items": {
+        "additionalProperties": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            }
+          ]
+        },
+        "type": "object"
+      },
+      "title": "Selected Scope",
+      "type": "array"
+    },
+    "verified_payload": {
+      "additionalProperties": true,
+      "title": "Verified Payload",
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "policy",
+    "repository",
+    "commit_sha",
+    "rights_evidence_sha256",
+    "selected_scope",
+    "original_artifacts",
+    "verified_payload",
+    "metrics"
+  ],
+  "title": "PredictionPacket",
+  "type": "object"
+}

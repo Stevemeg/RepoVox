@@ -3,6 +3,9 @@
 Bring source code to life visually.
 
 **Status: Phase 2 engineering accepted at `b60ba548`; Phase 2B preparation; EVAL-ENTRY pending.**
+Phase 2B accepted at `e87a95c4`; owner-authorized [AI exploratory pilot](docs/delivery/phase2c-a-verification.md)
+is a separate blind source-review preparation track. It contributes no official
+human-reviewed gold. [Reviewer handoff](docs/development/exploratory-handoff.md).
 Accepted Phase 0 `e35d8ef8a8a53cb34e46271a9813b5332ea42c1f` and Phase 1
 `ec09b733ab3ceffe592ad96d07902b92596dfd1b` remain in history. PRs #1/#2 are
 unmerged; Phase 2 is stacked on Phase 1. Development analysis executes Stages 1–9;
