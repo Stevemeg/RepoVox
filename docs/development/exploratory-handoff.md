@@ -1,6 +1,6 @@
 # Blind exploratory source-review handoff
 
-Version `exploratory-handoff-1.0`, 2026-10-13. Track `AI_AUDITED_EXPLORATORY`.
+Version `exploratory-handoff-1.1`, 2026-10-13. Track `AI_AUDITED_EXPLORATORY`.
 This packet is AI-reviewed only after actual independent review. It is not human
 gold, an official held-out benchmark, production certification, a corpus freeze or
 authorization for model training. Its contribution to official EVAL-ENTRY is zero.
@@ -32,6 +32,13 @@ Paste this instruction:
 > and limitations. Use your own IDs. Do not classify yourself as a human reviewer,
 > certify RepoVox accuracy or approve official EVAL-ENTRY. Request more source if
 > needed. Stop after recording your reference; do not request predictions yet.
+
+Return the independently authored `gold`, `semantic_observations` and `limitations`
+content first. The implementation assistant later wraps that unchanged content in
+`exploratory-ai-reference-1.0`, adding policy, known A/B commitments and the mechanically
+computed raw-response capture hash. ChatGPT must not invent a response hash, capture
+timestamp, owner receipt or approval to fill those fields. A response cannot contain
+its own final capture checksum; that checksum is computed only after recording it.
 
 Package A has original inventory/hashes, source excerpts and full notices. The
 contracts folder contains accepted `gold-evaluation-1.0` / `source-fact-1.0`

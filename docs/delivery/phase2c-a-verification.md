@@ -108,8 +108,10 @@ reference contracts and opaque B commitments only. The owner-readable ZIP is out
 Git under local `%TEMP%/repovox-ai-audited-review/`, with an export manifest. Its hash
 and exact path appear in the final handoff. Predictions and generated answer keys are
 excluded. No AI reference is supplied in the ZIP. The export does not re-seal B.
-Export SHA256: `b1ba7b7611f6cce260498223bf5cb0130871d2a20d98466aeef8483c2d002d46`;
-94,747 bytes, 33 entries, every manifest hash and all three A schemas checked.
+Final `blind-review-v2.zip` SHA256: `535fddb1acd1b80c471fc282d5484d958df703b8972db682a9310eac3907eea1`;
+94,940 bytes, 33 entries, every manifest hash and all three A schemas checked.
+Earlier v1 export remains preserved; v2 clarifies that the raw response checksum is
+computed after capture, not invented by ChatGPT. A/B bytes and their seals are unchanged.
 Windows export ACL permits the current owner, SYSTEM and Administrators; it is outside
 OneDrive/Git. The ZIP retains the handoff text and contracts at export time.
 
