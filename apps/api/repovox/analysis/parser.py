@@ -10,6 +10,7 @@ import tree_sitter_python
 import tree_sitter_typescript
 from tree_sitter import Language, Node, Parser
 
+from repovox.analysis.bindings import annotate
 from repovox.analysis.common import (
     DEFAULT_LIMITS,
     PARSER_VERSION,
@@ -113,6 +114,8 @@ def parse_file(
     symbols: list[dict[str, Any]] = []
 
     def record(node: Node, kind: str, name: str, rule: str, **extra: Any) -> dict[str, Any]:
+        if len(symbols) >= DEFAULT_LIMITS.facts:
+            raise AnalysisError("analysis_fact_limit")
         name = redact(name)[0]
         for key, value in extra.items():
             if isinstance(value, str):
@@ -167,6 +170,16 @@ def parse_file(
                 "declaration-v1",
                 parameters=parameter_names(params, body),
             )
+            if lang == "python" and kind == "class":
+                bases = node.child_by_field_name("superclasses")
+                for base in bases.named_children if bases else []:
+                    record(
+                        base,
+                        "base_reference",
+                        text(base, body),
+                        "python-base-v2",
+                        dispatch="named" if base.type == "identifier" else "dynamic",
+                    )
         elif node.type in {"call", "call_expression", "new_expression"}:
             target = node.child_by_field_name("function") or node.child_by_field_name("constructor")
             parent = node.parent
@@ -231,13 +244,31 @@ def parse_file(
             else:
                 source = node.child_by_field_name("source")
                 if source:
-                    record(
-                        node,
-                        "import",
-                        text(source, body)[1:-1],
-                        "import-v1",
-                        alias=text(node.named_children[0], body),
+                    clause = next(
+                        (c for c in node.named_children if c.type == "import_clause"), None
                     )
+                    js_imports: list[tuple[str | None, str, bool]] = []
+                    for c in walk(clause) if clause else []:
+                        if c.type == "import_specifier":
+                            member = text(c.child_by_field_name("name"), body)
+                            alias = text(c.child_by_field_name("alias"), body) or member
+                            js_imports.append(
+                                (member, alias, any(t.type == "type" for t in c.children))
+                            )
+                        elif c.type == "namespace_import":
+                            js_imports.append((None, text(c.named_children[-1], body), False))
+                        elif c.type == "identifier" and c.parent == clause:
+                            js_imports.append(("default", text(c, body), False))
+                    for js_member, alias, type_only in js_imports or [(None, "", False)]:
+                        record(
+                            node,
+                            "import",
+                            text(source, body)[1:-1],
+                            "import-v1",
+                            alias=alias,
+                            imported_name=js_member,
+                            _type_only=type_only,
+                        )
         elif node.type == "export_statement":
             source = node.child_by_field_name("source")
             if source:
@@ -253,10 +284,26 @@ def parse_file(
             )
         elif node.type == "decorator":
             record(node, "decorator", text(node, body), "decorator-v1")
+        elif node.type == "variable_declarator" and lang != "python":
+            value = node.child_by_field_name("value")
+            if value and value.type == "object":
+                keys = {
+                    text(c.child_by_field_name("key"), body).strip("\"'")
+                    for c in value.named_children
+                    if c.type == "pair"
+                }
+                if {"id", "activate"} <= keys:
+                    record(
+                        node,
+                        "plugin_registration",
+                        text(node.child_by_field_name("name"), body),
+                        "plugin-shape-v2",
+                    )
         elif lang == "python" and node.type == "if_statement":
             condition = text(node.child_by_field_name("condition"), body)
             if re.fullmatch(r"__name__\s*==\s*['\"]__main__['\"]", condition):
                 record(node, "entrypoint", "__main__", "python-main-v1")
+    annotate(root, body, lang, symbols)
     return symbols, []
 
 

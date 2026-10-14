@@ -5,7 +5,7 @@ from typing import Any
 
 PIPELINE = "phase2-static-v1"
 ACQUISITION = "github-archive-v1"
-RULES = "static-rules-v1"
+RULES = "static-rules-v2"
 PARSER_VERSION = "tree-sitter-0.25.2/python-0.25.0/js-0.25.0/ts-0.23.2"
 
 

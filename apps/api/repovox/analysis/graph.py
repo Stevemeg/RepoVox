@@ -1,12 +1,12 @@
-import json
 import posixpath
 import re
-import tomllib
-from pathlib import Path, PurePosixPath
+from pathlib import PurePosixPath
 from typing import Any
 
-from repovox.analysis.common import RULES, AnalysisError, digest, stable
+from repovox.analysis.common import RULES, AnalysisError, stable
+from repovox.analysis.configuration import configuration as configuration
 from repovox.analysis.privacy import redact
+from repovox.analysis.relationships import qualified_edges
 
 # Rules require an imported binding and an application construction, not a README word.
 FRAMEWORKS = {"fastapi": {"FastAPI"}, "flask": {"Flask"}, "express": {"express"}}
@@ -20,83 +20,6 @@ def safe_text(value: str) -> str:
     return result
 
 
-def configuration(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
-    dependencies: list[dict[str, Any]] = []
-    entries: list[dict[str, Any]] = []
-    errors: list[str] = []
-    for file in manifest["files"]:
-        if file["status"] != "context" or file["classification"] != "configuration":
-            continue
-        path = file["path"]
-        body = (root / path).read_bytes()
-        if digest(body) != file["file_sha256"]:
-            raise AnalysisError("source_changed")
-        try:
-            config = (
-                json.loads(body) if path.endswith("package.json") else tomllib.loads(body.decode())
-            )
-            # Declarative readers only. Reject deeply nested JSON instead of recursive processing.
-            stack = [(config, 0)]
-            while stack:
-                value, depth = stack.pop()
-                if depth > 32:
-                    raise ValueError
-                if isinstance(value, dict):
-                    stack.extend((v, depth + 1) for v in value.values())
-                elif isinstance(value, list):
-                    stack.extend((v, depth + 1) for v in value)
-            if path.endswith("package.json"):
-                for name, constraint in config.get("dependencies", {}).items():
-                    if isinstance(name, str) and isinstance(constraint, str):
-                        dependencies.append(
-                            {
-                                "name": safe_text(name),
-                                "declared_constraint": safe_text(constraint),
-                                "locked_version": None,
-                                "path": path,
-                            }
-                        )
-                for field in ["main", "module", "bin"]:
-                    value = config.get(field)
-                    values = value.values() if isinstance(value, dict) else [value]
-                    for target in values:
-                        if isinstance(target, str) and len(target) <= 255:
-                            entries.append(
-                                {
-                                    "path": path,
-                                    "target": safe_text(target),
-                                    "rule": "package-entry-v1",
-                                }
-                            )
-                # Lifecycle scripts are never executed or exposed as commands.
-            else:
-                project = config.get("project", {})
-                for constraint in project.get("dependencies", []):
-                    if isinstance(constraint, str):
-                        match = re.match(r"[A-Za-z0-9_.-]+", constraint)
-                        if match:
-                            dependencies.append(
-                                {
-                                    "name": match.group().lower(),
-                                    "declared_constraint": safe_text(constraint),
-                                    "locked_version": None,
-                                    "path": path,
-                                }
-                            )
-                for name, target in project.get("scripts", {}).items():
-                    if isinstance(name, str) and isinstance(target, str):
-                        entries.append(
-                            {
-                                "path": path,
-                                "target": safe_text(target),
-                                "rule": "pyproject-cli-v1",
-                            }
-                        )
-        except (ValueError, TypeError, AttributeError, RecursionError):
-            errors.append(path)
-    return {"dependencies": dependencies, "config_entries": entries, "config_errors": errors}
-
-
 def entrypoints(
     structural: dict[str, Any], config: dict[str, Any], manifest: dict[str, Any]
 ) -> dict[str, Any]:
@@ -107,6 +30,19 @@ def entrypoints(
     for symbol in symbols:
         if symbol["kind"] in {"documentation", "config_entry", "declared_dependency"}:
             continue
+        category = symbol.get("syntax", {}).get("candidate_category")
+        if category:
+            candidates.append(
+                {
+                    "symbol_id": symbol["id"],
+                    "path": symbol["path"],
+                    "rule": "source-" + category + "-v2",
+                    "support_ids": [symbol["id"], *symbol["syntax"]["candidate_support_ids"]],
+                    "category": category,
+                    "rank": 30,
+                    "qualification": "Declaration candidate; execution and wiring are unproven.",
+                }
+            )
         if symbol["kind"] == "entrypoint":
             candidates.append(
                 {
@@ -173,7 +109,7 @@ def entrypoints(
                         )
     for entry in config["config_entries"]:
         modules = {s["path"]: s for s in symbols if s["kind"] == "module"}
-        if entry["rule"] == "package-entry-v1":
+        if entry["rule"].startswith("package-"):
             target_path = posixpath.normpath(
                 posixpath.join(posixpath.dirname(entry["path"]), entry["target"])
             )
@@ -188,6 +124,7 @@ def entrypoints(
                     if s["kind"] == "config_entry"
                     and s["path"] == entry["path"]
                     and s["name"] == entry["target"]
+                    and s["start_byte"] == entry["start_byte"]
                 ),
                 "path": entry["path"],
                 "rule": entry["rule"],
@@ -197,15 +134,24 @@ def entrypoints(
                     if s["kind"] == "config_entry"
                     and s["path"] == entry["path"]
                     and s["name"] == entry["target"]
+                    and s["start_byte"] == entry["start_byte"]
                 ],
                 "target": entry["target"],
-                "rank": 70 if resolved else 40,
+                "rank": 60 if resolved else 40,
+                "category": entry["category"],
                 "qualification": "Declared target exists."
                 if resolved
                 else "Declared target unresolved.",
             }
         )
-    candidates.sort(key=lambda c: (-c["rank"], c["path"], c["symbol_id"]))
+    for candidate in candidates:
+        candidate.setdefault(
+            "category",
+            "executable_application"
+            if candidate["rule"] == "python-main-v1"
+            else "candidate_command",
+        )
+    candidates.sort(key=lambda c: (-c["rank"], c["path"], c["symbol_id"], c["rule"]))
     selected = next((c["symbol_id"] for c in candidates if c["rank"] >= 70), None)
     return {
         "candidates": candidates,
@@ -261,6 +207,9 @@ def infer(structural: dict[str, Any], entries: dict[str, Any]) -> dict[str, Any]
                 symbol["path"], symbol["name"], symbol["parser_language"], modules
             )
             classification = "resolved_static" if target else "unresolved"
+            if symbol["syntax"]["type_only"]:
+                target = None
+                classification = "unresolved"
         elif symbol["kind"] == "call":
             relationship = "call_expression"
             # No lexical binding/dataflow analysis in v1: even matching names stay unresolved.
@@ -279,13 +228,14 @@ def infer(structural: dict[str, Any], entries: dict[str, Any]) -> dict[str, Any]
                 "qualification": "Static syntax only; no runtime execution asserted.",
             }
         )
+    edges.extend(qualified_edges(symbols, modules))
     return {
         "nodes": nodes,
         "edges": sorted(edges, key=lambda e: e["id"]),
         "entrypoints": entries,
         "rule_version": RULES,
         "limitations": [
-            "Call targets remain unresolved without lexical binding and dataflow proof.",
+            "Unique lexical/local imports can resolve; calls do not prove execution.",
             (
                 "Import resolution uses literal local paths; aliases, package"
                 " search paths and dynamic imports remain uncertain."

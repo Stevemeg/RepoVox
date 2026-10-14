@@ -1,5 +1,12 @@
 # Phase 2 repository analysis
 
+Phase 2C-C proposes [canonical source facts](canonical-facts.md) and explicit
+[analysis schema 2.3](../architecture/analysis-2.3.schema.json). Legacy 2.2
+artifacts retain their original reader and interpretation. New output records
+rules v2 through the separately authorized additive completion function;
+mixed-version jobs fail closed and need an explicit new job. No historical
+artifact is upgraded or rerun automatically.
+
 [Pipeline](../architecture/pipeline.md) · [Schema 2.2](../architecture/analysis.schema.json) · [ADR-0010](../adr/0010-phase2-static-analysis-boundary.md) · [Isolation](../adr/0011-parser-process-isolation.md) · [Evaluation preparation](evaluation-preparation.md)
 
 ## Admission and pinning

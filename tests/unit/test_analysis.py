@@ -501,7 +501,7 @@ def test_serialized_analysis_matches_versioned_schema(tmp_path: Path) -> None:
 
     request, _ = analyze(tmp_path)
     schema = json.loads(
-        (Path(__file__).parents[2] / "docs/architecture/analysis.schema.json").read_bytes()
+        (Path(__file__).parents[2] / "docs/architecture/analysis-2.3.schema.json").read_bytes()
     )
     validator = Draft202012Validator(schema, format_checker=FormatChecker())
     for ordinal, kind in [
@@ -514,7 +514,7 @@ def test_serialized_analysis_matches_versioned_schema(tmp_path: Path) -> None:
         (9, "verify"),
     ]:
         envelope = {
-            "schema_version": "2.2",
+            "schema_version": "2.3",
             "kind": kind,
             "owner_id": SNAPSHOT_ID,
             "snapshot_id": SNAPSHOT_ID,

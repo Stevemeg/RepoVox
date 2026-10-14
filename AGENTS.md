@@ -12,6 +12,16 @@ RepoVox is solo-maintained by GitHub owner **Stevemeg**. Codex is the implementa
 
 ## No premature phase advancement
 
+The owner authorized Phase 2C-C engineering on 2026-10-14 from accepted
+`8b1674de8459725bba25646e3fdd223a57316150`: canonical facts, conservative static
+relationships, candidate discovery, citation precision and synthetic regression
+coverage only. Use `phase2/canonical-fact-remediation`, stacked against
+`phase2/ai-audited-pilot`. The owner separately approved the narrow additive 2.3
+completion migration and local synthetic database tests; no pilot/production
+database changes. Preserve original 2C-B evidence and official evaluation gates.
+Stop at draft PR and independent engineering review. See
+[ADR-0015](docs/adr/0015-canonical-source-fact-semantics.md).
+
 Phase 2B engineering was independently accepted at
 `e87a95c4763331e3cb73211eb02f7acbc738941a`. Owner authorized Phase 2C-A
 `AI_AUDITED_EXPLORATORY`: free local rights-screened static analysis and a manual,

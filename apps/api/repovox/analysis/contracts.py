@@ -1,9 +1,11 @@
-"""Analysis envelope 2.2 extends static contracts; accepted media v2.1 is unchanged."""
+"""Analysis 2.3; explicit legacy 2.2 reader, no reinterpretation of sealed artifacts."""
 
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
+
+from repovox.analysis.facts import CanonicalFact, Syntax, validate_collection
 
 Hash = Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
 SHA = Annotated[str, Field(pattern=r"^[a-f0-9]{40}$")]
@@ -58,6 +60,7 @@ class Manifest(Strict):
 
 
 class Symbol(Strict):
+    syntax: Syntax
     id: ID
     path: str
     start_line: int = Field(ge=1)
@@ -92,6 +95,15 @@ class Structure(Strict):
 
 
 class Candidate(Strict):
+    category: Literal[
+        "executable_application",
+        "library_export",
+        "type_declaration",
+        "build_system",
+        "plugin",
+        "packaging_hook",
+        "candidate_command",
+    ]
     symbol_id: ID
     path: str
     rule: str
@@ -115,14 +127,23 @@ class Entrypoints(Strict):
     uncertainty: list[str]
 
 
-class Dependency(Strict):
+class PropertyRange(Strict):
+    property_path: list[str]
+    start_line: int = Field(ge=1)
+    end_line: int = Field(ge=1)
+    start_byte: int = Field(ge=0)
+    end_byte: int = Field(ge=0)
+
+
+class Dependency(PropertyRange):
     name: str
     declared_constraint: str
     locked_version: Literal[None]
     path: str
 
 
-class ConfigEntry(Strict):
+class ConfigEntry(PropertyRange):
+    category: str
     path: str
     target: str
     rule: str
@@ -188,6 +209,7 @@ class Flow(Strict):
 
 
 class Knowledge(Strict):
+    canonical_facts: list[CanonicalFact]
     repository: SnapshotData
     scope: str
     stack: list[str]
@@ -204,6 +226,11 @@ class Knowledge(Strict):
     coverage: Manifest
     limitations: list[str]
     versions: Versions
+
+    @model_validator(mode="after")
+    def unique_facts(self) -> "Knowledge":
+        validate_collection(self.canonical_facts)
+        return self
 
 
 class Redaction(Strict):
@@ -283,7 +310,7 @@ PAYLOADS: dict[str, type[BaseModel]] = {
 
 
 class Envelope(Strict):
-    schema_version: Literal["2.2"]
+    schema_version: Literal["2.3"]
     kind: Literal[
         "validate", "filter", "structure", "entrypoints", "infer", "knowledge", "evidence", "verify"
     ]
@@ -297,5 +324,10 @@ class Envelope(Strict):
 
 
 def validate_envelope(value: dict[str, Any]) -> None:
+    if value.get("schema_version") == "2.2":
+        from repovox.analysis.contracts_v22 import validate_envelope as legacy
+
+        legacy(value)
+        return
     envelope = Envelope.model_validate(value)
     TypeAdapter(PAYLOADS[envelope.kind]).validate_python(envelope.payload)

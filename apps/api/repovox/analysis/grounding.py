@@ -7,6 +7,7 @@ from urllib.parse import quote
 
 from repovox.analysis.common import PARSER_VERSION, PIPELINE, RULES, AnalysisError, digest, stable
 from repovox.analysis.documentation import context_symbols
+from repovox.analysis.facts import project
 from repovox.analysis.graph import configuration, entrypoints, infer, qualified_flows
 from repovox.analysis.parser import parse_file
 from repovox.analysis.privacy import redact
@@ -85,6 +86,9 @@ def knowledge(
         claims.append(claim)
     return {
         "repository": snapshot,
+        "canonical_facts": project(
+            snapshot, structural["symbols"], graph["edges"], graph["entrypoints"]["candidates"]
+        ),
         "scope": graph["entrypoints"]["scope"],
         "stack": sorted(
             {s["parser_language"] for s in structural["symbols"] if s["kind"] == "module"}
@@ -111,7 +115,7 @@ def knowledge(
             "parser": PARSER_VERSION,
             "pipeline": PIPELINE,
             "rules": RULES,
-            "schema": "analysis-1.0",
+            "schema": "analysis-2.3",
         },
     }
 
@@ -213,6 +217,10 @@ def verify(
     if pkm["dependencies"] != expected_config["dependencies"]:
         raise AnalysisError("insufficient_evidence")
     graph = infer({"symbols": list(actual.values())}, pkm["entrypoints"])
+    if pkm["canonical_facts"] != project(
+        snapshot, pkm["symbols"], graph["edges"], expected_entries["candidates"]
+    ):
+        raise AnalysisError("insufficient_evidence")
     if pkm["execution_flows"] != qualified_flows(graph):
         raise AnalysisError("insufficient_evidence")
     actual_edges = {e["id"]: e for e in graph["edges"]}
@@ -290,7 +298,9 @@ def verify(
             )
         ):
             status = (
-                "inferred" if relation and subject["classification"] == "unresolved" else "verified"
+                "inferred"
+                if relation and subject["classification"] in {"unresolved", "inferred"}
+                else "verified"
             )
             if subject.get("kind") == "documentation":
                 status = "documentation_only"

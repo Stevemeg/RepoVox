@@ -105,11 +105,13 @@ class AnalysisRunner:
             checkpoint()
             with self.engine.begin() as c:
                 scope = c.scalar(
-                    text("SELECT rv.analysis_scope(:id,:fence)"),
+                    text("SELECT rv.analysis_scope_v23(:id,:fence)"),
                     {"id": lease["stage_id"], "fence": lease["fence"]},
                 )
             if scope is None:
                 return False
+            if not scope["version_compatible"]:
+                raise AnalysisError("artifact_corrupt")
             snapshot = scope["snapshot"]
             if digest(canonical(snapshot)) != scope["validate_digest"]:
                 raise AnalysisError("artifact_corrupt")
@@ -148,6 +150,7 @@ class AnalysisRunner:
                         or envelope["commit_sha"] != snapshot["commit_sha"]
                         or envelope["input_digest"] != prior_input
                         or envelope["kind"] != STAGES[output["ordinal"]]
+                        or envelope["schema_version"] != "2.3"
                     ):
                         raise AnalysisError("artifact_corrupt")
                     inputs[str(output["ordinal"])] = envelope["payload"]
@@ -198,7 +201,7 @@ class AnalysisRunner:
                     if ordinal == 3:
                         payload = self.preparation_filter(payload)
                     envelope = {
-                        "schema_version": "2.2",
+                        "schema_version": "2.3",
                         "kind": STAGES[ordinal],
                         "owner_id": str(lease["owner_id"]),
                         "snapshot_id": str(lease["snapshot_id"]),
@@ -247,7 +250,7 @@ class AnalysisRunner:
                 committed = bool(
                     c.scalar(
                         text(
-                            "SELECT rv.finish_analysis(:id,:fence,:artifact,:checksum,:ke"
+                            "SELECT rv.finish_analysis_v23(:id,:fence,:artifact,:checksum,:ke"
                             "y,:bytes,:input,CAST(:summary AS jsonb))"
                         ),
                         {
