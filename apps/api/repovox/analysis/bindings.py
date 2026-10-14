@@ -48,7 +48,7 @@ def annotate(root: Node, body: bytes, lang: str, symbols: list[dict[str, Any]]) 
 
     def ancestors(n: Node) -> list[Node]:
         checkpoint()
-        result = []
+        result: list[Node] = []
         p = n.parent
         while p:
             if len(result) >= 512:

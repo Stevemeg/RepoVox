@@ -177,6 +177,12 @@ The startup version and role-context grants were corrected. The development test
 database ACLs were repaired explicitly; the fresh upgrade test then verified the
 corrected migration, and all 28 integration tests passed. No bypass was added.
 
+The first published CI head found a missing explicit `list[Node]` annotation in
+the new ancestry-limit helper. A follow-up commit adds that annotation without
+changing runtime behavior. A local container mypy attempt initially could not
+create its cache on the read-only filesystem; its repeat uses `/tmp` for cache.
+Neither failed attempt is counted as a passing check.
+
 The final-head CI workflow includes all new tests and the existing full Linux
 suite, synthetic runtime/browser regression, dependency audits and history secret
 scan. Its actual run URL and outcome belong in the draft PR's final review
