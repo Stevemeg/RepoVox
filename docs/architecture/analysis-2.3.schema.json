@@ -1,0 +1,2454 @@
+{
+  "$defs": {
+    "Candidate": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "enum": [
+            "executable_application",
+            "library_export",
+            "type_declaration",
+            "build_system",
+            "plugin",
+            "packaging_hook",
+            "candidate_command"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "qualification": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Qualification"
+        },
+        "rank": {
+          "title": "Rank",
+          "type": "integer"
+        },
+        "rule": {
+          "title": "Rule",
+          "type": "string"
+        },
+        "support_ids": {
+          "items": {
+            "pattern": "^[a-z][a-z0-9-]*$",
+            "type": "string"
+          },
+          "title": "Support Ids",
+          "type": "array"
+        },
+        "symbol_id": {
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "title": "Symbol Id",
+          "type": "string"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target"
+        }
+      },
+      "required": [
+        "category",
+        "symbol_id",
+        "path",
+        "rule",
+        "support_ids",
+        "rank"
+      ],
+      "title": "Candidate",
+      "type": "object"
+    },
+    "CanonicalFact": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "enum": [
+            "syntax",
+            "relationship",
+            "entrypoint"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "classification": {
+          "enum": [
+            "declared",
+            "resolved_static",
+            "unresolved",
+            "inferred"
+          ],
+          "title": "Classification",
+          "type": "string"
+        },
+        "commit_sha": {
+          "pattern": "^[a-f0-9]{40}$",
+          "title": "Commit Sha",
+          "type": "string"
+        },
+        "entrypoint_category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Entrypoint Category"
+        },
+        "entrypoint_target": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Entrypoint Target"
+        },
+        "parser_rules": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Parser Rules",
+          "type": "array"
+        },
+        "relationship": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Relationship"
+        },
+        "repository": {
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$",
+          "title": "Repository",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "source-fact-2.0",
+          "default": "source-fact-2.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "subject": {
+          "$ref": "#/$defs/SemanticSymbol"
+        },
+        "support": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "minItems": 1,
+          "title": "Support",
+          "type": "array"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SemanticSymbol"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "repository",
+        "commit_sha",
+        "category",
+        "subject",
+        "classification",
+        "support",
+        "parser_rules"
+      ],
+      "title": "CanonicalFact",
+      "type": "object"
+    },
+    "Citation": {
+      "additionalProperties": false,
+      "properties": {
+        "end_line": {
+          "minimum": 1,
+          "title": "End Line",
+          "type": "integer"
+        },
+        "file_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "File Sha256",
+          "type": "string"
+        },
+        "path": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "start_line": {
+          "minimum": 1,
+          "title": "Start Line",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "file_sha256",
+        "start_line",
+        "end_line"
+      ],
+      "title": "Citation",
+      "type": "object"
+    },
+    "Claim": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[a-z][a-z0-9-]*$",
+            "type": "string"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "rule": {
+          "title": "Rule",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "verified",
+            "inferred",
+            "documentation_only",
+            "unsupported"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "subject_id": {
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "title": "Subject Id",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "text",
+        "status",
+        "evidence_ids",
+        "reason",
+        "rule",
+        "subject_id"
+      ],
+      "title": "Claim",
+      "type": "object"
+    },
+    "ConfigEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "end_byte": {
+          "minimum": 0,
+          "title": "End Byte",
+          "type": "integer"
+        },
+        "end_line": {
+          "minimum": 1,
+          "title": "End Line",
+          "type": "integer"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "property_path": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Property Path",
+          "type": "array"
+        },
+        "rule": {
+          "title": "Rule",
+          "type": "string"
+        },
+        "start_byte": {
+          "minimum": 0,
+          "title": "Start Byte",
+          "type": "integer"
+        },
+        "start_line": {
+          "minimum": 1,
+          "title": "Start Line",
+          "type": "integer"
+        },
+        "target": {
+          "title": "Target",
+          "type": "string"
+        }
+      },
+      "required": [
+        "property_path",
+        "start_line",
+        "end_line",
+        "start_byte",
+        "end_byte",
+        "category",
+        "path",
+        "target",
+        "rule"
+      ],
+      "title": "ConfigEntry",
+      "type": "object"
+    },
+    "Configuration": {
+      "additionalProperties": false,
+      "properties": {
+        "config_entries": {
+          "items": {
+            "$ref": "#/$defs/ConfigEntry"
+          },
+          "title": "Config Entries",
+          "type": "array"
+        },
+        "config_errors": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Config Errors",
+          "type": "array"
+        },
+        "dependencies": {
+          "items": {
+            "$ref": "#/$defs/Dependency"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        }
+      },
+      "required": [
+        "dependencies",
+        "config_entries",
+        "config_errors"
+      ],
+      "title": "Configuration",
+      "type": "object"
+    },
+    "Dependency": {
+      "additionalProperties": false,
+      "properties": {
+        "declared_constraint": {
+          "title": "Declared Constraint",
+          "type": "string"
+        },
+        "end_byte": {
+          "minimum": 0,
+          "title": "End Byte",
+          "type": "integer"
+        },
+        "end_line": {
+          "minimum": 1,
+          "title": "End Line",
+          "type": "integer"
+        },
+        "locked_version": {
+          "const": null,
+          "title": "Locked Version",
+          "type": "null"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "property_path": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Property Path",
+          "type": "array"
+        },
+        "start_byte": {
+          "minimum": 0,
+          "title": "Start Byte",
+          "type": "integer"
+        },
+        "start_line": {
+          "minimum": 1,
+          "title": "Start Line",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "property_path",
+        "start_line",
+        "end_line",
+        "start_byte",
+        "end_byte",
+        "name",
+        "declared_constraint",
+        "locked_version",
+        "path"
+      ],
+      "title": "Dependency",
+      "type": "object"
+    },
+    "Edge": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "pattern": "^[a-z][a-z0-9-]*$",
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Claim Ids"
+        },
+        "classification": {
+          "enum": [
+            "declared",
+            "resolved_static",
+            "unresolved",
+            "inferred"
+          ],
+          "title": "Classification",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "qualification": {
+          "title": "Qualification",
+          "type": "string"
+        },
+        "relationship": {
+          "title": "Relationship",
+          "type": "string"
+        },
+        "rule": {
+          "title": "Rule",
+          "type": "string"
+        },
+        "source": {
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "title": "Source",
+          "type": "string"
+        },
+        "support_ids": {
+          "items": {
+            "pattern": "^[a-z][a-z0-9-]*$",
+            "type": "string"
+          },
+          "title": "Support Ids",
+          "type": "array"
+        },
+        "target": {
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "title": "Target",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "source",
+        "target",
+        "relationship",
+        "classification",
+        "support_ids",
+        "rule",
+        "qualification"
+      ],
+      "title": "Edge",
+      "type": "object"
+    },
+    "Entrypoints": {
+      "additionalProperties": false,
+      "properties": {
+        "candidates": {
+          "items": {
+            "$ref": "#/$defs/Candidate"
+          },
+          "title": "Candidates",
+          "type": "array"
+        },
+        "frameworks": {
+          "items": {
+            "$ref": "#/$defs/Framework"
+          },
+          "title": "Frameworks",
+          "type": "array"
+        },
+        "scope": {
+          "title": "Scope",
+          "type": "string"
+        },
+        "selected": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Selected"
+        },
+        "uncertainty": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Uncertainty",
+          "type": "array"
+        }
+      },
+      "required": [
+        "candidates",
+        "selected",
+        "frameworks",
+        "scope",
+        "uncertainty"
+      ],
+      "title": "Entrypoints",
+      "type": "object"
+    },
+    "Evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/EvidenceItem"
+          },
+          "maxItems": 10000,
+          "title": "Items",
+          "type": "array"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "EvidenceItem": {
+      "additionalProperties": false,
+      "properties": {
+        "commit_sha": {
+          "pattern": "^[a-f0-9]{40}$",
+          "title": "Commit Sha",
+          "type": "string"
+        },
+        "end_line": {
+          "minimum": 1,
+          "title": "End Line",
+          "type": "integer"
+        },
+        "excerpt": {
+          "maxLength": 4096,
+          "title": "Excerpt",
+          "type": "string"
+        },
+        "excerpt_end_line": {
+          "title": "Excerpt End Line",
+          "type": "integer"
+        },
+        "file_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "File Sha256",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "source",
+            "documentation",
+            "manifest"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "last_checked_at": {
+          "title": "Last Checked At",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "permalink": {
+          "title": "Permalink",
+          "type": "string"
+        },
+        "redacted": {
+          "title": "Redacted",
+          "type": "boolean"
+        },
+        "redactions": {
+          "items": {
+            "$ref": "#/$defs/Redaction"
+          },
+          "title": "Redactions",
+          "type": "array"
+        },
+        "rule": {
+          "title": "Rule",
+          "type": "string"
+        },
+        "snapshot_id": {
+          "format": "uuid",
+          "title": "Snapshot Id",
+          "type": "string"
+        },
+        "start_line": {
+          "minimum": 1,
+          "title": "Start Line",
+          "type": "integer"
+        },
+        "symbol_id": {
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "title": "Symbol Id",
+          "type": "string"
+        },
+        "validation_status": {
+          "enum": [
+            "pending",
+            "valid",
+            "invalid"
+          ],
+          "title": "Validation Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "snapshot_id",
+        "commit_sha",
+        "path",
+        "start_line",
+        "end_line",
+        "file_sha256",
+        "symbol_id",
+        "kind",
+        "rule",
+        "redacted",
+        "redactions",
+        "excerpt",
+        "excerpt_end_line",
+        "permalink",
+        "validation_status",
+        "last_checked_at"
+      ],
+      "title": "EvidenceItem",
+      "type": "object"
+    },
+    "Flow": {
+      "additionalProperties": false,
+      "properties": {
+        "edge_ids": {
+          "items": {
+            "pattern": "^[a-z][a-z0-9-]*$",
+            "type": "string"
+          },
+          "title": "Edge Ids",
+          "type": "array"
+        },
+        "entrypoint_id": {
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "title": "Entrypoint Id",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "module_id": {
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "title": "Module Id",
+          "type": "string"
+        },
+        "node_ids": {
+          "items": {
+            "pattern": "^[a-z][a-z0-9-]*$",
+            "type": "string"
+          },
+          "title": "Node Ids",
+          "type": "array"
+        },
+        "qualification": {
+          "title": "Qualification",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "entrypoint_id",
+        "module_id",
+        "node_ids",
+        "edge_ids",
+        "qualification"
+      ],
+      "title": "Flow",
+      "type": "object"
+    },
+    "Framework": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "qualification": {
+          "title": "Qualification",
+          "type": "string"
+        },
+        "symbol_id": {
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "title": "Symbol Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "symbol_id",
+        "qualification"
+      ],
+      "title": "Framework",
+      "type": "object"
+    },
+    "Knowledge": {
+      "additionalProperties": false,
+      "properties": {
+        "canonical_facts": {
+          "items": {
+            "$ref": "#/$defs/CanonicalFact"
+          },
+          "title": "Canonical Facts",
+          "type": "array"
+        },
+        "claims": {
+          "items": {
+            "$ref": "#/$defs/Claim"
+          },
+          "maxItems": 20000,
+          "title": "Claims",
+          "type": "array"
+        },
+        "coverage": {
+          "$ref": "#/$defs/Manifest"
+        },
+        "dependencies": {
+          "items": {
+            "$ref": "#/$defs/Dependency"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "edges": {
+          "items": {
+            "$ref": "#/$defs/Edge"
+          },
+          "title": "Edges",
+          "type": "array"
+        },
+        "entrypoints": {
+          "$ref": "#/$defs/Entrypoints"
+        },
+        "execution_flows": {
+          "items": {
+            "$ref": "#/$defs/Flow"
+          },
+          "title": "Execution Flows",
+          "type": "array"
+        },
+        "frameworks": {
+          "items": {
+            "$ref": "#/$defs/Framework"
+          },
+          "title": "Frameworks",
+          "type": "array"
+        },
+        "limitations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Limitations",
+          "type": "array"
+        },
+        "modules": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Modules",
+          "type": "array"
+        },
+        "nodes": {
+          "items": {
+            "$ref": "#/$defs/NodeData"
+          },
+          "title": "Nodes",
+          "type": "array"
+        },
+        "purpose_candidates": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Purpose Candidates",
+          "type": "array"
+        },
+        "repository": {
+          "$ref": "#/$defs/SnapshotData"
+        },
+        "scope": {
+          "title": "Scope",
+          "type": "string"
+        },
+        "stack": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Stack",
+          "type": "array"
+        },
+        "symbols": {
+          "items": {
+            "$ref": "#/$defs/Symbol"
+          },
+          "title": "Symbols",
+          "type": "array"
+        },
+        "versions": {
+          "$ref": "#/$defs/Versions"
+        }
+      },
+      "required": [
+        "canonical_facts",
+        "repository",
+        "scope",
+        "stack",
+        "frameworks",
+        "purpose_candidates",
+        "modules",
+        "symbols",
+        "nodes",
+        "edges",
+        "entrypoints",
+        "execution_flows",
+        "dependencies",
+        "claims",
+        "coverage",
+        "limitations",
+        "versions"
+      ],
+      "title": "Knowledge",
+      "type": "object"
+    },
+    "Ledger": {
+      "additionalProperties": false,
+      "properties": {
+        "conflicts": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Conflicts",
+          "type": "array"
+        },
+        "counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "propertyNames": {
+            "enum": [
+              "verified",
+              "inferred",
+              "documentation_only",
+              "unsupported"
+            ]
+          },
+          "title": "Counts",
+          "type": "object"
+        },
+        "scope": {
+          "title": "Scope",
+          "type": "string"
+        },
+        "verdicts": {
+          "items": {
+            "$ref": "#/$defs/Verdict"
+          },
+          "title": "Verdicts",
+          "type": "array"
+        },
+        "verifier_version": {
+          "title": "Verifier Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "verifier_version",
+        "verdicts",
+        "counts",
+        "conflicts",
+        "scope"
+      ],
+      "title": "Ledger",
+      "type": "object"
+    },
+    "Manifest": {
+      "additionalProperties": false,
+      "properties": {
+        "acquisition_version": {
+          "title": "Acquisition Version",
+          "type": "string"
+        },
+        "archive_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Archive Sha256",
+          "type": "string"
+        },
+        "commit_sha": {
+          "pattern": "^[a-f0-9]{40}$",
+          "title": "Commit Sha",
+          "type": "string"
+        },
+        "coverage": {
+          "default": 0,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Coverage",
+          "type": "number"
+        },
+        "eligible_bytes": {
+          "minimum": 0,
+          "title": "Eligible Bytes",
+          "type": "integer"
+        },
+        "eligible_files": {
+          "maximum": 5000,
+          "minimum": 0,
+          "title": "Eligible Files",
+          "type": "integer"
+        },
+        "excluded_bytes": {
+          "minimum": 0,
+          "title": "Excluded Bytes",
+          "type": "integer"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/SourceFile"
+          },
+          "maxItems": 10000,
+          "title": "Files",
+          "type": "array"
+        },
+        "language_coverage": {
+          "additionalProperties": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object"
+          },
+          "title": "Language Coverage",
+          "type": "object"
+        },
+        "parsed_bytes": {
+          "minimum": 0,
+          "title": "Parsed Bytes",
+          "type": "integer"
+        },
+        "parsed_non_test_files": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Parsed Non Test Files",
+          "type": "integer"
+        },
+        "parser_version": {
+          "title": "Parser Version",
+          "type": "string"
+        },
+        "pipeline_version": {
+          "title": "Pipeline Version",
+          "type": "string"
+        },
+        "processing_timestamp": {
+          "title": "Processing Timestamp",
+          "type": "string"
+        },
+        "repository": {
+          "title": "Repository",
+          "type": "string"
+        }
+      },
+      "required": [
+        "repository",
+        "commit_sha",
+        "acquisition_version",
+        "archive_sha256",
+        "files",
+        "eligible_bytes",
+        "parsed_bytes",
+        "excluded_bytes",
+        "eligible_files",
+        "processing_timestamp",
+        "parser_version",
+        "pipeline_version"
+      ],
+      "title": "Manifest",
+      "type": "object"
+    },
+    "NodeData": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "path",
+        "name"
+      ],
+      "title": "NodeData",
+      "type": "object"
+    },
+    "ParseError": {
+      "additionalProperties": false,
+      "properties": {
+        "end_line": {
+          "title": "End Line",
+          "type": "integer"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "start_line": {
+          "title": "Start Line",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "start_line",
+        "end_line"
+      ],
+      "title": "ParseError",
+      "type": "object"
+    },
+    "Redaction": {
+      "additionalProperties": false,
+      "properties": {
+        "end_line": {
+          "title": "End Line",
+          "type": "integer"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "start_line": {
+          "title": "Start Line",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "start_line",
+        "end_line",
+        "reason"
+      ],
+      "title": "Redaction",
+      "type": "object"
+    },
+    "SemanticSymbol": {
+      "additionalProperties": false,
+      "properties": {
+        "alias": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Alias"
+        },
+        "binding": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Binding"
+        },
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "constructor": {
+          "default": false,
+          "title": "Constructor",
+          "type": "boolean"
+        },
+        "default_export": {
+          "default": false,
+          "title": "Default Export",
+          "type": "boolean"
+        },
+        "dispatch": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dispatch"
+        },
+        "end_byte": {
+          "minimum": 0,
+          "title": "End Byte",
+          "type": "integer"
+        },
+        "end_line": {
+          "minimum": 1,
+          "title": "End Line",
+          "type": "integer"
+        },
+        "exported": {
+          "default": false,
+          "title": "Exported",
+          "type": "boolean"
+        },
+        "file_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "File Sha256",
+          "type": "string"
+        },
+        "import_module": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Import Module"
+        },
+        "imported_member": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Imported Member"
+        },
+        "language": {
+          "title": "Language",
+          "type": "string"
+        },
+        "local_binding": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Local Binding"
+        },
+        "parameters": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parameters"
+        },
+        "path": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "qualified_name": {
+          "title": "Qualified Name",
+          "type": "string"
+        },
+        "source_name": {
+          "title": "Source Name",
+          "type": "string"
+        },
+        "start_byte": {
+          "minimum": 0,
+          "title": "Start Byte",
+          "type": "integer"
+        },
+        "start_line": {
+          "minimum": 1,
+          "title": "Start Line",
+          "type": "integer"
+        },
+        "type_only": {
+          "default": false,
+          "title": "Type Only",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "path",
+        "file_sha256",
+        "start_line",
+        "end_line",
+        "start_byte",
+        "end_byte",
+        "category",
+        "language",
+        "source_name",
+        "qualified_name"
+      ],
+      "title": "SemanticSymbol",
+      "type": "object"
+    },
+    "SnapshotData": {
+      "additionalProperties": false,
+      "properties": {
+        "acquired_at": {
+          "title": "Acquired At",
+          "type": "string"
+        },
+        "acquisition_version": {
+          "const": "github-archive-v1",
+          "title": "Acquisition Version",
+          "type": "string"
+        },
+        "canonical_url": {
+          "title": "Canonical Url",
+          "type": "string"
+        },
+        "commit_sha": {
+          "pattern": "^[a-f0-9]{40}$",
+          "title": "Commit Sha",
+          "type": "string"
+        },
+        "default_branch": {
+          "title": "Default Branch",
+          "type": "string"
+        },
+        "github_id": {
+          "title": "Github Id",
+          "type": "integer"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "owner": {
+          "title": "Owner",
+          "type": "string"
+        },
+        "public": {
+          "const": true,
+          "title": "Public",
+          "type": "boolean"
+        },
+        "repository": {
+          "title": "Repository",
+          "type": "string"
+        }
+      },
+      "required": [
+        "repository",
+        "canonical_url",
+        "github_id",
+        "owner",
+        "name",
+        "public",
+        "default_branch",
+        "commit_sha",
+        "acquired_at",
+        "acquisition_version"
+      ],
+      "title": "SnapshotData",
+      "type": "object"
+    },
+    "SourceFile": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "classification": {
+          "title": "Classification",
+          "type": "string"
+        },
+        "file_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "File Sha256",
+          "type": "string"
+        },
+        "language": {
+          "title": "Language",
+          "type": "string"
+        },
+        "parsed_bytes": {
+          "minimum": 0,
+          "title": "Parsed Bytes",
+          "type": "integer"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "eligible",
+            "parsed",
+            "skipped",
+            "failed",
+            "context"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "file_sha256",
+        "bytes",
+        "language",
+        "classification",
+        "status",
+        "reason",
+        "parsed_bytes"
+      ],
+      "title": "SourceFile",
+      "type": "object"
+    },
+    "Structure": {
+      "additionalProperties": false,
+      "properties": {
+        "parse_errors": {
+          "items": {
+            "$ref": "#/$defs/ParseError"
+          },
+          "maxItems": 10000,
+          "title": "Parse Errors",
+          "type": "array"
+        },
+        "parser_version": {
+          "title": "Parser Version",
+          "type": "string"
+        },
+        "rule_version": {
+          "title": "Rule Version",
+          "type": "string"
+        },
+        "symbols": {
+          "items": {
+            "$ref": "#/$defs/Symbol"
+          },
+          "maxItems": 10000,
+          "title": "Symbols",
+          "type": "array"
+        }
+      },
+      "required": [
+        "symbols",
+        "parse_errors",
+        "parser_version",
+        "rule_version"
+      ],
+      "title": "Structure",
+      "type": "object"
+    },
+    "Symbol": {
+      "additionalProperties": false,
+      "properties": {
+        "alias": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Alias"
+        },
+        "binding": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Binding"
+        },
+        "dispatch": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dispatch"
+        },
+        "end_byte": {
+          "minimum": 0,
+          "title": "End Byte",
+          "type": "integer"
+        },
+        "end_line": {
+          "minimum": 1,
+          "title": "End Line",
+          "type": "integer"
+        },
+        "file_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "File Sha256",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "imported_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Imported Name"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 1024,
+          "title": "Name",
+          "type": "string"
+        },
+        "parameters": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parameters"
+        },
+        "parser_language": {
+          "title": "Parser Language",
+          "type": "string"
+        },
+        "parser_version": {
+          "title": "Parser Version",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "qualification": {
+          "title": "Qualification",
+          "type": "string"
+        },
+        "rule": {
+          "title": "Rule",
+          "type": "string"
+        },
+        "start_byte": {
+          "minimum": 0,
+          "title": "Start Byte",
+          "type": "integer"
+        },
+        "start_line": {
+          "minimum": 1,
+          "title": "Start Line",
+          "type": "integer"
+        },
+        "syntax": {
+          "$ref": "#/$defs/Syntax"
+        }
+      },
+      "required": [
+        "syntax",
+        "id",
+        "path",
+        "start_line",
+        "end_line",
+        "start_byte",
+        "end_byte",
+        "kind",
+        "name",
+        "file_sha256",
+        "parser_language",
+        "parser_version",
+        "rule",
+        "qualification"
+      ],
+      "title": "Symbol",
+      "type": "object"
+    },
+    "Syntax": {
+      "additionalProperties": false,
+      "properties": {
+        "candidate_category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Candidate Category"
+        },
+        "candidate_support_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Candidate Support Ids",
+          "type": "array"
+        },
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "constructor": {
+          "default": false,
+          "title": "Constructor",
+          "type": "boolean"
+        },
+        "default_export": {
+          "default": false,
+          "title": "Default Export",
+          "type": "boolean"
+        },
+        "enclosing_symbol_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Enclosing Symbol Id"
+        },
+        "exported": {
+          "default": false,
+          "title": "Exported",
+          "type": "boolean"
+        },
+        "import_module": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Import Module"
+        },
+        "imported_member": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Imported Member"
+        },
+        "lexical_target_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lexical Target Id"
+        },
+        "local_binding": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Local Binding"
+        },
+        "qualified_name": {
+          "title": "Qualified Name",
+          "type": "string"
+        },
+        "scope": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Scope",
+          "type": "array"
+        },
+        "type_only": {
+          "default": false,
+          "title": "Type Only",
+          "type": "boolean"
+        },
+        "unsafe_binding": {
+          "default": false,
+          "title": "Unsafe Binding",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "category",
+        "qualified_name"
+      ],
+      "title": "Syntax",
+      "type": "object"
+    },
+    "Verdict": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_id": {
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "title": "Claim Id",
+          "type": "string"
+        },
+        "conflict_ids": {
+          "items": {
+            "pattern": "^[a-z][a-z0-9-]*$",
+            "type": "string"
+          },
+          "title": "Conflict Ids",
+          "type": "array"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[a-z][a-z0-9-]*$",
+            "type": "string"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "rule": {
+          "title": "Rule",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "verified",
+            "inferred",
+            "documentation_only",
+            "unsupported"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "claim_id",
+        "status",
+        "evidence_ids",
+        "rule",
+        "reason",
+        "conflict_ids"
+      ],
+      "title": "Verdict",
+      "type": "object"
+    },
+    "Versions": {
+      "additionalProperties": false,
+      "properties": {
+        "parser": {
+          "title": "Parser",
+          "type": "string"
+        },
+        "pipeline": {
+          "title": "Pipeline",
+          "type": "string"
+        },
+        "rules": {
+          "title": "Rules",
+          "type": "string"
+        },
+        "schema": {
+          "title": "Schema",
+          "type": "string"
+        }
+      },
+      "required": [
+        "parser",
+        "pipeline",
+        "rules",
+        "schema"
+      ],
+      "title": "Versions",
+      "type": "object"
+    }
+  },
+  "$id": "https://repovox.invalid/contracts/analysis/2.3",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "validate"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "additionalProperties": false,
+            "properties": {
+              "acquired_at": {
+                "title": "Acquired At",
+                "type": "string"
+              },
+              "acquisition_version": {
+                "const": "github-archive-v1",
+                "title": "Acquisition Version",
+                "type": "string"
+              },
+              "canonical_url": {
+                "title": "Canonical Url",
+                "type": "string"
+              },
+              "commit_sha": {
+                "pattern": "^[a-f0-9]{40}$",
+                "title": "Commit Sha",
+                "type": "string"
+              },
+              "default_branch": {
+                "title": "Default Branch",
+                "type": "string"
+              },
+              "github_id": {
+                "title": "Github Id",
+                "type": "integer"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "owner": {
+                "title": "Owner",
+                "type": "string"
+              },
+              "public": {
+                "const": true,
+                "title": "Public",
+                "type": "boolean"
+              },
+              "repository": {
+                "title": "Repository",
+                "type": "string"
+              }
+            },
+            "required": [
+              "repository",
+              "canonical_url",
+              "github_id",
+              "owner",
+              "name",
+              "public",
+              "default_branch",
+              "commit_sha",
+              "acquired_at",
+              "acquisition_version"
+            ],
+            "title": "SnapshotData",
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "filter"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "additionalProperties": false,
+            "properties": {
+              "acquisition_version": {
+                "title": "Acquisition Version",
+                "type": "string"
+              },
+              "archive_sha256": {
+                "pattern": "^[a-f0-9]{64}$",
+                "title": "Archive Sha256",
+                "type": "string"
+              },
+              "commit_sha": {
+                "pattern": "^[a-f0-9]{40}$",
+                "title": "Commit Sha",
+                "type": "string"
+              },
+              "coverage": {
+                "default": 0,
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Coverage",
+                "type": "number"
+              },
+              "eligible_bytes": {
+                "minimum": 0,
+                "title": "Eligible Bytes",
+                "type": "integer"
+              },
+              "eligible_files": {
+                "maximum": 5000,
+                "minimum": 0,
+                "title": "Eligible Files",
+                "type": "integer"
+              },
+              "excluded_bytes": {
+                "minimum": 0,
+                "title": "Excluded Bytes",
+                "type": "integer"
+              },
+              "files": {
+                "items": {
+                  "$ref": "#/$defs/SourceFile"
+                },
+                "maxItems": 10000,
+                "title": "Files",
+                "type": "array"
+              },
+              "language_coverage": {
+                "additionalProperties": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "type": "object"
+                },
+                "title": "Language Coverage",
+                "type": "object"
+              },
+              "parsed_bytes": {
+                "minimum": 0,
+                "title": "Parsed Bytes",
+                "type": "integer"
+              },
+              "parsed_non_test_files": {
+                "default": 0,
+                "minimum": 0,
+                "title": "Parsed Non Test Files",
+                "type": "integer"
+              },
+              "parser_version": {
+                "title": "Parser Version",
+                "type": "string"
+              },
+              "pipeline_version": {
+                "title": "Pipeline Version",
+                "type": "string"
+              },
+              "processing_timestamp": {
+                "title": "Processing Timestamp",
+                "type": "string"
+              },
+              "repository": {
+                "title": "Repository",
+                "type": "string"
+              }
+            },
+            "required": [
+              "repository",
+              "commit_sha",
+              "acquisition_version",
+              "archive_sha256",
+              "files",
+              "eligible_bytes",
+              "parsed_bytes",
+              "excluded_bytes",
+              "eligible_files",
+              "processing_timestamp",
+              "parser_version",
+              "pipeline_version"
+            ],
+            "title": "Manifest",
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "structure"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "additionalProperties": false,
+            "properties": {
+              "configuration": {
+                "$ref": "#/$defs/Configuration"
+              },
+              "manifest": {
+                "$ref": "#/$defs/Manifest"
+              },
+              "structure": {
+                "$ref": "#/$defs/Structure"
+              }
+            },
+            "required": [
+              "manifest",
+              "structure",
+              "configuration"
+            ],
+            "title": "Parsed",
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "entrypoints"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "additionalProperties": false,
+            "properties": {
+              "candidates": {
+                "items": {
+                  "$ref": "#/$defs/Candidate"
+                },
+                "title": "Candidates",
+                "type": "array"
+              },
+              "frameworks": {
+                "items": {
+                  "$ref": "#/$defs/Framework"
+                },
+                "title": "Frameworks",
+                "type": "array"
+              },
+              "scope": {
+                "title": "Scope",
+                "type": "string"
+              },
+              "selected": {
+                "anyOf": [
+                  {
+                    "pattern": "^[a-z][a-z0-9-]*$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Selected"
+              },
+              "uncertainty": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Uncertainty",
+                "type": "array"
+              }
+            },
+            "required": [
+              "candidates",
+              "selected",
+              "frameworks",
+              "scope",
+              "uncertainty"
+            ],
+            "title": "Entrypoints",
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "infer"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "additionalProperties": false,
+            "properties": {
+              "edges": {
+                "items": {
+                  "$ref": "#/$defs/Edge"
+                },
+                "title": "Edges",
+                "type": "array"
+              },
+              "entrypoints": {
+                "$ref": "#/$defs/Entrypoints"
+              },
+              "limitations": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Limitations",
+                "type": "array"
+              },
+              "nodes": {
+                "items": {
+                  "$ref": "#/$defs/NodeData"
+                },
+                "title": "Nodes",
+                "type": "array"
+              },
+              "rule_version": {
+                "title": "Rule Version",
+                "type": "string"
+              }
+            },
+            "required": [
+              "nodes",
+              "edges",
+              "entrypoints",
+              "rule_version",
+              "limitations"
+            ],
+            "title": "Graph",
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "knowledge"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "additionalProperties": false,
+            "properties": {
+              "canonical_facts": {
+                "items": {
+                  "$ref": "#/$defs/CanonicalFact"
+                },
+                "title": "Canonical Facts",
+                "type": "array"
+              },
+              "claims": {
+                "items": {
+                  "$ref": "#/$defs/Claim"
+                },
+                "maxItems": 20000,
+                "title": "Claims",
+                "type": "array"
+              },
+              "coverage": {
+                "$ref": "#/$defs/Manifest"
+              },
+              "dependencies": {
+                "items": {
+                  "$ref": "#/$defs/Dependency"
+                },
+                "title": "Dependencies",
+                "type": "array"
+              },
+              "edges": {
+                "items": {
+                  "$ref": "#/$defs/Edge"
+                },
+                "title": "Edges",
+                "type": "array"
+              },
+              "entrypoints": {
+                "$ref": "#/$defs/Entrypoints"
+              },
+              "execution_flows": {
+                "items": {
+                  "$ref": "#/$defs/Flow"
+                },
+                "title": "Execution Flows",
+                "type": "array"
+              },
+              "frameworks": {
+                "items": {
+                  "$ref": "#/$defs/Framework"
+                },
+                "title": "Frameworks",
+                "type": "array"
+              },
+              "limitations": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Limitations",
+                "type": "array"
+              },
+              "modules": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Modules",
+                "type": "array"
+              },
+              "nodes": {
+                "items": {
+                  "$ref": "#/$defs/NodeData"
+                },
+                "title": "Nodes",
+                "type": "array"
+              },
+              "purpose_candidates": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Purpose Candidates",
+                "type": "array"
+              },
+              "repository": {
+                "$ref": "#/$defs/SnapshotData"
+              },
+              "scope": {
+                "title": "Scope",
+                "type": "string"
+              },
+              "stack": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Stack",
+                "type": "array"
+              },
+              "symbols": {
+                "items": {
+                  "$ref": "#/$defs/Symbol"
+                },
+                "title": "Symbols",
+                "type": "array"
+              },
+              "versions": {
+                "$ref": "#/$defs/Versions"
+              }
+            },
+            "required": [
+              "canonical_facts",
+              "repository",
+              "scope",
+              "stack",
+              "frameworks",
+              "purpose_candidates",
+              "modules",
+              "symbols",
+              "nodes",
+              "edges",
+              "entrypoints",
+              "execution_flows",
+              "dependencies",
+              "claims",
+              "coverage",
+              "limitations",
+              "versions"
+            ],
+            "title": "Knowledge",
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "evidence"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "additionalProperties": false,
+            "properties": {
+              "evidence": {
+                "$ref": "#/$defs/Evidence"
+              },
+              "knowledge": {
+                "$ref": "#/$defs/Knowledge"
+              }
+            },
+            "required": [
+              "knowledge",
+              "evidence"
+            ],
+            "title": "EvidenceBundle",
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "verify"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "additionalProperties": false,
+            "properties": {
+              "evidence": {
+                "$ref": "#/$defs/Evidence"
+              },
+              "knowledge": {
+                "$ref": "#/$defs/Knowledge"
+              },
+              "verification": {
+                "$ref": "#/$defs/Ledger"
+              }
+            },
+            "required": [
+              "knowledge",
+              "evidence",
+              "verification"
+            ],
+            "title": "Verified",
+            "type": "object"
+          }
+        }
+      }
+    }
+  ],
+  "properties": {
+    "commit_sha": {
+      "pattern": "^[a-f0-9]{40}$",
+      "title": "Commit Sha",
+      "type": "string"
+    },
+    "generation_metadata": {
+      "const": null,
+      "title": "Generation Metadata",
+      "type": "null"
+    },
+    "input_digest": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Input Digest",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "validate",
+        "filter",
+        "structure",
+        "entrypoints",
+        "infer",
+        "knowledge",
+        "evidence",
+        "verify"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "owner_id": {
+      "format": "uuid",
+      "title": "Owner Id",
+      "type": "string"
+    },
+    "payload": {
+      "additionalProperties": true,
+      "title": "Payload",
+      "type": "object"
+    },
+    "pipeline_version": {
+      "const": "phase2-static-v1",
+      "title": "Pipeline Version",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "2.3",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "snapshot_id": {
+      "format": "uuid",
+      "title": "Snapshot Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "kind",
+    "owner_id",
+    "snapshot_id",
+    "commit_sha",
+    "pipeline_version",
+    "input_digest",
+    "generation_metadata",
+    "payload"
+  ],
+  "title": "Envelope",
+  "type": "object"
+}

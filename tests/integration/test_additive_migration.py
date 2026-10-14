@@ -31,13 +31,30 @@ def test_accepted_database_upgrade_preserves_data(admin: Engine) -> None:
                 ),
                 {"id": project_id},
             )
+        command.upgrade(config, "0002")
+        with engine.connect() as c:
+            legacy = c.scalar(
+                text(
+                    "SELECT pg_get_functiondef('rv.finish_analysis(uuid,bigint,uuid,"
+                    "text,text,bigint,text,jsonb)'::regprocedure)"
+                )
+            )
         command.upgrade(config, "head")
         with engine.connect() as c:
             assert (
                 c.scalar(text("SELECT title FROM projects WHERE id=:id"), {"id": project_id})
                 == "Accepted Phase 1 data"
             )
-            assert c.scalar(text("SELECT version_num FROM alembic_version")) == "0002"
+            assert c.scalar(text("SELECT version_num FROM alembic_version")) == "0003"
+            assert (
+                c.scalar(
+                    text(
+                        "SELECT pg_get_functiondef('rv.finish_analysis(uuid,bigint,uuid,"
+                        "text,text,bigint,text,jsonb)'::regprocedure)"
+                    )
+                )
+                == legacy
+            )
             assert c.scalar(text("SELECT count(*) FROM users")) == 2
             assert c.scalar(
                 text("SELECT relforcerowsecurity FROM pg_class WHERE relname='analysis_results'")

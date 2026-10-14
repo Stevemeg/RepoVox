@@ -61,6 +61,13 @@ advancement, model benchmark or official freeze is implied by engineering tests.
 
 ## Owner decisions before implementation/provisioning
 
+Phase 2C-C is separately authorized engineering remediation for F-02/F-03 and N-01:
+[canonical contract and conservative parser/graph rules](../development/canonical-facts.md),
+synthetic regressions and a draft stacked PR. Its scoped additive artifact-version
+migration is owner-authorized for local synthetic tests only. Historical 2C-B
+comparison results, partial references and official human-reviewed counts remain
+unchanged. No new blind evaluation, corpus expansion or Phase 3 is authorized.
+
 Phase 2C-A is a separately authorized [AI exploratory preparation](phase2c-a-verification.md)
 track after accepted Phase 2B. Blind ChatGPT review is pending; no model experiment,
 official dataset freeze, scaling, spending, merge or Phase 3 is authorized. The official

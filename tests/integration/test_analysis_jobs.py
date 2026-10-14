@@ -127,6 +127,8 @@ def test_real_stages_owner_artifacts_and_boundary(
     result = a.get(f"/v1/development/jobs/{job['id']}/analysis")
     assert result.status_code == 200, result.text
     payload = result.json()["payload"]
+    assert result.json()["schema_version"] == "2.3"
+    assert payload["knowledge"]["canonical_facts"]
     assert payload["verification"]["counts"]["verified"] > 0
     assert payload["verification"]["counts"]["documentation_only"] == 1
     assert all(e["validation_status"] == "valid" for e in payload["evidence"]["items"])
@@ -138,6 +140,15 @@ def test_real_stages_owner_artifacts_and_boundary(
     with admin.connect() as c:
         assert c.scalar(text("SELECT count(*) FROM video_artifacts")) == 0
         assert c.scalar(text("SELECT count(*) FROM knowledge_artifacts WHERE NOT synthetic")) == 8
+        assert (
+            c.scalar(
+                text(
+                    "SELECT count(*) FROM knowledge_artifacts WHERE NOT synthetic "
+                    "AND schema_version='2.3' AND versions->>'rules'='static-rules-v2'"
+                )
+            )
+            == 8
+        )
     with pytest.raises(DBAPIError, match="terminal_immutable"):
         with admin.begin() as c:
             c.execute(
@@ -146,6 +157,75 @@ def test_real_stages_owner_artifacts_and_boundary(
     with pytest.raises(DBAPIError, match="permission denied"):
         with tenant(a.app.state.engine, A) as c:
             c.execute(text("SELECT * FROM evaluation.manifests"))
+
+
+@pytest.mark.parametrize(
+    "first,second",
+    [("finish_analysis", "finish_analysis_v23"), ("finish_analysis_v23", "finish_analysis")],
+)
+def test_mixed_artifact_versions_rejected(clients, orchestrator, admin, first, second) -> None:
+    a, _ = clients
+    job, _ = setup(a, orchestrator)
+    first_lease = orchestrator.claim(UUID(job["stages"][1]["id"]), "version-test")
+    assert first_lease
+
+    def completion(lease, function):
+        with orchestrator.engine.begin() as c:
+            scope = c.scalar(
+                text("SELECT rv.analysis_scope(:id,:fence)"),
+                {"id": lease["stage_id"], "fence": lease["fence"]},
+            )
+        hashes = [scope["validate_digest"], *[o["checksum"] for o in scope["outputs"]]]
+        input_hash = digest(
+            (scope["snapshot"]["commit_sha"] + "|phase2-static-v1|" + "|".join(hashes)).encode()
+        )
+        ref = ObjectRef(A, lease["snapshot_id"], lease["job_id"], uuid4(), "c" * 64, "analysis")
+        with orchestrator.engine.begin() as c:
+            return c.scalar(
+                text(f"SELECT rv.{function}(:id,:fence,:artifact,:hash,:key,0,:input,'{{}}')"),
+                {
+                    "id": lease["stage_id"],
+                    "fence": lease["fence"],
+                    "artifact": ref.artifact,
+                    "hash": ref.checksum,
+                    "key": ref.key,
+                    "input": input_hash,
+                },
+            )
+
+    assert completion(first_lease, first)
+    second_lease = orchestrator.claim(UUID(job["stages"][2]["id"]), "version-test")
+    assert second_lease
+    with pytest.raises(DBAPIError, match="analysis_version_mismatch"):
+        completion(second_lease, second)
+    with admin.connect() as c:
+        assert (
+            c.scalar(
+                text("SELECT count(*) FROM knowledge_artifacts WHERE job_id=:job"),
+                {"job": job["id"]},
+            )
+            == 1
+        )
+    if first == "finish_analysis":
+        # Reject before attempting to read the intentionally absent synthetic object.
+        assert not orchestrator.analysis.run(second_lease, lambda: True)
+        assert a.get(f"/v1/jobs/{job['id']}").json()["error_code"] == "artifact_corrupt"
+
+
+def test_versioned_completion_permissions(admin: Engine) -> None:
+    with admin.connect() as c:
+        for name in [
+            "finish_analysis_v23(uuid,bigint,uuid,text,text,bigint,text,jsonb)",
+            "analysis_scope_v23(uuid,bigint)",
+        ]:
+            for role, expected in [("rv_app", False), ("rv_worker", True)]:
+                assert (
+                    c.scalar(
+                        text("SELECT has_function_privilege(:role,:function,'EXECUTE')"),
+                        {"role": role, "function": "rv." + name},
+                    )
+                    is expected
+                )
 
 
 def test_analysis_stale_upload_cancel_and_deadline(

@@ -69,7 +69,7 @@ try:
             stage_start = time.monotonic()
             payload = isolated(root, {**request, "stage": ordinal}, lambda: None, 115)
             envelope = {
-                "schema_version": "2.2",
+                "schema_version": "2.3",
                 "kind": STAGES[ordinal],
                 "owner_id": str(uuid4()),
                 "snapshot_id": request["snapshot_id"],

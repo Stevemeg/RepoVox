@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from repovox.analysis.common import RULES, digest, stable
+from repovox.analysis.facts import Syntax
 from repovox.analysis.graph import configuration
 from repovox.analysis.privacy import redact
 
@@ -53,12 +54,9 @@ def context_symbols(root: Path, manifest: dict[str, Any]) -> list[dict[str, Any]
         )
         symbols.append(
             {
-                "id": stable("config", path, kind, name, digest(body)),
+                "id": stable("config", path, kind, name, item["property_path"], digest(body)),
                 "path": path,
-                "start_line": 1,
-                "end_line": len(body.rstrip(b"\n").split(b"\n")),
-                "start_byte": 0,
-                "end_byte": len(body),
+                **{k: item[k] for k in ["start_line", "end_line", "start_byte", "end_byte"]},
                 "kind": kind,
                 "name": name,
                 "file_sha256": digest(body),
@@ -66,6 +64,15 @@ def context_symbols(root: Path, manifest: dict[str, Any]) -> list[dict[str, Any]
                 "parser_version": RULES,
                 "rule": "declarative-config-v1",
                 "qualification": "declared_only",
+                "syntax": Syntax(
+                    category=kind,
+                    qualified_name=".".join(item["property_path"]),
+                    candidate_category=item.get("category"),
+                ).model_dump(),
             }
+        )
+    for symbol in symbols:
+        symbol.setdefault(
+            "syntax", Syntax(category=symbol["kind"], qualified_name=symbol["name"]).model_dump()
         )
     return sorted({s["id"]: s for s in symbols}.values(), key=lambda s: s["id"])
