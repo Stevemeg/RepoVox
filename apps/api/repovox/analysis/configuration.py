@@ -20,10 +20,15 @@ def properties(
         return len(source[:start].encode()), len(source[:end].encode())
 
     if json_format:
-        decoder = json.JSONDecoder()
+
+        def invalid_constant(value: str) -> Any:
+            raise ValueError("invalid_json_constant")
+
+        decoder = json.JSONDecoder(parse_constant=invalid_constant)
 
         def whitespace(i: int) -> int:
-            while i < len(source) and source[i].isspace():
+            # RFC 8259 whitespace; Unicode whitespace remains valid inside strings.
+            while i < len(source) and source[i] in " \t\r\n":
                 i += 1
             return i
 
@@ -66,7 +71,7 @@ def properties(
             return result, i + 1
 
         config, end = read(0, (), 0)
-        if source[end:].strip() or not isinstance(config, dict):
+        if whitespace(end) != len(source) or not isinstance(config, dict):
             raise ValueError("invalid_json_root")
         return config, spans
     config = tomllib.loads(source)  # Duplicate keys and malformed TOML are rejected here.

@@ -188,6 +188,48 @@ suite, synthetic runtime/browser regression, dependency audits and history secre
 scan. Its actual run URL and outcome belong in the draft PR's final review
 handoff; pending CI is not a claimed pass.
 
+## Independent review correction C-01
+
+Independent review identified Unicode whitespace accepted by the custom JSON
+scanner. At baseline `bf93bde85ae979b412b081bef34eec445cb84b8b`, the minimal
+synthetic input `b'{"main":\xc2\xa0"entry.js"}'` produced a configuration entry
+with no error. The regression test failed before the correction, confirming
+that malformed input could produce facts.
+
+The scanner now accepts only space, tab, carriage return and line feed between
+tokens, as specified by [RFC 8259 section 2](https://www.rfc-editor.org/rfc/rfc8259.html#section-2).
+The root trailing-content check uses the same scanner instead of Unicode-aware
+`strip()`. Inspection of this path also found the decoder's permissive
+`NaN`/`Infinity`/`-Infinity` extension; an explicit rejection callback now routes
+these through the existing configuration-error path. TOML is validated by
+`tomllib` before localization; a regression confirms nonbreaking-space rejection
+there without changing the TOML reader.
+
+After correction the minimal input produces exactly
+`{"dependencies": [], "config_entries": [], "config_errors": ["package.json"]}`.
+No configuration symbols or canonical facts survive malformed input. Original
+byte-span computation, complete-file hashes, duplicate-key rejection and valid
+Unicode inside strings are preserved. No schema, evaluator, migration or private
+evidence changes are involved.
+
+The new `tests/unit/test_configuration_validation.py` contains 63 cases: seven
+invalid whitespace characters at six token boundaries; duplicate/escaped-key,
+trailing-comma, malformed-value and incomplete-document failures; valid nested
+multiline UTF-8 with original byte/line/hash checks; end-to-end safe error
+recording; TOML rejection; and immutable source hash mismatch rejection.
+
+Local correction checks: focused suite 63 passed (1.81 seconds); Windows unit
+suite 339 passed / 23 POSIX-only skips (19.23 seconds); Ruff and formatting passed
+(82 files); fresh-cache mypy passed (48 source files); both contract checks,
+documentation checks, cost-model checks and 32 tooling tests passed. Final-head
+CI results and its exact corrective commit are recorded in PR #6's C-01 handoff.
+The expected pre-fix failing regression is not counted as a passing check.
+The full Linux `pytest -q --tb=short` run passed 389 tests with one Windows-only
+skip in 87.00 seconds, including all 28 integration tests. It used the same
+isolated Compose command above; the synthetic application services were stopped
+during test-data resets and restored afterward. Existing deprecation warnings
+remain; no dependency changes or suppressions were introduced.
+
 ## Measurements, limits and next verification
 
 Durations above are actual automated execution times, not human labor. Human review time was not measured and no human approval was recorded. No
