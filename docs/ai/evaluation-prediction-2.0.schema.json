@@ -1,0 +1,581 @@
+{
+  "$defs": {
+    "CanonicalFact": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "enum": [
+            "syntax",
+            "relationship",
+            "entrypoint"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "classification": {
+          "enum": [
+            "declared",
+            "resolved_static",
+            "unresolved",
+            "inferred"
+          ],
+          "title": "Classification",
+          "type": "string"
+        },
+        "commit_sha": {
+          "pattern": "^[a-f0-9]{40}$",
+          "title": "Commit Sha",
+          "type": "string"
+        },
+        "entrypoint_category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Entrypoint Category"
+        },
+        "entrypoint_target": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Entrypoint Target"
+        },
+        "parser_rules": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Parser Rules",
+          "type": "array"
+        },
+        "relationship": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Relationship"
+        },
+        "repository": {
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$",
+          "title": "Repository",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "source-fact-2.0",
+          "default": "source-fact-2.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "subject": {
+          "$ref": "#/$defs/SemanticSymbol"
+        },
+        "support": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "minItems": 1,
+          "title": "Support",
+          "type": "array"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SemanticSymbol"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "category",
+        "classification",
+        "commit_sha",
+        "parser_rules",
+        "repository",
+        "schema_version",
+        "subject",
+        "support"
+      ],
+      "title": "CanonicalFact",
+      "type": "object"
+    },
+    "Citation": {
+      "additionalProperties": false,
+      "properties": {
+        "end_line": {
+          "minimum": 1,
+          "title": "End Line",
+          "type": "integer"
+        },
+        "file_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "File Sha256",
+          "type": "string"
+        },
+        "path": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "start_line": {
+          "minimum": 1,
+          "title": "Start Line",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "file_sha256",
+        "start_line",
+        "end_line"
+      ],
+      "title": "Citation",
+      "type": "object"
+    },
+    "Policy": {
+      "additionalProperties": false,
+      "properties": {
+        "independently_human_reviewed": {
+          "const": false,
+          "default": false,
+          "title": "Independently Human Reviewed",
+          "type": "boolean"
+        },
+        "official_eval_entry_contribution": {
+          "const": false,
+          "default": false,
+          "title": "Official Eval Entry Contribution",
+          "type": "boolean"
+        },
+        "production_certification": {
+          "const": false,
+          "default": false,
+          "title": "Production Certification",
+          "type": "boolean"
+        },
+        "track": {
+          "const": "AI_AUDITED_EXPLORATORY",
+          "default": "AI_AUDITED_EXPLORATORY",
+          "title": "Track",
+          "type": "string"
+        },
+        "training_authorized": {
+          "const": false,
+          "default": false,
+          "title": "Training Authorized",
+          "type": "boolean"
+        }
+      },
+      "title": "Policy",
+      "type": "object"
+    },
+    "PredictedFact": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Claim Id"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "fact": {
+          "$ref": "#/$defs/CanonicalFact"
+        },
+        "id": {
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "verified",
+            "inferred",
+            "documentation_only",
+            "unsupported",
+            "unreviewed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "verdict_origin": {
+          "enum": [
+            "bound_analysis_ledger",
+            "no_verdict_available",
+            "synthetic_fixture"
+          ],
+          "title": "Verdict Origin",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "fact",
+        "status",
+        "verdict_origin",
+        "claim_id",
+        "evidence"
+      ],
+      "title": "PredictedFact",
+      "type": "object"
+    },
+    "SemanticSymbol": {
+      "additionalProperties": false,
+      "properties": {
+        "alias": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Alias"
+        },
+        "binding": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Binding"
+        },
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "constructor": {
+          "default": false,
+          "title": "Constructor",
+          "type": "boolean"
+        },
+        "default_export": {
+          "default": false,
+          "title": "Default Export",
+          "type": "boolean"
+        },
+        "dispatch": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dispatch"
+        },
+        "end_byte": {
+          "minimum": 0,
+          "title": "End Byte",
+          "type": "integer"
+        },
+        "end_line": {
+          "minimum": 1,
+          "title": "End Line",
+          "type": "integer"
+        },
+        "exported": {
+          "default": false,
+          "title": "Exported",
+          "type": "boolean"
+        },
+        "file_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "File Sha256",
+          "type": "string"
+        },
+        "import_module": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Import Module"
+        },
+        "imported_member": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Imported Member"
+        },
+        "language": {
+          "title": "Language",
+          "type": "string"
+        },
+        "local_binding": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Local Binding"
+        },
+        "parameters": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parameters"
+        },
+        "path": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "qualified_name": {
+          "title": "Qualified Name",
+          "type": "string"
+        },
+        "source_name": {
+          "title": "Source Name",
+          "type": "string"
+        },
+        "start_byte": {
+          "minimum": 0,
+          "title": "Start Byte",
+          "type": "integer"
+        },
+        "start_line": {
+          "minimum": 1,
+          "title": "Start Line",
+          "type": "integer"
+        },
+        "type_only": {
+          "default": false,
+          "title": "Type Only",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "path",
+        "file_sha256",
+        "start_line",
+        "end_line",
+        "start_byte",
+        "end_byte",
+        "category",
+        "language",
+        "source_name",
+        "qualified_name"
+      ],
+      "title": "SemanticSymbol",
+      "type": "object"
+    },
+    "Unprojected": {
+      "additionalProperties": false,
+      "properties": {
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "minItems": 1,
+          "title": "Citations",
+          "type": "array"
+        },
+        "id": {
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "verified",
+            "inferred",
+            "documentation_only",
+            "unsupported",
+            "unreviewed"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "reason",
+        "citations"
+      ],
+      "title": "Unprojected",
+      "type": "object"
+    }
+  },
+  "$id": "https://repovox.invalid/contracts/evaluation-prediction-2.0",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "analysis_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Analysis Sha256",
+      "type": "string"
+    },
+    "commit_sha": {
+      "pattern": "^[a-f0-9]{40}$",
+      "title": "Commit Sha",
+      "type": "string"
+    },
+    "engineering_commit": {
+      "pattern": "^[a-f0-9]{40}$",
+      "title": "Engineering Commit",
+      "type": "string"
+    },
+    "facts": {
+      "items": {
+        "$ref": "#/$defs/PredictedFact"
+      },
+      "maxItems": 30000,
+      "title": "Facts",
+      "type": "array"
+    },
+    "family_id": {
+      "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+      "title": "Family Id",
+      "type": "string"
+    },
+    "policy": {
+      "$ref": "#/$defs/Policy"
+    },
+    "projection_version": {
+      "enum": [
+        "analysis-2.3-verdict-projection-1.0",
+        "synthetic-fixture-2.0"
+      ],
+      "title": "Projection Version",
+      "type": "string"
+    },
+    "repository": {
+      "title": "Repository",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "evaluation-prediction-2.0",
+      "default": "evaluation-prediction-2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "scope_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Scope Sha256",
+      "type": "string"
+    },
+    "selected_entrypoint": {
+      "anyOf": [
+        {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Selected Entrypoint"
+    },
+    "selection_interpretation": {
+      "default": "not_selected",
+      "enum": [
+        "not_selected",
+        "unique_static_candidate",
+        "ambiguous_static_candidates"
+      ],
+      "title": "Selection Interpretation",
+      "type": "string"
+    },
+    "tenant_id": {
+      "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+      "title": "Tenant Id",
+      "type": "string"
+    },
+    "unprojected_claims": {
+      "items": {
+        "$ref": "#/$defs/Unprojected"
+      },
+      "maxItems": 20000,
+      "title": "Unprojected Claims",
+      "type": "array"
+    }
+  },
+  "required": [
+    "analysis_sha256",
+    "commit_sha",
+    "engineering_commit",
+    "facts",
+    "family_id",
+    "policy",
+    "projection_version",
+    "repository",
+    "schema_version",
+    "scope_sha256",
+    "selected_entrypoint",
+    "tenant_id",
+    "unprojected_claims"
+  ],
+  "title": "Prediction",
+  "type": "object"
+}

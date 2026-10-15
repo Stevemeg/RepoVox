@@ -1,0 +1,144 @@
+{
+  "$defs": {
+    "Excerpt": {
+      "additionalProperties": false,
+      "properties": {
+        "citation": {
+          "$ref": "#/$defs/Window"
+        },
+        "numbered_source": {
+          "title": "Numbered Source",
+          "type": "string"
+        },
+        "redacted": {
+          "title": "Redacted",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "citation",
+        "numbered_source",
+        "redacted"
+      ],
+      "title": "Excerpt",
+      "type": "object"
+    },
+    "Policy": {
+      "additionalProperties": false,
+      "properties": {
+        "independently_human_reviewed": {
+          "const": false,
+          "default": false,
+          "title": "Independently Human Reviewed",
+          "type": "boolean"
+        },
+        "official_eval_entry_contribution": {
+          "const": false,
+          "default": false,
+          "title": "Official Eval Entry Contribution",
+          "type": "boolean"
+        },
+        "production_certification": {
+          "const": false,
+          "default": false,
+          "title": "Production Certification",
+          "type": "boolean"
+        },
+        "track": {
+          "const": "AI_AUDITED_EXPLORATORY",
+          "default": "AI_AUDITED_EXPLORATORY",
+          "title": "Track",
+          "type": "string"
+        },
+        "training_authorized": {
+          "const": false,
+          "default": false,
+          "title": "Training Authorized",
+          "type": "boolean"
+        }
+      },
+      "title": "Policy",
+      "type": "object"
+    },
+    "Window": {
+      "additionalProperties": false,
+      "properties": {
+        "end_byte": {
+          "minimum": 0,
+          "title": "End Byte",
+          "type": "integer"
+        },
+        "end_line": {
+          "minimum": 1,
+          "title": "End Line",
+          "type": "integer"
+        },
+        "file_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "File Sha256",
+          "type": "string"
+        },
+        "path": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "start_byte": {
+          "minimum": 0,
+          "title": "Start Byte",
+          "type": "integer"
+        },
+        "start_line": {
+          "minimum": 1,
+          "title": "Start Line",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "file_sha256",
+        "start_line",
+        "end_line",
+        "start_byte",
+        "end_byte"
+      ],
+      "title": "Window",
+      "type": "object"
+    }
+  },
+  "$id": "https://repovox.invalid/contracts/evaluation-blind-source-2.0",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "excerpts": {
+      "items": {
+        "$ref": "#/$defs/Excerpt"
+      },
+      "title": "Excerpts",
+      "type": "array"
+    },
+    "policy": {
+      "$ref": "#/$defs/Policy"
+    },
+    "schema_version": {
+      "const": "evaluation-blind-source-2.0",
+      "default": "evaluation-blind-source-2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "scope_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Scope Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "excerpts",
+    "policy",
+    "schema_version",
+    "scope_sha256"
+  ],
+  "title": "SourcePacket",
+  "type": "object"
+}
