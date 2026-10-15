@@ -1,9 +1,9 @@
 name: Phase 1 and 2 quality gates
 on:
   pull_request:
-    branches: [main, phase0/foundation, phase1/saas-foundation, phase2/repository-intelligence, phase2/eval-entry, phase2/ai-audited-pilot]
+    branches: [main, phase0/foundation, phase1/saas-foundation, phase2/repository-intelligence, phase2/eval-entry, phase2/ai-audited-pilot, phase2/canonical-fact-remediation]
   push:
-    branches: [phase1/saas-foundation, phase2/repository-intelligence, phase2/eval-entry, phase2/ai-audited-pilot, phase2/canonical-fact-remediation]
+    branches: [phase1/saas-foundation, phase2/repository-intelligence, phase2/eval-entry, phase2/ai-audited-pilot, phase2/canonical-fact-remediation, phase2/source-fact-v2-evaluation]
 permissions:
   contents: read
 concurrency:
@@ -33,6 +33,7 @@ jobs:
           uv run python -m unittest discover -s tools -p 'test_*.py' -v
           uv run python tools/phase1_contracts.py --check
           uv run python tools/phase2_contracts.py --check
+          uv run python tools/phase2_v2_contracts.py --check
           uv run python tools/phase2_corpus.py docs/ai/evaluation-corpus.manifest.json
           uv run python tools/phase2_preparation.py --catalog docs/ai/evaluation-candidates.json --manifest docs/ai/evaluation-corpus.manifest.json --output docs/ai/evaluation-readiness.json --check
       - run: uv run pip-audit --local
@@ -64,6 +65,7 @@ jobs:
           docker compose up -d --build postgres redis storage storage-init migrate
           docker compose run --rm --build tests
           docker compose run --rm --no-deps --user 0 --cap-add SETUID --cap-add SETGID --cap-add CHOWN tests python tools/phase2_storage_probe.py
+          docker compose run --rm --no-deps --user 0 --cap-add SETUID --cap-add SETGID --cap-add CHOWN tests python tools/phase2_v2_storage_probe.py
       - name: Boot complete local stack
         run: |
           docker compose up -d --build --wait api web worker dispatcher

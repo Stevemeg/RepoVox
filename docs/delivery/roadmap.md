@@ -61,6 +61,14 @@ advancement, model benchmark or official freeze is implied by engineering tests.
 
 ## Owner decisions before implementation/provisioning
 
+Phase 2C-D is authorized additive evaluation engineering for F-02/F-03, N-01 and
+N-04, stacked on accepted Phase 2C-C at `9557938`.
+The [v2 evaluation contract](../development/evaluation-v2.md) and
+[review handoff](phase2c-d-reviewer-handoff.md) cover independent source-only
+annotations, exact matching, private custody and synthetic adversarial tests.
+No new pilot, acquisition, database migration, official gate change or Phase 3
+is authorized. Stop at the draft PR and independent evaluator review.
+
 Phase 2C-C is separately authorized engineering remediation for F-02/F-03 and N-01:
 [canonical contract and conservative parser/graph rules](../development/canonical-facts.md),
 synthetic regressions and a draft stacked PR. Its scoped additive artifact-version

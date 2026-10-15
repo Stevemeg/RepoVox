@@ -1,0 +1,226 @@
+{
+  "$defs": {
+    "Policy": {
+      "additionalProperties": false,
+      "properties": {
+        "independently_human_reviewed": {
+          "const": false,
+          "default": false,
+          "title": "Independently Human Reviewed",
+          "type": "boolean"
+        },
+        "official_eval_entry_contribution": {
+          "const": false,
+          "default": false,
+          "title": "Official Eval Entry Contribution",
+          "type": "boolean"
+        },
+        "production_certification": {
+          "const": false,
+          "default": false,
+          "title": "Production Certification",
+          "type": "boolean"
+        },
+        "track": {
+          "const": "AI_AUDITED_EXPLORATORY",
+          "default": "AI_AUDITED_EXPLORATORY",
+          "title": "Track",
+          "type": "string"
+        },
+        "training_authorized": {
+          "const": false,
+          "default": false,
+          "title": "Training Authorized",
+          "type": "boolean"
+        }
+      },
+      "title": "Policy",
+      "type": "object"
+    },
+    "SourceFile": {
+      "additionalProperties": false,
+      "properties": {
+        "file_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "File Sha256",
+          "type": "string"
+        },
+        "language": {
+          "minLength": 1,
+          "title": "Language",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "size": {
+          "maximum": 5000000,
+          "minimum": 0,
+          "title": "Size",
+          "type": "integer"
+        },
+        "windows": {
+          "items": {
+            "$ref": "#/$defs/Window"
+          },
+          "maxItems": 1000,
+          "minItems": 1,
+          "title": "Windows",
+          "type": "array"
+        }
+      },
+      "required": [
+        "path",
+        "file_sha256",
+        "language",
+        "size",
+        "windows"
+      ],
+      "title": "SourceFile",
+      "type": "object"
+    },
+    "Window": {
+      "additionalProperties": false,
+      "properties": {
+        "end_byte": {
+          "minimum": 0,
+          "title": "End Byte",
+          "type": "integer"
+        },
+        "end_line": {
+          "minimum": 1,
+          "title": "End Line",
+          "type": "integer"
+        },
+        "file_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "File Sha256",
+          "type": "string"
+        },
+        "path": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "start_byte": {
+          "minimum": 0,
+          "title": "Start Byte",
+          "type": "integer"
+        },
+        "start_line": {
+          "minimum": 1,
+          "title": "Start Line",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "file_sha256",
+        "start_line",
+        "end_line",
+        "start_byte",
+        "end_byte"
+      ],
+      "title": "Window",
+      "type": "object"
+    }
+  },
+  "$id": "https://repovox.invalid/contracts/evaluation-source-scope-2.0",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "analysis_owner_id": {
+      "pattern": "^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$",
+      "title": "Analysis Owner Id",
+      "type": "string"
+    },
+    "commit_sha": {
+      "pattern": "^[a-f0-9]{40}$",
+      "title": "Commit Sha",
+      "type": "string"
+    },
+    "family_id": {
+      "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+      "title": "Family Id",
+      "type": "string"
+    },
+    "files": {
+      "items": {
+        "$ref": "#/$defs/SourceFile"
+      },
+      "maxItems": 5000,
+      "minItems": 1,
+      "title": "Files",
+      "type": "array"
+    },
+    "limitations": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Limitations",
+      "type": "array"
+    },
+    "policy": {
+      "$ref": "#/$defs/Policy"
+    },
+    "repository": {
+      "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$",
+      "title": "Repository",
+      "type": "string"
+    },
+    "rights_decision": {
+      "const": "PERMITTED_INTERNAL_EXPLORATORY",
+      "title": "Rights Decision",
+      "type": "string"
+    },
+    "rights_evidence_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Rights Evidence Sha256",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "evaluation-source-scope-2.0",
+      "default": "evaluation-source-scope-2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "snapshot_verification_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Snapshot Verification Sha256",
+      "type": "string"
+    },
+    "tenant_id": {
+      "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+      "title": "Tenant Id",
+      "type": "string"
+    },
+    "usage": {
+      "enum": [
+        "SYNTHETIC_FIXTURE",
+        "FUTURE_BLIND_PILOT"
+      ],
+      "title": "Usage",
+      "type": "string"
+    }
+  },
+  "required": [
+    "analysis_owner_id",
+    "commit_sha",
+    "family_id",
+    "files",
+    "limitations",
+    "policy",
+    "repository",
+    "rights_decision",
+    "rights_evidence_sha256",
+    "schema_version",
+    "snapshot_verification_sha256",
+    "tenant_id",
+    "usage"
+  ],
+  "title": "Scope",
+  "type": "object"
+}
