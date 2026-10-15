@@ -46,3 +46,19 @@ See the [normative specification](../development/evaluation-v2.md),
 [future blind protocol](../development/evaluation-v2-blind-protocol.md),
 [verification](../delivery/phase2c-d-verification.md), and
 [review handoff](../delivery/phase2c-d-reviewer-handoff.md).
+
+## Independent review corrections C-02/C-03/C-04
+
+Date: 2026-10-15. Emit score/aggregate 2.1 with scorer `exact-v2-1.1`.
+Keep the original 2.0 report schemas and explicit archival readers; no automatic
+conversion or new legacy scoring. Rename supported-overlap ratios as diagnostic
+fractions and calculate independently reviewed precision only when every predicted
+assertion in its category has an explicit known independent judgment. Micro-count
+aggregation preserves unavailable denominators.
+
+Reject empty evidence windows and semantic endpoint spans at evaluation boundaries
+and original-source checks, preserving production canonical schema/identity and v1.
+Post-reveal corrections carry diagnostic-only eligibility, remain INCOMPLETE and
+cannot qualify as new blind results. Aggregates propagate this restriction, and
+lineage cannot return from post-reveal to source-only context. Disagreement metrics
+and original predecessor commitments remain available for independent adjudication.

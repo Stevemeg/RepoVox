@@ -33,6 +33,10 @@ owner approval and independent acceptance of the v2 evaluator first.
     and retained owner approval. Record `revision_context: post_reveal_correction`
     after reveal; never relabel it as a blind source-only correction.
     Post-reveal revisions are explicitly post-reveal diagnostics, never a new blind run.
+    Score/aggregate 2.1 enforces `eligibility.diagnostic_only: true`,
+    `blind_result_eligible: false` and formal INCOMPLETE status regardless of exact
+    pairing. Mixed aggregates inherit the restriction. Preserve the initial blind
+    report separately; a descendant cannot revert to source-only revision context.
 
 ## Custody controls and limitations
 

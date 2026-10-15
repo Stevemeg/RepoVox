@@ -114,6 +114,8 @@ def profile(fact: CanonicalFact) -> None:
     if fact.category == "entrypoint" and fact.entrypoint_category not in ENTRY_CATEGORIES:
         raise ValueError("v2_invalid_entrypoint_category")
     for endpoint in [fact.subject, fact.target]:
+        if endpoint and endpoint.start_byte == endpoint.end_byte:
+            raise ValueError("v2_empty_byte_range")
         if endpoint and (
             endpoint.category not in SYMBOL_CATEGORIES
             or not endpoint.language
@@ -137,6 +139,8 @@ class Window(Citation):
 
     @model_validator(mode="after")
     def ordered(self) -> "Window":
+        if self.end_byte == self.start_byte:
+            raise ValueError("v2_empty_byte_range")
         if self.end_byte < self.start_byte:
             raise ValueError("v2_invalid_byte_range")
         return self
@@ -154,7 +158,7 @@ class SourceFile(Record):
         last = -1
         for w in sorted(self.windows, key=lambda w: w.start_byte):
             if (w.path, w.file_sha256) != (self.path, self.file_sha256) or not (
-                last < w.start_byte <= w.end_byte <= self.size
+                last < w.start_byte < w.end_byte <= self.size
             ):
                 raise ValueError("v2_scope_window_overlap_or_mismatch")
             last = w.end_byte - 1
@@ -396,6 +400,8 @@ def check_range(c: Citation, body: bytes) -> None:
         raise ValueError("v2_line_range_invalid")
     if isinstance(c, (Window, SemanticSymbol)):
         start, end = c.start_byte, c.end_byte
+        if start == end:
+            raise ValueError("v2_empty_byte_range")
         if not 0 <= start <= end <= len(body) or (
             body[:start].count(b"\n") + 1 != c.start_line
             or body[: max(start, end - 1)].count(b"\n") + 1 != c.end_line
@@ -417,6 +423,8 @@ def validate_citation(c: Citation, scope: Scope, bodies: dict[str, bytes]) -> No
     end = min(len(body), sum(len(line) + 1 for line in body.split(b"\n")[: c.end_line]))
     if isinstance(c, (Window, SemanticSymbol)):
         start, end = c.start_byte, c.end_byte
+    if start == end:
+        raise ValueError("v2_empty_byte_range")
     if not any(w.start_byte <= start <= end <= w.end_byte for w in f.windows):
         raise ValueError("v2_citation_excluded_range")
 
@@ -490,6 +498,11 @@ def validate_reference(
         )
         if ref.revision != prior.revision + 1:
             raise ValueError("v2_revision_gap")
+        if (
+            prior.revision_context == "post_reveal_correction"
+            and ref.revision_context != "post_reveal_correction"
+        ):
+            raise ValueError("v2_correction_context_regression")
         if (ref.blind_source_sha256, ref.prediction_commitment_sha256) != (
             prior.blind_source_sha256,
             prior.prediction_commitment_sha256,

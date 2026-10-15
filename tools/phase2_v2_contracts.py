@@ -6,13 +6,25 @@ from pathlib import Path
 
 from repovox.evaluation.custody_v2 import Event, SourcePacket
 from repovox.evaluation.scoring_v2 import Aggregate, Score
+from repovox.evaluation.scoring_v20 import Aggregate as LegacyAggregate
+from repovox.evaluation.scoring_v20 import Score as LegacyScore
 from repovox.evaluation.v2 import Prediction, Reference, Scope
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--check", action="store_true")
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[1] / "docs/ai"
-for model in [Reference, Prediction, Scope, Score, Aggregate, SourcePacket, Event]:
+for model in [
+    Reference,
+    Prediction,
+    Scope,
+    Score,
+    Aggregate,
+    SourcePacket,
+    Event,
+    LegacyScore,
+    LegacyAggregate,
+]:
     schema = model.model_json_schema()
     version = schema["properties"]["schema_version"]["const"]
     schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"

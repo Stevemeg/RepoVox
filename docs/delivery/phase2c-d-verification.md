@@ -182,3 +182,130 @@ measurement exists from this engineering test run. No spending was initiated.
 Review [the handoff](phase2c-d-reviewer-handoff.md), exact public diff and final-head
 CI. Independent evaluator acceptance and separate owner pilot authorization are
 required before future data acquisition, prediction generation or blind review.
+
+## Independent review corrections C-02/C-03/C-04
+
+Correction evidence recorded 2026-10-15, approximately 13:40-13:55 UTC.
+Reviewed baseline: `ce703aa349d13d615391bea16241df33d49bd664`, draft PR #7.
+The exact corrective follow-up commit and final-head CI are recorded in that PR's
+body and completion response; the earlier implementation results above remain
+historical evidence, not substitutes for corrective-head CI.
+
+### Reproduction and changes
+
+Trusted evaluation code retrieved from the reviewed Git commit was exercised only
+against manually specified synthetic source. It accepted both a zero-length Window
+and zero-length SemanticSymbol through original-byte checks. The old scorer returned
+COMPLETE/REVIEW_REQUIRED for perfectly paired rows with no revision-context input.
+One supported annotation plus 99 additional unreviewed predictions produced `0.01`
+under `syntax_precision_against_annotated_subset`. The initial five new regression
+cases failed before correction (missing corrected metric/context and three accepted
+empty offsets), independently confirming the reported gaps.
+
+C-02: current `scoring_v2` emits `evaluation-score-2.1`,
+`evaluation-aggregate-2.1`, scorer `exact-v2-1.1`. Per category, retain supported
+match/total counts and rename the ratio `*_supported_overlap_fraction`. New
+`*_reviewed_predictions` counts exact matches with known expected status and known
+independent evidence judgment. `*_independently_reviewed_precision` is null unless
+that reviewed count equals all predictions and the denominator is nonzero. The
+1-of-100 example now gives overlap 0.01 and precision null for syntax, relationships
+and entrypoints. Aggregate integer totals propagate the unavailable denominator;
+known unsupported annotations receive denominator membership without supported
+numerator credit. Recall continues to describe the declared annotated subset.
+
+C-03: reject equal byte offsets in Window models, evaluation fact endpoint profiles,
+original-byte validation and line-only citation checks. Zero-length files cannot
+supply evidence; a nonempty range ending at EOF remains valid. UTF-8 boundaries,
+original inclusive lines, support coverage and scope containment retain their checks.
+Production canonical models and source-fact identity are unchanged. Input 2.0 schema
+shape remains stable; relative nonempty span constraints are normative model/source
+checks, which JSON Schema alone cannot express.
+
+C-04: every corrected score/aggregate carries typed `eligibility` with
+`diagnostic_only`, `blind_result_eligible` and reasons. Post-reveal revisions always
+remain INCOMPLETE and diagnostic-only even with exact full pairing. Independent
+verdict disagreements and commitments remain visible. Any diagnostic-only constituent
+makes the aggregate diagnostic-only and ineligible; per-family flags remain visible.
+Approved, source-cited revision lineage is still required, and a post-reveal ancestor
+cannot be relabelled source-only by its descendant. None of these flags authenticates
+a reviewer or awards independent acceptance.
+
+Original report 2.0 schemas remain identical to their Git blobs. Explicit archival
+readers in `scoring_v20` preserve original report recomputation and labels, including
+their known limitations. They provide no new scoring/aggregation entrypoint and
+cannot enter 2.1 aggregation. Existing 2.0 reports are never silently converted or
+promoted to corrected blind results. All nine schema exports are checked together.
+
+### Corrective verification commands and results
+
+| Exact command | Observed result |
+| --- | --- |
+| `uv run pytest tests/unit/test_evaluation_v2_corrections.py -q` | 38 passed, 1.25 seconds on Windows after final test correction |
+| `uv run pytest tests/unit -q` | 461 passed, 36 POSIX-only skips, 28.48 seconds |
+| `uv run ruff check apps/api tests tools/phase1*.py tools/phase2*.py` | Passed |
+| `uv run ruff format --check apps/api tests tools/phase1*.py tools/phase2*.py` | 94 files already formatted |
+| `uv run mypy` | Passed, 53 source files |
+| `uv run python tools/phase1_contracts.py --check` | Passed; public API unchanged |
+| `uv run python tools/phase2_contracts.py --check` | Passed; accepted production/v1 schemas unchanged |
+| `uv run python tools/phase2_v2_contracts.py --check` | Passed; nine schemas including unchanged 2.0 score/aggregate |
+| `uv run python tools/check_docs.py` | Passed; local links, contracts and phase controls checked |
+| `uv run python tools/cost_model.py --check` | Passed; no spending or cost assumptions changed |
+| `uv run python -m unittest discover -s tools -p 'test_*.py' -v` | 32 passed, 0.790 seconds |
+| `uv run pip-audit --local` | No known vulnerabilities; local RepoVox package is not a PyPI-audited package |
+| `uv run python tools/phase2_corpus.py docs/ai/evaluation-corpus.manifest.json` | UNFROZEN, zero approved/human-reviewed families |
+| `uv run python tools/phase2_preparation.py --catalog docs/ai/evaluation-candidates.json --manifest docs/ai/evaluation-corpus.manifest.json --output docs/ai/evaluation-readiness.json --check` | Passed; readiness bytes and official gates unchanged |
+
+Isolated Linux commands, using only the existing disposable synthetic test project:
+
+```powershell
+docker compose -p repovox-test -f docker-compose.yml -f .artifacts/phase2-ports.yml stop api worker dispatcher
+docker compose -p repovox-test -f docker-compose.yml -f .artifacts/phase2-ports.yml up -d --build postgres redis storage storage-init migrate
+docker compose -p repovox-test -f docker-compose.yml -f .artifacts/phase2-ports.yml run --rm --no-deps --build tests
+docker compose -p repovox-test -f docker-compose.yml -f .artifacts/phase2-ports.yml run --rm --no-deps --build tests pytest tests/unit/test_evaluation_v2_corrections.py -q
+docker compose -p repovox-test -f docker-compose.yml -f .artifacts/phase2-ports.yml run --rm --no-deps --user 0 --cap-add SETUID --cap-add SETGID --cap-add CHOWN tests python tools/phase2_v2_storage_probe.py
+docker compose -p repovox-test -f docker-compose.yml -f .artifacts/phase2-ports.yml start api worker dispatcher
+```
+
+The complete Linux suite passed **523 tests, 2 Windows-only skips**, 104.91 seconds,
+including all 28 integration tests and existing v1 compatibility/custody regressions.
+After the last test-only lineage and newline portability refinements, the rebuilt
+Linux correction suite passed **38**, 0.64 seconds. The private-storage probe returned
+OS_DENIED for worker UID 10001, custodian UID 10002, directory 0700/file 0600.
+Services were restored after the isolated run. Frontend source and diagrams are
+unchanged; final-head CI repeats frontend, browser/runtime, migration, both storage
+probes, dependency audits and complete-history secret scanning.
+
+Development failures were corrected without weakening checks: the initial empty-target
+fixture changed line bounds without updating its support citation and correctly failed
+the existing support check; the fixture now keeps that support consistent to isolate
+emptiness. Initial Ruff line lengths and a later docstring blank line were formatted.
+A raw checkout-byte schema hash was replaced with the unchanged Git LF-byte commitment
+to make the preservation check portable. The first standalone reproduction used a body
+with incorrect line numbering and failed the original-line check; rerunning with the
+actual synthetic original bytes reproduced acceptance. Skips are not counted as passes;
+existing deprecation warnings remain visible.
+
+### Scope, attribution and limits
+
+At 13:55 UTC, the intended public Git index was exported with
+`git checkout-index --all --prefix=$correctionScanPrefix` into an OS temporary
+directory outside Git. `docker run --rm -v "${correctionScanRoot}:/scan:ro" zricethezav/gitleaks:v8.30.0 dir /scan --redact --exit-code 1`
+scanned 2.25 MB and reported no leaks. `git diff --cached --check` passed.
+No private custodian directory was included in the scan.
+
+The corrective diff is limited to offline v2 evaluation, an explicit legacy v2 report
+reader, two new schemas, synthetic regressions and documentation. No v1 evaluator,
+production schema, migration, dependency, official manifest/readiness, historical gold,
+A/B packet, custodian commitment or 0/84 result was modified or rescored. No protected
+historical material was opened. No new acquisition/pilot/Phase 3, model work, deployment,
+paid service or merge occurred. Rollback stops corrected offline scoring; immutable
+original reports and the old schema/readers remain available for archival inspection.
+
+Effective Git identity, GitHub account association and full author/committer/messages
+are audited before the corrective commit and reviewer handoff. The owner's existing
+Stevemeg identity is retained without assistant/bot trailers or history rewriting.
+The trusted operator still verifies actual source/rights and pre/post-reveal capture
+context; local metadata does not authenticate provider identity or semantic entailment.
+The explicit eligibility rule prevents qualifying a declared post-reveal revision;
+it cannot detect a custodian falsely attesting chronology. Independent re-review is
+required. Official EVAL-ENTRY remains UNFROZEN with unchanged human-review blockers.

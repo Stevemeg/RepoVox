@@ -1,6 +1,6 @@
 # Independent source-fact 2.0 evaluation specification
 
-Version: `exact-v2-1.0`. Status: proposed for independent review, 2026-10-15.
+Version: `exact-v2-1.1` (review corrections C-02/C-03/C-04). Status: proposed for independent review, 2026-10-15.
 This is offline AI_AUDITED_EXPLORATORY infrastructure. It cannot admit official
 gold, freeze splits, authenticate a human review or certify production accuracy.
 
@@ -11,8 +11,20 @@ gold, freeze splits, authenticate a human review or certify production accuracy.
 | `evaluation-source-scope-2.0` | Tenant/family, repository/full SHA, owner binding, permitted original files/hash/language/byte windows, rights and acquisition evidence commitments |
 | `gold-evaluation-2.0` | Independently authored canonical assertions, expected verdicts, entailment judgments, partial/complete scope, limitations, provenance and revision lineage |
 | `evaluation-prediction-2.0` | Previously committed facts, copied ledger verdicts or explicit unknowns, original analysis hash, engineering commit and projection version |
-| `evaluation-score-2.0` | Exact alignment rows, integer counts, ratios, unknowns, commitments, completeness and unpaired diagnostics |
-| `evaluation-aggregate-2.0` | Micro-count totals, constituent report commitments and per-family completeness |
+| `evaluation-score-2.1` | Exact alignment rows, integer counts, ratios, unknowns, commitments, completeness and unpaired diagnostics |
+| `evaluation-aggregate-2.1` | Micro-count totals, constituent report commitments and per-family completeness |
+
+Score/aggregate 2.0 schemas remain byte-identical. Explicit archival readers are
+`evaluation.scoring_v20.Score` and `Aggregate`; their old recomputation preserves
+the original labels and limitations, including the reviewed precision and revision
+eligibility defects. They expose no scoring/aggregation entrypoint and cannot
+qualify a new blind result. Current `scoring_v2` emits only 2.1 reports and rejects
+2.0/mixed reports for aggregation. There is no implicit conversion or historical
+rescore. References, predictions and source-scope inputs remain 2.0; stricter
+nonempty-byte checks reject invalid evidence without changing canonical semantics,
+production models or input schema shape. Previously valid nonempty inputs retain
+their interpretation. JSON Schema cannot express relative start/end comparisons;
+the normative model and source validators enforce these conditions.
 
 Published schemas are named after these versions under `docs/ai/`. Schema shape,
 cross-field validation, original-byte validation and semantic review are separate
@@ -90,7 +102,14 @@ pilot scopes. This phase generates no actual pilot predictions.
 References and predictions bind to the same tenant, family, repository, full
 commit and exact scope bytes. Every endpoint/support citation must lie within
 selected scope and use the complete original-file checksum. Byte ranges must be
-UTF-8 boundaries with matching original inclusive line numbers. Line-only support
+nonempty (`0 <= start_byte < end_byte <= file_size`) UTF-8 boundaries with
+matching original inclusive line numbers. Windows reject empty spans on model
+validation. The evaluation fact profile rejects empty subject/target spans without
+changing production `SemanticSymbol`. Original-source range checks independently
+reject emptiness, including constructed/mutated model inputs and line-only support
+for the empty trailing line. Zero-length files cannot supply an evidence window.
+Nonempty spans ending exactly at EOF remain valid; offsets inside UTF-8 code points
+and contradictory line numbers reject. Line-only support
 must fit fully selected lines; a partial-byte window cannot authorize an entire
 excluded line. Symlinked source paths/ancestors and paths escaping source are
 rejected. All source is secret-screened without execution.
@@ -127,10 +146,24 @@ complete unmatched fact and its own ID. Duplicate identities reject the input.
 | Unsupported rejection recall | Both unsupported on exact pairs / all reference unsupported assertions |
 | Unscored predictions | Unmatched predictions plus matches with either verdict unknown |
 | Unscored verified | Verified predictions without a known matching judgment; unprojected verified claims are separately counted |
-| Graph/syntax/entrypoint correspondence | Exact matches to supported annotations / predictions and / supported annotations, respectively |
+| Per-category `*_supported_overlap_fraction` | Supported exact overlap / all category predictions; diagnostic correspondence, never independent precision |
+| Per-category `*_reviewed_predictions` | Predictions with an exact reference match, a known expected status and a known evidence-entailment judgment |
+| Per-category `*_independently_reviewed_precision` | Supported exact matches / all category predictions, only when every prediction in that denominator has an explicit independent judgment; otherwise null |
+| Per-category `*_recall_against_annotated_subset` | Supported exact overlap / supported category annotations; omissions concern declared annotation scope only |
 | Missing/additional structure | Set differences against supported reference subset; additional does not mean false positive |
 | Evidence entailment | Supported/unsupported independent judgments on exact pairs; other predictions remain unreviewed |
 | Unscored reference observations | Retained semantic/runtime observations; never dropped or promoted to atomic correctness |
+
+For syntax, relationship and entrypoint precision, `*_reviewed_predictions` must
+equal `*_predicted` and the latter must be nonzero. A partial reference may meet
+this condition for all predictions while still lacking complete gold coverage;
+that does not make formal acceptance complete. Unmatched predictions and unknown
+reference statuses/evidence make that category's precision undefined. One supported
+match with 99 additional unreviewed predictions yields overlap `0.01`, reviewed
+count 1, prediction count 100 and measured precision `null`, not 1% precision.
+Known unsupported matched assertions remain in a reviewed denominator with no
+supported numerator credit. Precision does not require a known prediction verdict;
+it measures independently judged source assertions, not verdict correctness.
 
 Zero denominators yield JSON `null`. Percentages are never averaged. Verdict
 histograms include all five statuses. Source commit/hash/range/scope checks are
@@ -140,7 +173,19 @@ entrypoint-target differences are unpaired diagnostics requiring independent
 review, not confirmed error counts. Ambiguous diagnostic correspondence is
 omitted rather than arbitrarily paired. Exact matching remains unchanged.
 
-Pairing is COMPLETE only for complete annotation scope, a nonempty 100% pairing
+Every 2.1 report has a machine-readable `eligibility` object:
+`diagnostic_only`, `blind_result_eligible`, and `reasons`. A
+`post_reveal_correction` always sets diagnostic-only true, blind eligibility false,
+and completeness/acceptance INCOMPLETE with reason `post_reveal_diagnostic_only`,
+even if all canonical facts pair and all judgments agree. Disagreement counts,
+false-verification counts, exact rows and revision commitments remain available as
+diagnostics. Descendants of a post-reveal revision cannot regress to source-only
+context. A source-only correction may remain a blind-review candidate only with
+validated lineage/approval and every existing completeness gate satisfied. This
+flag is an origin/completeness eligibility condition, never proof of authenticated
+review, semantic correctness or official independent acceptance.
+
+Pairing is COMPLETE only for eligible pre-reveal context, complete annotation scope, a nonempty 100% pairing
 in both directions, known verdicts/evidence judgments, no unprojected claims and
 no reference observations awaiting semantic review.
 Any failure makes formal acceptance INCOMPLETE, including perfect pairing to a
@@ -151,7 +196,13 @@ relative to declared scope, never implicitly the whole repository.
 Reports recompute counts, ratios, alignment completeness and diagnostics on
 validation. Aggregation verifies each retained report hash/version and recomputed
 content, rejects duplicate families/snapshots and cross-tenant inputs, sums integer
-counts and recomputes ratios. An incomplete family makes the aggregate incomplete;
+counts and recomputes ratios. Aggregate precision remains null if any constituent
+has unreviewed predictions in that category; reviewed and total counts are summed,
+not averaged or restricted to successful families. All post-reveal counts remain
+visible as diagnostics. If any family is diagnostic-only, the aggregate is also
+diagnostic-only and cannot qualify as a blind result. Per-family eligibility is
+retained, and aggregate blind eligibility requires every family to be eligible.
+An incomplete family makes the aggregate incomplete;
 rejected and review-required families remain visible. Empty aggregates are rejected.
 
 ## Independence and shared code

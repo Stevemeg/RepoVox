@@ -50,3 +50,16 @@ and scoring-time dependence on production extraction/verifier modules.
 Unpaired classification/category/target differences are diagnostics requiring
 independent adjudication. They are not fuzzy scoring pairs or confirmed errors.
 See the [normative contract](evaluation-v2.md) for denominators and boundaries.
+
+## Independent review regression matrix
+
+[Correction tests](../../tests/unit/test_evaluation_v2_corrections.py) add 38 cases:
+C-02 covers 1-of-100 overlap for all three structural categories, complete/partial
+scope, known/unknown independent denominators, unsupported judgments, weighted
+micro-aggregation and unknown propagation. C-03 covers empty windows at start,
+interior and EOF; empty subject/target spans at model and source boundaries;
+zero-length files; valid EOF/newline/multiline/UTF-8 ranges; split code points;
+incorrect byte/line pairs; and empty trailing-line citations. C-04 covers exact
+post-reveal pairing with agreement/disagreement, machine-readable eligibility,
+mixed aggregation, tampering, valid source-only revisions and context-regression
+rejection. Legacy readers/schema commitments verify the explicit version boundary.

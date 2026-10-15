@@ -19,8 +19,8 @@ to locate the positive, negative, unknown and tampered fixtures. Public code:
 
 Published contracts: [reference](../ai/gold-evaluation-2.0.schema.json),
 [prediction](../ai/evaluation-prediction-2.0.schema.json),
-[score](../ai/evaluation-score-2.0.schema.json), and
-[aggregate](../ai/evaluation-aggregate-2.0.schema.json).
+[score](../ai/evaluation-score-2.1.schema.json), and
+[aggregate](../ai/evaluation-aggregate-2.1.schema.json).
 
 Independently inspect:
 
@@ -45,3 +45,18 @@ Use the public synthetic tests and source diff; private historical packets are
 unnecessary. Report defects with independent minimal synthetic reproductions.
 Passing tests is machinery conformance under tested conditions, not repository
 accuracy, human-reviewed gold, production certification or new-pilot approval.
+
+## C-02/C-03/C-04 re-review
+
+Review the corrective follow-up to `ce703aa349d13d615391bea16241df33d49bd664`;
+the draft PR body records the exact corrective head and final-head CI. Run
+`uv run pytest tests/unit/test_evaluation_v2_corrections.py -q` and inspect its
+source-only synthetic expectations. Verify the 1-of-100 overlap versus undefined
+precision, known unsupported/unknown denominators, weighted micro-aggregation,
+empty evidence at ordinary/EOF/UTF-8/zero-file boundaries, valid original ranges,
+and complete post-reveal pairing remaining diagnostic-only. Mixed-family
+aggregates must preserve this limitation and disagreements; descendants cannot
+relabel post-reveal lineage as source-only. The explicit archival 2.0 readers
+preserve original report interpretation but cannot enter corrected aggregation.
+The legacy 2.0 schemas remain unchanged. See the verification report's correction
+section for before/after evidence, commands and actual outcomes.

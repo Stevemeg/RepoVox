@@ -1,0 +1,158 @@
+{
+  "$defs": {
+    "Eligibility": {
+      "additionalProperties": false,
+      "description": "Origin/completeness eligibility, never independent acceptance or authentication.",
+      "properties": {
+        "blind_result_eligible": {
+          "title": "Blind Result Eligible",
+          "type": "boolean"
+        },
+        "diagnostic_only": {
+          "title": "Diagnostic Only",
+          "type": "boolean"
+        },
+        "reasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reasons",
+          "type": "array"
+        }
+      },
+      "required": [
+        "diagnostic_only",
+        "blind_result_eligible",
+        "reasons"
+      ],
+      "title": "Eligibility",
+      "type": "object"
+    },
+    "Policy": {
+      "additionalProperties": false,
+      "properties": {
+        "independently_human_reviewed": {
+          "const": false,
+          "default": false,
+          "title": "Independently Human Reviewed",
+          "type": "boolean"
+        },
+        "official_eval_entry_contribution": {
+          "const": false,
+          "default": false,
+          "title": "Official Eval Entry Contribution",
+          "type": "boolean"
+        },
+        "production_certification": {
+          "const": false,
+          "default": false,
+          "title": "Production Certification",
+          "type": "boolean"
+        },
+        "track": {
+          "const": "AI_AUDITED_EXPLORATORY",
+          "default": "AI_AUDITED_EXPLORATORY",
+          "title": "Track",
+          "type": "string"
+        },
+        "training_authorized": {
+          "const": false,
+          "default": false,
+          "title": "Training Authorized",
+          "type": "boolean"
+        }
+      },
+      "title": "Policy",
+      "type": "object"
+    }
+  },
+  "$id": "https://repovox.invalid/contracts/evaluation-aggregate-2.1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "acceptance_status": {
+      "enum": [
+        "INCOMPLETE",
+        "REVIEW_REQUIRED",
+        "REJECTED"
+      ],
+      "title": "Acceptance Status",
+      "type": "string"
+    },
+    "counts": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "title": "Counts",
+      "type": "object"
+    },
+    "eligibility": {
+      "$ref": "#/$defs/Eligibility"
+    },
+    "families": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Families",
+      "type": "array"
+    },
+    "limitations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Limitations",
+      "type": "array"
+    },
+    "policy": {
+      "$ref": "#/$defs/Policy"
+    },
+    "ratios": {
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "title": "Ratios",
+      "type": "object"
+    },
+    "report_sha256": {
+      "items": {
+        "pattern": "^[a-f0-9]{64}$",
+        "type": "string"
+      },
+      "title": "Report Sha256",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "evaluation-aggregate-2.1",
+      "default": "evaluation-aggregate-2.1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "tenant_id": {
+      "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+      "title": "Tenant Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "acceptance_status",
+    "counts",
+    "eligibility",
+    "families",
+    "limitations",
+    "policy",
+    "ratios",
+    "report_sha256",
+    "schema_version",
+    "tenant_id"
+  ],
+  "title": "Aggregate",
+  "type": "object"
+}

@@ -1,4 +1,7 @@
-"""Exact, independently judged v2 comparison; no analyzer/verifier invocation."""
+"""Exact 2.1 reports; 2.0 archival readers live in scoring_v20.
+
+No analyzer/verifier invocation determines independent correctness.
+"""
 
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -118,10 +121,17 @@ def metrics(
         counts[category + "_matched_supported"] = len(supported & actual)
         counts[category + "_missing_supported"] = len(supported - actual)
         counts[category + "_additional"] = len(actual - supported)
+        counts[category + "_reviewed_predictions"] = sum(
+            p.fact.category == category
+            and g.expected_status != "unreviewed"
+            and g.evidence_entailment != "unreviewed"
+            for g, p in pairs
+        )
     return {"counts": counts, "ratios": ratios(counts)}
 
 
 def ratios(c: dict[str, int]) -> dict[str, float | None]:
+    """Micro-count ratios; precision requires judgment of every predicted category member."""
     result = {
         "gold_matching_coverage": ratio(c["matched"], c["gold"]),
         "prediction_matching_coverage": ratio(c["matched"], c["predictions"]),
@@ -133,8 +143,13 @@ def ratios(c: dict[str, int]) -> dict[str, float | None]:
         "unsupported_rejection_recall": ratio(c["unsupported_rejections"], c["gold_unsupported"]),
     }
     for category in ["syntax", "relationship", "entrypoint"]:
-        result[category + "_precision_against_annotated_subset"] = ratio(
+        result[category + "_supported_overlap_fraction"] = ratio(
             c[category + "_matched_supported"], c[category + "_predicted"]
+        )
+        result[category + "_independently_reviewed_precision"] = (
+            ratio(c[category + "_matched_supported"], c[category + "_predicted"])
+            if c[category + "_reviewed_predictions"] == c[category + "_predicted"]
+            else None
         )
         result[category + "_recall_against_annotated_subset"] = ratio(
             c[category + "_matched_supported"], c[category + "_gold_supported"]
@@ -147,8 +162,11 @@ def completeness(
     annotation_scope: str,
     unprojected: list[Unprojected],
     observations: list[Observation],
+    revision_context: str = "initial_blind",
 ) -> dict[str, Any]:
     reasons = []
+    if revision_context == "post_reveal_correction":
+        reasons.append("post_reveal_diagnostic_only")
     if annotation_scope != "complete":
         reasons.append("partial_reference_scope")
     if not rows or any(r.gold is None or r.prediction is None for r in rows):
@@ -224,9 +242,26 @@ def diagnostic_differences(rows: list[Row]) -> list[dict[str, str]]:
     return result
 
 
+class Eligibility(Record):
+    """Origin/completeness eligibility, never independent acceptance or authentication."""
+
+    diagnostic_only: bool
+    blind_result_eligible: bool
+    reasons: list[str]
+
+
+def eligibility(revision_context: str, state: dict[str, Any]) -> Eligibility:
+    return Eligibility(
+        diagnostic_only=revision_context == "post_reveal_correction",
+        blind_result_eligible=state["pairing_status"] == "COMPLETE"
+        and revision_context != "post_reveal_correction",
+        reasons=state["incomplete_reasons"],
+    )
+
+
 class Score(Record):
-    schema_version: Literal["evaluation-score-2.0"] = "evaluation-score-2.0"
-    scorer_version: Literal["exact-v2-1.0"] = "exact-v2-1.0"
+    schema_version: Literal["evaluation-score-2.1"] = "evaluation-score-2.1"
+    scorer_version: Literal["exact-v2-1.1"] = "exact-v2-1.1"
     policy: Policy
     tenant_id: ID
     family_id: ID
@@ -248,6 +283,7 @@ class Score(Record):
     limitations: list[str] = Field(min_length=1)
     summary: dict[str, Any]
     completeness: dict[str, Any]
+    eligibility: Eligibility
     diagnostics: list[dict[str, str]]
 
     @model_validator(mode="after")
@@ -294,7 +330,9 @@ class Score(Record):
                 self.annotation_scope,
                 self.unprojected_claims,
                 self.reference_observations,
+                self.revision_context,
             )
+            or self.eligibility != eligibility(self.revision_context, self.completeness)
             or self.diagnostics != diagnostic_differences(self.rows)
         ):
             raise ValueError("v2_report_recomputation_mismatch")
@@ -359,6 +397,9 @@ def score(
     rows = [
         Row(gold=gmap.get(k), prediction=pmap.get(k)) for k in sorted(gmap.keys() | pmap.keys())
     ]
+    state = completeness(
+        rows, ref.annotation_scope, pred.unprojected_claims, ref.observations, ref.revision_context
+    )
     return Score(
         policy=Policy(),
         tenant_id=scope.tenant_id,
@@ -388,15 +429,14 @@ def score(
             "No independent PASS, official corpus admission or statistical representativeness.",
         ],
         summary=metrics(rows, pred.unprojected_claims, ref.observations),
-        completeness=completeness(
-            rows, ref.annotation_scope, pred.unprojected_claims, ref.observations
-        ),
+        completeness=state,
+        eligibility=eligibility(ref.revision_context, state),
         diagnostics=diagnostic_differences(rows),
     )
 
 
 class Aggregate(Record):
-    schema_version: Literal["evaluation-aggregate-2.0"] = "evaluation-aggregate-2.0"
+    schema_version: Literal["evaluation-aggregate-2.1"] = "evaluation-aggregate-2.1"
     policy: Policy
     tenant_id: ID
     report_sha256: list[Hash]
@@ -404,6 +444,7 @@ class Aggregate(Record):
     counts: dict[str, int]
     ratios: dict[str, float | None]
     acceptance_status: Literal["INCOMPLETE", "REVIEW_REQUIRED", "REJECTED"]
+    eligibility: Eligibility
     limitations: list[str]
 
 
@@ -437,9 +478,15 @@ def aggregate(inputs: list[tuple[bytes, str]]) -> Aggregate:
                 "prediction_sha256": r.prediction_sha256,
                 "revision_context": r.revision_context,
                 **r.completeness,
+                "eligibility": r.eligibility.model_dump(mode="json"),
             }
             for r in reports
         ],
+        eligibility=Eligibility(
+            diagnostic_only=any(r.eligibility.diagnostic_only for r in reports),
+            blind_result_eligible=all(r.eligibility.blind_result_eligible for r in reports),
+            reasons=sorted({reason for r in reports for reason in r.eligibility.reasons}),
+        ),
         counts=dict(counts),
         ratios=ratios(dict(counts)),
         acceptance_status="INCOMPLETE"
