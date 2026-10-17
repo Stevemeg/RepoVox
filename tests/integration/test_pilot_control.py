@@ -214,6 +214,218 @@ def test_pending_and_already_published_events_after_abort(cp, orchestrator):
     assert cp.hub.calls == 0
 
 
+@pytest.mark.parametrize(
+    "ineligible",
+    [
+        "future",
+        "published",
+        "running",
+        "pending",
+        "expired",
+        "canceled",
+        "cross_attempt",
+        "mismatched_stage",
+        "terminal_job",
+    ],
+)
+def test_publication_rechecks_event_eligibility(cp, ineligible):
+    notification = cp.worker.deliveries(cp.attempt, 1)[0]
+    eid = notification["event_id"]
+    if ineligible == "running":
+        assert cp.worker.claim(cp.stage, cp.attempt, 1, cp.manifest.sha256, "sample")
+    elif ineligible in {"future", "published"}:
+        column = "due_at" if ineligible == "future" else "published_at"
+        value = "clock_timestamp()+interval '1 hour'" if ineligible == "future" else "now()"
+        with cp.admin.begin() as c:
+            c.execute(text(f"UPDATE outbox_events SET {column}={value} WHERE id=:id"), {"id": eid})
+    elif ineligible == "expired":
+        # Disposable-admin clock fixture only. Runtime logins cannot bypass the
+        # immutable-attempt trigger; SET LOCAL is rolled back/reset on exit.
+        with cp.admin.begin() as c:
+            c.execute(text("SET LOCAL session_replication_role=replica"))
+            c.execute(
+                text("UPDATE pilot_attempts SET expires_at=now()-interval '1 second' WHERE id=:id"),
+                {"id": cp.attempt},
+            )
+        assert cp.control.status(A, cp.attempt)["state"] == "ACTIVE"
+    elif ineligible == "canceled":
+        cp.control.invalidate(A, cp.attempt, 1)
+    elif ineligible == "cross_attempt":
+        other = uuid4()
+        cp.control.register(A, other, cp.manifest)
+        pid = UUID(project(cp.clients[0], "Synthetic cross-attempt notification"))
+        assert cp.control.admit(A, other, 1, "sample", pid, cp.snapshot)
+    elif ineligible in {"pending", "mismatched_stage"}:
+        sid = cp.job["stages"][2]["id"]
+        if ineligible == "mismatched_stage":
+            other_job = admit(cp.clients[0], project(cp.clients[0], "Synthetic other stage"))
+            sid = other_job["stages"][1]["id"]
+        with cp.admin.begin() as c:
+            c.execute(
+                text("UPDATE outbox_events SET stage_id=:sid WHERE id=:id"), {"sid": sid, "id": eid}
+            )
+    elif ineligible == "terminal_job":
+        with cp.admin.begin() as c:
+            c.execute(
+                text("SELECT rv.end_job(:id,'failed','synthetic_terminal')"),
+                {"id": cp.job["id"]},
+            )
+        assert cp.control.status(A, cp.attempt)["state"] == "ACTIVE"
+    with cp.admin.connect() as c:
+        before = c.scalar(text("SELECT published_at FROM outbox_events WHERE id=:id"), {"id": eid})
+    with cp.worker.engine.begin() as c:
+        published = c.scalar(
+            text("SELECT rv.pilot_published(:event,:attempt,1)"),
+            {"event": eid, "attempt": other if ineligible == "cross_attempt" else cp.attempt},
+        )
+    with cp.admin.connect() as c:
+        after = c.scalar(text("SELECT published_at FROM outbox_events WHERE id=:id"), {"id": eid})
+    assert (published, after) == (False, before)
+    assert cp.hub.calls == 0
+
+
+def test_concurrent_publication_marks_event_once(cp):
+    eid = cp.worker.deliveries(cp.attempt, 1)[0]["event_id"]
+    barrier = threading.Barrier(2)
+
+    def publish():
+        with cp.worker.engine.begin() as c:
+            pid = c.scalar(text("SELECT pg_backend_pid()"))
+            barrier.wait(timeout=5)
+            result = c.scalar(
+                text("SELECT rv.pilot_published(:event,:attempt,1)"),
+                {"event": eid, "attempt": cp.attempt},
+            )
+            return pid, result
+
+    with ThreadPoolExecutor(2) as pool:
+        results = list(pool.map(lambda _: publish(), range(2)))
+    assert len({pid for pid, _ in results}) == 2
+    assert sum(result for _, result in results) == 1
+    with cp.admin.connect() as c:
+        assert c.scalar(
+            text("SELECT published_at IS NOT NULL FROM outbox_events WHERE id=:id"), {"id": eid}
+        )
+        assert (
+            c.scalar(text("SELECT count(*) FROM job_attempts WHERE stage_id=:id"), {"id": cp.stage})
+            == 0
+        )
+
+
+def test_concurrent_publication_delivery_executes_one_stage(cp):
+    notification = cp.worker.deliveries(cp.attempt, 1)[0]
+    barrier = threading.Barrier(2)
+
+    def before_publish(conn, cursor, statement, parameters, context, executemany):
+        if statement.startswith("SELECT rv.pilot_published("):
+            barrier.wait(timeout=5)  # Both observed the same eligible notification.
+
+    def deliver():
+        return cp.worker.deliver(
+            notification["event_id"], cp.stage, cp.attempt, 1, cp.manifest.sha256, "sample"
+        )
+
+    event.listen(cp.worker.engine, "before_cursor_execute", before_publish)
+    try:
+        with ThreadPoolExecutor(2) as pool:
+            results = list(pool.map(lambda _: deliver(), range(2)))
+    finally:
+        event.remove(cp.worker.engine, "before_cursor_execute", before_publish)
+    assert sum(results) == 1 and cp.hub.calls == 1
+    with cp.admin.connect() as c:
+        assert (
+            c.scalar(text("SELECT attempt_count FROM job_stages WHERE id=:id"), {"id": cp.stage})
+            == 1
+        )
+        assert (
+            c.scalar(
+                text("SELECT count(*) FROM knowledge_artifacts WHERE job_id=:id"),
+                {"id": cp.job["id"]},
+            )
+            == 1
+        )
+
+
+@pytest.mark.parametrize("changed", ["due_at", "published_at", "attempt_expiry"])
+def test_publication_rechecks_after_event_lock_wait(cp, changed):
+    import time
+
+    eid = cp.worker.deliveries(cp.attempt, 1)[0]["event_id"]
+    entered = threading.Event()
+    backend = []
+    if changed == "attempt_expiry":
+        # Shorten only the synthetic fixture's clock, not runtime authorization.
+        with cp.admin.begin() as c:
+            c.execute(text("SET LOCAL session_replication_role=replica"))
+            c.execute(
+                text(
+                    "UPDATE pilot_attempts SET expires_at=clock_timestamp()+interval '3 seconds' "
+                    "WHERE id=:id"
+                ),
+                {"id": cp.attempt},
+            )
+
+    def publish():
+        with cp.worker.engine.begin() as c:
+            backend.append(c.scalar(text("SELECT pg_backend_pid()")))
+            entered.set()
+            return c.scalar(
+                text("SELECT rv.pilot_published(:event,:attempt,1)"),
+                {"event": eid, "attempt": cp.attempt},
+            )
+
+    # An independent transaction changes the event after listing, holds its row,
+    # and commits only after PostgreSQL reports the publication is waiting on a lock.
+    with cp.admin.connect() as blocker, ThreadPoolExecutor(1) as pool:
+        transaction = blocker.begin()
+        try:
+            if changed == "attempt_expiry":
+                # No new tuple: time must be rechecked even without EvalPlanQual.
+                blocker.execute(
+                    text("SELECT id FROM outbox_events WHERE id=:id FOR UPDATE"), {"id": eid}
+                )
+            else:
+                value = "clock_timestamp()+interval '1 hour'" if changed == "due_at" else "now()"
+                blocker.execute(
+                    text(f"UPDATE outbox_events SET {changed}={value} WHERE id=:id"), {"id": eid}
+                )
+            pending = pool.submit(publish)
+            assert entered.wait(5)
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                with cp.admin.connect() as observer:
+                    waiting = observer.scalar(
+                        text("SELECT wait_event_type='Lock' FROM pg_stat_activity WHERE pid=:pid"),
+                        {"pid": backend[0]},
+                    )
+                if waiting:
+                    break
+                time.sleep(0.01)
+            assert waiting, "Publication must reach the held event row"
+            if changed == "attempt_expiry":
+                blocker.execute(
+                    text(
+                        "SELECT pg_sleep(greatest(0,extract(epoch FROM "
+                        "(expires_at-clock_timestamp()))+0.02)) FROM pilot_attempts WHERE id=:id"
+                    ),
+                    {"id": cp.attempt},
+                )
+            expected = blocker.scalar(
+                text("SELECT published_at FROM outbox_events WHERE id=:id"), {"id": eid}
+            )
+            transaction.commit()
+            assert pending.result(timeout=5) is False
+        finally:
+            if transaction.is_active:
+                transaction.rollback()
+    with cp.admin.connect() as c:
+        assert (
+            c.scalar(text("SELECT published_at FROM outbox_events WHERE id=:id"), {"id": eid})
+            == expected
+        )
+    assert cp.hub.calls == 0
+
+
 def test_two_workers_only_one_claim(cp):
     barrier = threading.Barrier(2)
 

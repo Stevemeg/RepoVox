@@ -141,3 +141,71 @@ authorization expiry is not a renewable controller heartbeat. In-flight network/
 effects are not instantly reversible; no accepted pointer may publish after cancellation.
 Physical quiescence is separate from durable invalidation. Independent review is required
 before any future owner decision on execution or reuse of retained packets.
+
+## CP-03 focused correction
+
+Independent review identified missing event-level eligibility in `rv.pilot_published`
+at `e97548769b21f9484a095168e78348678d458d7d`. Local/remote branch and PR 8 were
+verified at that exact head, still draft/unmerged against accepted `711184e`.
+No analyzer/scorer or evaluation-contract change is included in this correction.
+
+Reproduction used only fresh disposable Compose project
+`repovox-cp03-8f5f4fe0d64e`, independent credentials and ordinary built images, with
+no incident-project or custodian mount. Command outputs, stderr, exit codes and UTC
+timestamps remain in an owner-only engineering directory outside Git.
+
+- Original three regressions (`future`, `published`, `running`): **3 expected
+  failures**, 3.84 seconds, completed 2026-10-17 11:22:09 UTC. The reviewed function
+  incorrectly returned true for all three.
+- Expanded committed-readback reproduction against that original database function:
+  **6 expected failures, 3 passed**, 22.93 seconds, completed 2026-10-17
+  11:24:39 UTC. Future/running/pending/mismatched-stage/terminal-job events acquired
+  publication timestamps; an already-published event incorrectly reported a new
+  publication. Canceled, expired and cross-attempt negative controls passed.
+  The test commits the call before checking both result and stored timestamp.
+- Exact reproduction command: `docker compose -p repovox-cp03-8f5f4fe0d64e --env-file PRIVATE_TEST_ENV -f docker-compose.yml run --rm --no-deps tests pytest -q tests/integration/test_pilot_control.py -k publication_rechecks_event_eligibility --tb=short`.
+- One rebuild failed with a GHCR TLS handshake timeout at 2026-10-17 11:26:40 UTC,
+  before the migration/test commands. An identical build succeeded at 11:27:31 UTC;
+  no image/tool version was substituted. Both outcomes and stderr are preserved.
+- Corrected focused run: **14 passed, 29 deselected**, 22.17 seconds, completed
+  **2026-10-17 11:28:25 UTC**. Command:
+  `docker compose ... run --rm --no-deps tests pytest -q tests/integration/test_pilot_control.py -k "publication_rechecks or concurrent_publication" --tb=short`.
+- Final full regression: **580 passed, 2 skipped**, 346 warnings, **193.07 seconds**,
+  completed **2026-10-17 11:31:47 UTC**. Command:
+  `docker compose ... run --rm --no-deps tests pytest -q --tb=short`.
+  This includes all 57 control-plane/scope cases against the accepted base, real
+  READ COMMITTED concurrency/roles, migration upgrade/rollback guards, ordinary SaaS,
+  historical v1/v2 contracts/scorers and source-provenance/security regressions.
+  Both skips are explicitly Windows-only checks; they are not counted as passing.
+- Ruff lint/format (102 files), mypy (57 source files), documentation and all three
+  phase contract checks passed. One initial long test SQL literal was split to meet
+  the unchanged Ruff limit. The SQL diff audit confirms only `rv.pilot_published`
+  changed; all other procedures, schema definitions and grants are identical.
+
+The database correction touches only `rv.pilot_published`. Locks follow owner quota,
+attempt, job, stage, event order. State/association/readiness are checked under these
+locks; the conditional update rechecks current event identity, null publication,
+due time and live attempt/job deadlines. Explicitly acquiring the event lock before
+the time predicate also covers a `SELECT FOR UPDATE` holder that creates no new
+tuple while authorization expires. True means exactly one new publication; false
+preserves an existing timestamp. The independent stage claim remains mandatory.
+Ordinary outbox delegates and all grants/signatures are unchanged.
+
+Migration 0004 is corrected in place because it remains an unmerged, undeployed
+draft used only in disposable environments. No 0005 is needed for this authorized
+scope. Previously applied draft databases require recreation or a separately
+reviewed forward migration; `upgrade head` alone cannot reload edited SQL. For this
+test database only, reproduction logs were preserved, synthetic fixture rows reset,
+and empty-ledger downgrade/re-upgrade applied the corrected SQL. The existing
+populated-ledger refusal remains part of the required regression suite.
+
+Fourteen new PostgreSQL cases cover nine eligibility negatives, two concurrent
+publication/delivery scenarios and three observed lock-wait races. Expiry clock
+fixtures use disposable-administrator transaction-local replication mode; no runtime
+role, trigger or production permission is changed. The expiry race waits for the
+actual shortened fixture deadline while publication is blocked on an unchanged
+event tuple. No runtime timeouts or resource limits are relaxed.
+
+The exact final-head CI run and attribution/secret-scan audit are recorded in the
+PR before the independent re-review handoff. Existing local/CI results above describe the
+original correction and are not substituted for CP-03 final-head verification.

@@ -48,8 +48,9 @@ those materials were used in tests.
 
 All cases below use synthetic source, new test credentials and disposable services.
 The integration file linked above contains the named tests; scope negatives and
-rollback live in their separately linked files. The suite collects 43 new cases
-(13 scope unit cases and 30 database/broker/migration cases).
+rollback live in their separately linked files. The original correction contributed
+43 cases (13 scope unit cases and 30 database/broker/migration cases). CP-03 adds
+14 PostgreSQL publication cases, for 57 cases against the accepted engineering base.
 
 | Required scenario | Test or tests | Observable requirement |
 | --- | --- | --- |
@@ -78,6 +79,32 @@ The real Celery case explicitly seeds and asserts the legacy `retry_wait` state 
 a timed-out synthetic request, durably aborts before restoration, then delivers the
 original outbox stage notification to the restored worker. That single scenario
 reproduces the incident sequence without a second analysis stage or real repository.
+
+## CP-03 focused re-review
+
+Inspect `rv.pilot_published` and the `publication` tests in the linked integration
+file. The reviewed head returned true and committed timestamps for future-due and
+stale-stage events; it also reported already-published rows as new publications.
+The correction preserves the function signature/grants and ordinary outbox delegates.
+
+Nine negative cases cover future-due, already-published, running/pending stages,
+expired/canceled attempts, cross-attempt events, mismatched job/stage identity and
+terminal jobs. Three independent PostgreSQL lock-wait cases change due time,
+publication state or let authorization expire while a `SELECT FOR UPDATE` holder
+leaves the tuple unchanged. Two concurrent cases require exactly one new publication
+and exactly one actual synthetic acquisition/stage artifact. Listing alone never
+authorizes consumption. Existing cancellation, tenant/scope, ordinary SaaS and
+migration rollback/role proofs remain required.
+
+Expiry fixtures use disposable-administrator `SET LOCAL session_replication_role`
+only to advance synthetic authorization clocks. Runtime grants and immutable-state
+triggers remain unchanged; the setting resets with the fixture transaction. This
+does not authorize changing a real attempt or custody record.
+
+Migration 0004 is still an unmerged, undeployed draft and is corrected in place.
+Already-applied draft databases need recreation or a separately reviewed forward
+migration; `upgrade head` alone does not reload edited SQL. See the updated contract
+and verification report for the migration decision, reproduction and exact results.
 
 ## Limits and next gate
 

@@ -316,7 +316,7 @@ CREATE FUNCTION rv.pilot_delivery(aid uuid,gen bigint) RETURNS TABLE(event_id uu
 
 CREATE FUNCTION rv.pilot_published(eid uuid,aid uuid,gen bigint) RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER
  SET search_path=pg_catalog,public,rv AS $$
-DECLARE a pilot_attempts;
+DECLARE a pilot_attempts; notification outbox_events; j generation_jobs; s job_stages;
 BEGIN
  IF NOT pg_has_role(session_user,'rv_pilot_executor','member') THEN RAISE EXCEPTION 'pilot_unauthorized'; END IF;
  SELECT * INTO a FROM pilot_attempts WHERE id=aid AND owner_id=rv.owner();
@@ -325,9 +325,27 @@ BEGIN
  SELECT * INTO a FROM pilot_attempts WHERE id=aid FOR UPDATE;
  IF a.state<>'ACTIVE' OR a.generation<>gen OR a.expires_at<=clock_timestamp()
  THEN PERFORM rv.pilot_record(a,'delivery_denied'); RETURN false; END IF;
- UPDATE outbox_events e SET published_at=coalesce(published_at,clock_timestamp())
- FROM pilot_bindings b WHERE e.id=eid AND b.job_id=e.job_id AND b.attempt_id=aid;
- RETURN FOUND;
+ SELECT e.* INTO notification FROM outbox_events e JOIN pilot_bindings b ON b.job_id=e.job_id
+ WHERE e.id=eid AND e.owner_id=a.owner_id AND e.event_type='stage'
+ AND b.attempt_id=aid AND b.owner_id=a.owner_id AND b.generation=gen;
+ IF NOT FOUND THEN PERFORM rv.pilot_record(a,'delivery_denied'); RETURN false; END IF;
+ -- Match claim/completion lock order. Keep job/stage readiness stable until commit.
+ SELECT * INTO j FROM generation_jobs WHERE id=notification.job_id FOR UPDATE;
+ SELECT * INTO s FROM job_stages WHERE id=notification.stage_id AND job_id=j.id FOR UPDATE;
+ IF NOT FOUND OR j.state NOT IN ('queued','running') OR s.state<>'ready' OR s.attempt_count>=s.max_attempts
+ OR NOT EXISTS(SELECT 1 FROM projects WHERE id=j.project_id AND deleted_at IS NULL)
+ OR NOT EXISTS(SELECT 1 FROM quota_reservations WHERE job_id=j.id AND status='reserved')
+ THEN PERFORM rv.pilot_record(a,'delivery_ineligible',notification.stage_id); RETURN false; END IF;
+ -- Acquire the event lock before evaluating time predicates, even if its holder
+ -- only SELECTed FOR UPDATE and left the tuple unchanged while authorization expired.
+ PERFORM 1 FROM outbox_events WHERE id=eid FOR UPDATE;
+ -- Recheck current event identity/eligibility and time after all possible row waits.
+ UPDATE outbox_events e SET published_at=clock_timestamp()
+ WHERE e.id=eid AND e.owner_id=a.owner_id AND e.job_id=j.id AND e.stage_id=s.id AND e.event_type='stage'
+ AND e.published_at IS NULL AND e.due_at<=clock_timestamp()
+ AND a.expires_at>clock_timestamp() AND j.deadline>clock_timestamp();
+ IF NOT FOUND THEN PERFORM rv.pilot_record(a,'delivery_ineligible',s.id); RETURN false; END IF;
+ RETURN true;
 END $$;
 
 CREATE FUNCTION rv.pilot_status(aid uuid) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER

@@ -1,7 +1,8 @@
 # Pilot control-plane contract
 
 Version: `pilot-control-1.0`. Proposed for independent review; engineering only.
-Requirements: CP-01 durable cancellation; CP-02 mandatory source scope; existing
+Requirements: CP-01 durable cancellation; CP-02 mandatory source scope;
+CP-03 atomic outbox eligibility; existing
 N-01 evidence integrity and tenant/security/resource controls remain in force.
 
 ## Authorization and source manifest
@@ -55,6 +56,7 @@ reused for another pilot; it is preserved only as incident evidence.
 | Admit | Existing global admission advisory lock, owner quota, attempt; validated family/project/snapshot; original admission plus binding in one transaction | No runnable unbound pilot job; same-family replay returns only its original project/job |
 | Claim | Owner quota, attempt, then existing job/stage locks; role/owner/state/generation/hash/family/expiry checks | At most one lease and stage fence; no I/O on denial |
 | Receipt | Owner quota and attempt; current exact stage fence and manifest check | One immutable scope receipt for that lease |
+| Publish outbox notice | Owner quota, attempt, job, stage, then event row; recheck binding, readiness, unpublished/due status and current deadlines | True only for one eligible NULL-to-timestamp transition |
 | Publish result | Owner quota/attempt, then existing completion job/stage locks; valid lease and receipt required | Original upstream digest checks and artifact pointer publication remain atomic |
 | Invalidate | Owner quota, attempt, attached jobs in UUID order; ACTIVE/generation compare; existing terminalization revokes stage fences | Cohort INVALIDATED and generation incremented; accepted completed records remain unchanged |
 | Close | Owner quota/attempt; every approved family bound and stage 9 succeeded | EXECUTION_CLOSED, generation incremented; no evaluation acceptance claim |
@@ -99,10 +101,21 @@ normal error is transient. An expired running-stage lease or legacy `retry_wait`
 state is invalidated by reconciliation before ordinary retry promotion. Recovery
 retains source/outbox/audit records; it does not reopen terminal rows or drain queues.
 
-Ordinary outbox dispatch excludes pilot bindings. Dedicated delivery checks owner,
-attempt, generation and expiry, conditionally records publication, then independently
-claims the stage. Send/mark/claim races and duplicate notifications cannot bypass the
-claim gate. Rejection events record database actor, attempt/generation and stage;
+Ordinary outbox dispatch excludes pilot bindings. Dedicated listing is advisory;
+`rv.pilot_published` independently checks the authenticated owner, ACTIVE attempt,
+generation, binding and event/stage/job association. It holds quota/attempt/job/stage
+locks, requires a ready stage with remaining attempts, a queued/running job, an
+undeleted project and a reserved quota record, then locks the event before evaluating
+publication time. The conditional update requires `published_at IS NULL`, due time
+at or before the current clock and unexpired attempt/job deadlines. It rechecks event
+identity after locking. A lock holder that never changes the tuple must not bypass
+the time recheck. False denotes no new publication, including already-published
+events; previous timestamps remain unchanged. Rejections are audited.
+
+Publication and claim remain separate transactions. A successful mark is not a
+lease or a guarantee of execution; the independent claim gate still enforces quotas
+and fencing. Concurrent deliveries obtain at most one new mark and cannot bypass
+the claim gate. Rejection events record database actor, attempt/generation and stage;
 worker-name strings are never authority. Unknown IDs yield no runnable work.
 
 The authorization expires after 45 minutes without renewal. This is a maximum
@@ -130,6 +143,14 @@ authorized locally only for isolated disposable tests. Existing migration files 
 historical jobs/artifacts are unchanged. Empty-ledger rollback restores the original
 procedure definitions and removes new control objects; populated-ledger rollback
 fails without deleting lineage. Non-login group definitions remain owner-managed.
+
+CP-03 corrects the unmerged 0004 draft in place: no deployed/persistent migration
+was authorized, and previous 0004 environments were disposable. Its public function
+signature and grants are unchanged. An already-applied draft 0004 database will not
+be repaired by `alembic upgrade head`; recreate a disposable database or obtain a
+separately reviewed forward migration before any persistent use. No such persistent
+operation is performed here. Tests exercise fresh upgrade and empty-ledger rollback
+plus re-upgrade, retaining the populated-ledger rollback refusal.
 
 No control-plane test has a real custodian mount or real evaluation source. Source
 extraction/scoring, v1/v2 schemas, gold, official thresholds and historical comparison
