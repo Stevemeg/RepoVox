@@ -1,5 +1,12 @@
 # Persistence and job orchestration
 
+The proposed [pilot control-plane correction](../development/pilot-control-plane.md)
+adds migration 0004 only for separately authorized database scopes. Immutable attempt,
+binding, scope-receipt and audit metadata fence pilot admission, claims, recovery and
+publication. Ordinary jobs retain their existing path; protected evaluation data and
+private custody are not stored in these tables. See
+[ADR-0017](../adr/0017-pilot-control-plane-safety.md).
+
 Phase 2B offline candidate/review states and immutable approval lineage are described
 in [evaluation authoring](../development/evaluation-authoring.md) and
 [batches](../development/evaluation-batches.md). These do not create application routes,

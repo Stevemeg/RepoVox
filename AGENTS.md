@@ -12,6 +12,17 @@ RepoVox is solo-maintained by GitHub owner **Stevemeg**. Codex is the implementa
 
 ## No premature phase advancement
 
+The owner authorized the Phase 2C-E control-plane safety correction on 2026-10-16,
+stacked on accepted `711184e82128c7b0a6f3978cfc1cf13975db39ef`. Use
+`phase2/pilot-control-plane-safety`: durable attempt fencing, mandatory scoped
+execution, minimal authenticated offline routing, additive migration/role definitions,
+disposable synthetic tests and a draft PR only. Preserve analyzer/scorer source,
+evaluation contracts, private custody and historical evidence. Apply migration 0004
+only to explicitly isolated disposable databases. No real acquisition/re-execution,
+prediction packets, production migration, packet reuse, reveal, gold, scoring, merge
+or Phase 3. Stop for independent review. See
+[ADR-0017](docs/adr/0017-pilot-control-plane-safety.md).
+
 The owner accepted Phase 2C-C at `9557938f69f0c71f124abe4633089e531e753693`
 and authorized Phase 2C-D additive source-fact-2.0 evaluation infrastructure.
 Use `phase2/source-fact-v2-evaluation`, stacked on `phase2/canonical-fact-remediation`.

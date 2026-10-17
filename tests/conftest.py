@@ -26,6 +26,7 @@ def admin() -> Iterator[Engine]:
     engine = create_engine(os.environ["REPOVOX_TEST_ADMIN_URL"])
     with engine.begin() as c:
         c.execute(text("TRUNCATE projects,auth_sessions CASCADE"))
+        c.execute(text("TRUNCATE pilot_attempts CASCADE"))
         c.execute(text("TRUNCATE rv.auth_rate_buckets"))
         c.execute(text("UPDATE quota_accounts SET month_limit=10,queued_limit=10,active_limit=1"))
     yield engine

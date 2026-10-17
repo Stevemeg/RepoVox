@@ -1,5 +1,11 @@
 # Phase 1 testing
 
+For the [pilot control-plane correction](pilot-control-plane.md), use a new uniquely
+named Compose project and independently generated private environment file. Do not
+assume an existing project named `repovox-test` is empty/disposable: it may contain
+incident records. Reset commands below are valid only for an explicitly verified
+disposable environment. Never mount a real evaluation custodian into test services.
+
 ## Phase 2 additions
 
 All accepted Phase 0/1 suites remain. The expected migration revision advances to 0002;
