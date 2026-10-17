@@ -21,3 +21,4 @@ All proposed for Phase 0 review, dated 2026-10-08. Acceptance follows independen
 | [014](0014-ai-audited-exploratory-track.md) | Separate blind AI exploratory source review; no official counts or human approval |
 | [015](0015-canonical-source-fact-semantics.md) | Additive canonical source semantics, qualified static bindings and truthful artifact versioning |
 | [016](0016-independent-source-fact-v2-evaluation.md) | Independent v2 references, exact scoring, unknown verdicts and private blind custody |
+| [017](0017-pilot-control-plane-safety.md) | Durable pilot authorization, fenced cancellation and mandatory original-file scope |

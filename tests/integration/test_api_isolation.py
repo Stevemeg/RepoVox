@@ -172,7 +172,7 @@ def test_rls_missing_owner_pool_and_composite_fk(
 
 def test_migration_rls_and_worker_grants(admin: Engine, orchestrator) -> None:
     with admin.connect() as c:
-        assert c.scalar(text("SELECT version_num FROM alembic_version")) == "0003"
+        assert c.scalar(text("SELECT version_num FROM alembic_version")) == "0004"
         unsafe = c.execute(
             text(
                 "SELECT relname FROM pg_class WHERE relnamespace='public'::regnamespace "

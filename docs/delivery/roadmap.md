@@ -29,6 +29,12 @@ No invented schedule. Phase dependencies are sequential, though bounded implemen
 
 ## Requirements traceability
 
+CP-01/CP-02 remediation is engineering-only: [ADR-0017](../adr/0017-pilot-control-plane-safety.md)
+and the [control-plane verification](phase2ce-control-plane-verification.md) cover
+durable execution fencing and approved source scope. Independent engineering review
+and a separate owner execution decision remain prerequisites for any new real pilot.
+No official EVAL-ENTRY count, acceptance threshold or Phase 3 gate changes.
+
 Phase 2 engineering accepted at `b60ba548`; Phase 2B prepares the N-01/EVAL-ENTRY
 corpus gate through [staged batches](../development/evaluation-batches.md).
 [Readiness](../ai/evaluation-readiness.json) and [owner decisions](phase2b-decisions.md)

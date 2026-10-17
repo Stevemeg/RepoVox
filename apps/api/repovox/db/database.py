@@ -35,7 +35,10 @@ def verify_role(engine: Engine, expected: str) -> None:
             )
         ):
             raise RuntimeError("Runtime role must not own application tables")
-        if connection.scalar(text("SELECT version_num FROM alembic_version")) != "0003":
+        if connection.scalar(text("SELECT version_num FROM alembic_version")) not in {
+            "0003",
+            "0004",
+        }:
             raise RuntimeError("Database migration required")
 
 

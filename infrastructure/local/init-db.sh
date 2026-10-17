@@ -6,8 +6,12 @@ CREATE ROLE rv_executor NOLOGIN NOSUPERUSER NOBYPASSRLS;
 CREATE ROLE rv_migrator LOGIN NOINHERIT NOSUPERUSER NOBYPASSRLS PASSWORD :'migrator';
 CREATE ROLE rv_app LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD :'app';
 CREATE ROLE rv_worker LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD :'worker';
+-- Non-login capability groups only. No runtime service or credential is provisioned.
+CREATE ROLE rv_pilot_controller NOLOGIN NOSUPERUSER NOBYPASSRLS;
+CREATE ROLE rv_pilot_executor NOLOGIN NOSUPERUSER NOBYPASSRLS;
 GRANT rv_executor TO rv_migrator;
 CREATE DATABASE repovox OWNER rv_migrator;
 REVOKE ALL ON DATABASE repovox FROM PUBLIC;
 GRANT CONNECT ON DATABASE repovox TO rv_migrator,rv_app,rv_worker;
+GRANT CONNECT ON DATABASE repovox TO rv_pilot_controller,rv_pilot_executor;
 SQL
