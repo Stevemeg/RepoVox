@@ -12,6 +12,17 @@ RepoVox is solo-maintained by GitHub owner **Stevemeg**. Codex is the implementa
 
 ## No premature phase advancement
 
+The owner authorized coordinated Phase 2 completion work on 2026-10-18, including
+a dedicated VMware Ubuntu environment and isolated retention/runtime verification.
+Use `phase2/retention-runtime-verification` stacked on accepted control plane
+`925752b8df38668349b9ef5a45a34cac7d948253`. Preserve analyzer/scorer
+`711184e82128c7b0a6f3978cfc1cf13975db39ef`, control-plane SQL, historical custody
+and official UNFROZEN gates. New operational code requires independent review;
+synthetic-only retention must not be activated for growing real custody. A future
+real attempt remains conditional on all runtime/custody/control-plane gates and
+the accepted source-only review chronology. No merges, production, paid services,
+training or Phase 3. See [ADR-0018](docs/adr/0018-isolated-retention-runtime.md).
+
 The owner authorized the Phase 2C-E control-plane safety correction on 2026-10-16,
 stacked on accepted `711184e82128c7b0a6f3978cfc1cf13975db39ef`. Use
 `phase2/pilot-control-plane-safety`: durable attempt fencing, mandatory scoped
