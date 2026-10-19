@@ -64,6 +64,11 @@ jobs:
         run: |
           docker compose up -d --build postgres redis storage storage-init migrate
           docker compose run --rm --build tests
+          CUSTODIAN_TEST_IMAGE=$(docker image inspect repovox-tests --format '{{.Id}}')
+          docker run --rm --user 10002:10002 --cap-drop ALL --security-opt no-new-privileges:true \
+            --read-only --network none --memory 256m --cpus 1 --pids-limit 64 \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=64m "$CUSTODIAN_TEST_IMAGE" \
+            pytest -q tests/unit/test_custodian_lifecycle.py
           docker compose run --rm --no-deps --user 0 --cap-add SETUID --cap-add SETGID --cap-add CHOWN tests python tools/phase2_storage_probe.py
           docker compose run --rm --no-deps --user 0 --cap-add SETUID --cap-add SETGID --cap-add CHOWN tests python tools/phase2_v2_storage_probe.py
       - name: Boot complete local stack

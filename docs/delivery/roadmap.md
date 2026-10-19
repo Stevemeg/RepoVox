@@ -97,3 +97,11 @@ EVAL-ENTRY gates and Phase 2B decision register remain unchanged.
 8. Any external AI evaluation requires separately explicit approval, permitted data/terms and budget; not required for normal production. Authorize next phase only after independent validation; do not merge this PR without it.
 
 These decisions do not block review of Phase 0 proposals; they block treating proposals as authority to implement, spend or launch.
+
+The owner-authorized growing-custodian correction is tracked by
+[ADR-0019](../adr/0019-growing-evaluation-custodian.md) and its
+[independent-review handoff](custodian-lifecycle-verification.md). This closes an
+engineering preparation gap only after review. [Official evidence requirements and
+the fresh-attempt runbook](../development/phase2-official-evidence.md) preserve every
+EVAL-ENTRY threshold, zero verified counts, pending human appointment and UNFROZEN
+status. No real attempt, corpus freeze, merge, production or Phase 3 is implied.

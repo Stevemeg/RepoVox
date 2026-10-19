@@ -12,6 +12,13 @@ RepoVox is solo-maintained by GitHub owner **Stevemeg**. Codex is the implementa
 
 ## No premature phase advancement
 
+The owner subsequently authorized the additive growing-custodian lifecycle and
+complete isolated synthetic verification, continuing on the PR #9 branch. Preserve
+all accepted analyzer/scorer/control-plane code and historical evidence. New local
+SQLite retention metadata is not an application DB migration. Stop for independent
+security/engineering review and fresh owner execution confirmation before any real
+acquisition or prediction. See [ADR-0019](docs/adr/0019-growing-evaluation-custodian.md).
+
 The owner authorized coordinated Phase 2 completion work on 2026-10-18, including
 a dedicated VMware Ubuntu environment and isolated retention/runtime verification.
 Use `phase2/retention-runtime-verification` stacked on accepted control plane
