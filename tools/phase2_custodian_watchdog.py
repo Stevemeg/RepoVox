@@ -17,7 +17,7 @@ def validate_progress(first, second, plan, process, source_sha256, now=None):
     for heartbeat in [first, second]:
         require(heartbeat is not None, "heartbeat_absent")
         require(
-            heartbeat["version"] == "custodian-lifecycle-1.0"
+            heartbeat["version"] == plan["version"]
             and heartbeat["namespace"] == plan["namespace"]
             and heartbeat["plan_sha256"] == digest(canonical(plan)),
             "heartbeat_binding",
@@ -72,6 +72,44 @@ def validate_progress(first, second, plan, process, source_sha256, now=None):
         "progress": [first["sequence"], second["sequence"]],
         "runtime_verified": True,
     }
+
+
+class LiveWatchdog:
+    """Concrete local observer. PID, command and source are pinned by provisioning.
+
+    Never substitutes a boolean callback or a container-running observation for
+    loop progress. An actual restart requires a new verified process binding.
+    """
+
+    def __init__(self, pid, command, status_dir, source_sha256):
+        self.pid, self.command = pid, command
+        self.path = Path(status_dir) / "heartbeat.json"
+        self.source_sha = source_sha256
+
+    def proof(self, plan):
+        first = strict(self.path.read_bytes()) if self.path.exists() else None
+        require(first is not None, "heartbeat_absent")
+        until = time.monotonic() + 0.6
+        second = first
+        while second["sequence"] == first["sequence"] and time.monotonic() < until:
+            time.sleep(0.02)
+            second = strict(self.path.read_bytes())
+        root = Path(f"/proc/{self.pid}")
+        fields = dict(line.split(":", 1) for line in (root / "status").read_text().splitlines())
+        birth = int((root / "stat").read_text().rpartition(") ")[2].split()[19])
+        process = dict(
+            uid=list(map(int, fields["Uid"].split())),
+            gid=list(map(int, fields["Gid"].split())),
+            groups=list(map(int, fields["Groups"].split())),
+            caps={k: fields[k].strip() for k in ["CapInh", "CapPrm", "CapEff", "CapBnd", "CapAmb"]},
+            no_new_privs=int(fields["NoNewPrivs"]),
+            state=fields["State"].split()[0],
+            source_sha256=digest(Path(__file__).read_bytes()),
+            command_matches=(root / "cmdline").read_bytes().split(b"\0")[:-1]
+            == [s.encode() for s in self.command],
+            birth_ns=birth * 1_000_000_000 // os.sysconf("SC_CLK_TCK"),
+        )
+        return validate_progress(first, second, plan, process, self.source_sha)
 
 
 def run(config_path, status_dir):

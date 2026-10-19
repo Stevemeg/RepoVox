@@ -54,8 +54,10 @@ owner, attempt, generation, manifest, family and stage. Each later check calls t
 accepted lease/scope SQL. Wrong attempt, changed manifest, cancellation, stale fence
 or expiry fails. It must not claim again through the ordinary runner. The trusted
 offline controller owns stage scheduling and the returned lease; no new route or
-SQL grant is introduced. Later owner-authorized capture/reveal needs a separately
-bound approval predicate, and cannot use a closed execution lease as authority.
+SQL grant is introduced. [Offline review grants](custodian-review.md) provide the
+separate post-execution path; a closed execution lease cannot authorize review.
+New review namespaces use additive version 1.1 and durable per-batch operation
+deadlines. Historical 1.0 namespaces retain their original receipt/schema unchanged.
 
 ## Durable states and irreversible transitions
 

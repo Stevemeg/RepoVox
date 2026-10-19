@@ -35,12 +35,19 @@ def record(name, value):
             json.dump(value, stream, indent=2)
 
 
-def fixture(parent, seconds=120, tenant="tenantA", active=True, authorization_seconds=None):
+def fixture(
+    parent,
+    seconds=120,
+    tenant="tenantA",
+    active=True,
+    authorization_seconds=None,
+    version="custodian-lifecycle-1.0",
+):
     now = datetime.now(UTC)
     namespace = "synthetic-" + uuid.uuid4().hex
     secret = "synthetic-authorization-" + uuid.uuid4().hex
     plan = dict(
-        version="custodian-lifecycle-1.0",
+        version=version,
         namespace=namespace,
         tenant=tenant,
         attempt="attemptA",
@@ -328,7 +335,9 @@ def test_adapter_full_synthetic_chronology(tmp_path):
     from repovox.evaluation.v2 import digest as v2_digest
 
     life, token = fixture(tmp_path)
-    store = CustodianStore(life, token, lambda plan: True, lambda plan: True)
+    store = CustodianStore(
+        life, token, lambda plan: True, lambda plan: True, synthetic_fixture=True
+    )
     records = []
     prediction = store.write("tenantA", b"synthetic prediction, never real")
     for sequence in range(1, 8):
@@ -508,7 +517,7 @@ def stamp_deadline(life):
 
 def test_wrong_hash_control_mutation_and_permission_failure(tmp_path):
     life, token = fixture(tmp_path)
-    store = CustodianStore(life, token, lambda p: True, lambda p: True)
+    store = CustodianStore(life, token, lambda p: True, lambda p: True, synthetic_fixture=True)
     sha = store.write("tenantA", b"exact bytes")
     (life.data / ("tenantA-" + sha)).write_bytes(b"wrong bytes")
     with pytest.raises(ValueError, match="registered_evidence_corrupt"):
@@ -655,7 +664,9 @@ def test_real_v2_contract_wrappers_with_synthetic_source_only(case, tmp_path):
 
     root, scope, proofs, ref, pred = case
     life, token = fixture(tmp_path, tenant=scope.tenant_id)
-    store = CustodianStore(life, token, lambda plan: True, lambda plan: True)
+    store = CustodianStore(
+        life, token, lambda plan: True, lambda plan: True, synthetic_fixture=True
+    )
     for body in [*proofs.values(), serialize(scope), serialize(pred), serialize(ref)]:
         store.write(scope.tenant_id, body)
     records = []

@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 VERSION = "custodian-lifecycle-1.0"
+REVIEW_VERSION = "custodian-lifecycle-1.1"
 LIMIT = 50_000_000
 STATES = {"CREATED", "ACTIVE", "SEALED", "INVALIDATED", "WITHDRAWN", "EXPIRING", "EXPIRED"}
 
@@ -113,7 +114,7 @@ def validate_plan(plan):
         },
         "lifecycle_plan_fields",
     )
-    require(plan["version"] == VERSION, "lifecycle_version")
+    require(plan["version"] in {VERSION, REVIEW_VERSION}, "lifecycle_version")
     for key in ["namespace", "tenant"]:
         require(re.fullmatch(r"[A-Za-z][A-Za-z0-9_.-]{0,127}", plan[key]), "lifecycle_binding")
     require(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", plan["attempt"]), "lifecycle_attempt")
@@ -165,6 +166,13 @@ CREATE TABLE events(session TEXT NOT NULL,sequence INTEGER NOT NULL,sha TEXT NOT
 CREATE TABLE audit(sequence INTEGER PRIMARY KEY,body BLOB NOT NULL,sha TEXT NOT NULL);
 """
 
+REVIEW_SCHEMA = (
+    SCHEMA
+    + """
+CREATE TABLE batches(batch TEXT PRIMARY KEY,deadline REAL NOT NULL,seal INTEGER NOT NULL);
+"""
+)
+
 
 class Lifecycle:
     def __init__(self, root, plan, receipt):
@@ -198,7 +206,7 @@ class Lifecycle:
         try:
             connection.execute("PRAGMA synchronous=EXTRA")
             require(connection.execute("PRAGMA synchronous").fetchone()[0] == 3, "ledger_sync_mode")
-            connection.executescript(SCHEMA)
+            connection.executescript(REVIEW_SCHEMA if plan["version"] == REVIEW_VERSION else SCHEMA)
             connection.execute("INSERT INTO meta VALUES (?)", (canonical(plan),))
             connection.execute(
                 "INSERT INTO lifecycle VALUES (1,'CREATED',1,?,'created')", (time.time(),)
@@ -463,6 +471,15 @@ class Lifecycle:
             and len(self._file(r["name"])) == r["size"]
             for r in intents
         )
+        seals = False
+        deadlines = []
+        if self.plan["version"] == REVIEW_VERSION:
+            for batch in {r["batch"] for r in intents}:
+                policy = db.execute("SELECT * FROM batches WHERE batch=?", (batch,)).fetchone()
+                if policy:
+                    complete = complete and time.time() < policy["deadline"]
+                    deadlines.append(policy["deadline"])
+                    seals = seals or bool(policy["seal"])
         if complete:
             for entry in intents:
                 fd = os.open(entry["name"], os.O_RDONLY | os.O_NOFOLLOW, dir_fd=self._df)
@@ -471,9 +488,12 @@ class Lifecycle:
                 finally:
                     os.close(fd)
             os.fsync(self._df)
+        complete = complete and all(time.time() < deadline for deadline in deadlines)
         db.execute("BEGIN IMMEDIATE")
         if complete:
             db.execute("UPDATE files SET status='COMMITTED' WHERE status='INTENT'")
+            if seals:
+                db.execute("UPDATE lifecycle SET state='SEALED',reason='recovered_close'")
             self._audit(db, "recovered_committed_bytes")
         else:
             db.execute(
@@ -512,7 +532,7 @@ class Lifecycle:
             self._audit(db, "activated")
             db.execute("COMMIT")
 
-    def put(self, token, entries, event=None):
+    def put(self, token, entries, event=None, *, operation_expires_at=None, seal=False):
         """All entries form one durable intent; no body is complete until the batch commits."""
         require(entries and len(entries) <= 8, "write_batch_limit")
         for name, body in entries.items():
@@ -522,8 +542,17 @@ class Lifecycle:
                 "evidence_path",
             )
         expected = {n: {"sha": digest(b), "size": len(b)} for n, b in entries.items()}
+        deadline = stamp(operation_expires_at) if operation_expires_at else None
+        require(not seal or deadline is not None, "close_deadline_required")
+        if deadline is not None:
+            require(self.plan["version"] == REVIEW_VERSION, "review_lifecycle_required")
+            require(
+                deadline <= stamp(self.plan["authorization_expires_at"]),
+                "operation_exceeds_custody_authorization",
+            )
         with self.locked() as db:
             self._authorized(db, token)
+            require(deadline is None or time.time() < deadline, "operation_authorization_expired")
             self._recover(db)
             self._authorized(db, token)
             rows, _ = self._inventory(db)
@@ -557,6 +586,8 @@ class Lifecycle:
                 require(sequence == len(prior) + 1 and sequence <= 7, "event_sequence_conflict")
             batch = digest(canonical(expected))
             db.execute("BEGIN IMMEDIATE")
+            if deadline is not None:
+                db.execute("INSERT INTO batches VALUES (?,?,?)", (batch, deadline, int(seal)))
             for name, e in expected.items():
                 db.execute(
                     "INSERT INTO files VALUES (?,?,?,?, 'INTENT')",
@@ -580,11 +611,15 @@ class Lifecycle:
                 os.fsync(self._df)
                 require(self._file(name) == body, "write_readback")
             self._authorized(db, token)  # Deadline can pass during a bounded write.
+            require(deadline is None or time.time() < deadline, "operation_authorization_expired")
             db.execute("BEGIN IMMEDIATE")
             db.execute(
                 "UPDATE files SET status='COMMITTED' WHERE batch=? AND status='INTENT'", (batch,)
             )
             self._audit(db, "write_committed")
+            if seal:
+                db.execute("UPDATE lifecycle SET state='SEALED',reason='review_closed'")
+                self._audit(db, "sealed")
             db.execute("COMMIT")
             return expected
 
@@ -665,7 +700,7 @@ class Lifecycle:
                     db.execute("COMMIT")
             row = db.execute("SELECT * FROM lifecycle").fetchone()
             return {
-                "version": VERSION,
+                "version": self.plan["version"],
                 "namespace": self.plan["namespace"],
                 "plan_sha256": self.plan_sha,
                 "state": row["state"],

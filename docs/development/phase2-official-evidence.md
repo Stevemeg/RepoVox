@@ -72,6 +72,9 @@ authorized by this engineering preparation.
    adapter with durable commitments. Seal B before any source-only handoff. Check A
    separately for prediction leakage. Existing Addict/Parseurl packets are not reused.
 8. Record only actual SOURCE_APPROVED, PREDICTION_SEALED, SOURCE_HANDED_OFF events.
+   Execution closure releases its SQL authority. Verify the closure binding and
+   separately enrolled owner key; authorize handoff through the scoped
+   [offline review protocol](custodian-review.md), never a renewed execution lease.
    Give the independent reviewer only authorized A, pins/hashes/rights/scope, v2
    schema and source-only instructions. Stop. Codex cannot author the real reference.
 9. Later separate owner instruction is required to capture actual reviewer bytes,
@@ -79,6 +82,8 @@ authorized by this engineering preparation.
    disagreements and immutable supersession. Post-reveal corrections are diagnostic.
    Keep custody ACTIVE for separately authorized growth; PG execution closure is
    not custody closure. Final custody SEALED never reopens and expiry never renews.
+   Each operation requires its own signed payload/head grant, original approval
+   evidence and live watchdog proof within the original custody lifetime.
 10. Any failed family/timeout/security/uncertain result stops the entire attempt.
     Durably invalidate via CP-01 and confirm terminal status/stale-token rejection
     before any routine worker restoration. If terminal state is uncertain, no

@@ -104,4 +104,11 @@ Launch needs private self-hosted Director/TTS with approved model evaluation/lic
 
 ## Model and research artifact retention
 
+Offline exploratory custody uses the separate [review authorization contract](../development/custodian-review.md)
+and [growing lifecycle](../development/custodian-lifecycle.md), proposed for independent
+review. It is never a routine API/worker mount. Execution closure releases SQL leases;
+owner-authorized review cannot extend the original custody authorization or retention.
+No real watchdog is activated by synthetic verification. Existing November 14 and 16
+custodians and owner-managed host copies retain their original cleanup obligations.
+
 Private registry retains current and prior verified releases plus notices/eval lineage while rollback support required; never public by default. Model object allowance 60GiB plus 80GiB encrypted local disk per GPU in costs. Research dataset storage 100GiB initial estimate, immutable versions/access/deletion in training strategy, distinct from 24h customer source/30-day media. Retain candidate training checkpoints <=90 days absent promotion/rights need; prune with dependency manifest. Rights/privacy tombstone withdraws dependent adapters immediately and purges live copies <=24h; clean retraining/evaluation before re-promotion. Dataset manifests/tombstone hashes retained as minimum provenance without deleted source. No backup restore can bypass suppression ledger.

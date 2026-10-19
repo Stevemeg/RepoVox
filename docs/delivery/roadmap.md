@@ -105,3 +105,8 @@ engineering preparation gap only after review. [Official evidence requirements a
 the fresh-attempt runbook](../development/phase2-official-evidence.md) preserve every
 EVAL-ENTRY threshold, zero verified counts, pending human appointment and UNFROZEN
 status. No real attempt, corpus freeze, merge, production or Phase 3 is implied.
+
+The additive [execution-to-review authority](../adr/0020-post-execution-custody-authority.md)
+and [offline protocol](../development/custodian-review.md) remain subject to independent
+security/engineering review. Synthetic signed approvals are not real owner approvals,
+source-only references or human gold. Execution closure never extends retention.

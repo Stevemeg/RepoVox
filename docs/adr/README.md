@@ -1,5 +1,8 @@
 # Architectural decisions
 
+Post-execution custody: [ADR-0020](0020-post-execution-custody-authority.md), proposed
+for independent review; no real-pilot activation or official corpus acceptance.
+
 Phase 2 proposals: [ADR-0010 static boundary](0010-phase2-static-analysis-boundary.md)
 and [ADR-0011 parser isolation](0011-parser-process-isolation.md).
 Phase 2 review corrections: [ADR-0012 independent gold/pairing](0012-independent-gold-contract.md).

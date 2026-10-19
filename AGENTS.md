@@ -12,6 +12,14 @@ RepoVox is solo-maintained by GitHub owner **Stevemeg**. Codex is the implementa
 
 ## No premature phase advancement
 
+The owner authorized execution-to-review integration on 2026-10-19, continuing
+draft PR #9. Separate genuine SQL execution leases from bounded offline owner-key
+review grants; use disposable synthetic PostgreSQL/Linux custody verification.
+Preserve accepted analyzer/scorer, migration 0004 and historical evidence. No real
+acquisition, A/B generation, reference, reveal, scoring, persistent migration or
+Phase 3. Stop at final independent review. See
+[ADR-0020](docs/adr/0020-post-execution-custody-authority.md).
+
 The owner subsequently authorized the additive growing-custodian lifecycle and
 complete isolated synthetic verification, continuing on the PR #9 branch. Preserve
 all accepted analyzer/scorer/control-plane code and historical evidence. New local
