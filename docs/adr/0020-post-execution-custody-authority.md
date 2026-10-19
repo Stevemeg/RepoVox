@@ -47,3 +47,25 @@ compromise remains outside local DAC/checksum protection. Offline grants have no
 SQL or worker authority. Withdrawal invalidates the namespace and admits cleanup.
 Power-off, storage failure or a stopped watchdog can prevent timely physical
 deletion; owner-operated cleanup remains mandatory.
+
+## RV-09-01: Eliminate reconstructed source scratch
+
+Independent review at `a23303ee0b83301b7db7205956e30d818ab63089` identified that
+`TemporaryDirectory` cleanup depended on normal process exit. SIGKILL could leave
+original source outside the registered retention inventory. Do not repair that by
+trusting a finally block, a default temporary directory or a second deletion sweep.
+
+Use an explicit read-only `CustodySource` over existing registered content-addressed
+files. The accepted source validator receives actual filesystem metadata and exact
+bytes read through lifecycle authorization, owner/mode/link/hash and expiry checks.
+Original logical paths still index the same scope; identity and scoring do not change.
+No source, proof, analysis, reference or prediction is reconstructed to scratch.
+Closure validation uses this same retained source view instead of a caller-supplied
+source directory. Handoff, raw capture and close do not create a source view at all.
+
+Disable process core dumps before review reads. Normal validation streams exist only
+in RAM and do not create an additional filesystem inventory. Interrupted registered
+writes/deletion remain covered by the existing durable lifecycle. Real deployment
+must still account for OS/hypervisor paging, snapshots, delivery copies and host-side
+evidence; this is not a memory-forensics or physical-erasure guarantee. See the
+[correction evidence](../delivery/rv09-01-verification.md).

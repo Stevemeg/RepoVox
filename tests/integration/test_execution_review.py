@@ -44,6 +44,7 @@ from tools.phase2_custodian_adapter import (
 )
 from tools.phase2_custodian_lifecycle import Lifecycle, canonical, digest
 from tools.phase2_custodian_review import ReviewSession
+from tools.phase2_custodian_source import CustodySource
 
 pytestmark = pytest.mark.skipif(os.geteuid() != 10002, reason="restricted custodian integration")
 
@@ -125,7 +126,6 @@ def test_real_execution_closure_and_independently_authorized_review(cp, tmp_path
                 [],
                 b"",
                 {},
-                tmp_path,
                 probe,
             )
         proof_bodies = [
@@ -171,14 +171,7 @@ def test_real_execution_closure_and_independently_authorized_review(cp, tmp_path
             ],
             limitations=["Synthetic partial fixture only; no independent accuracy claim."],
         )
-        source = tmp_path / "source-for-initial-validation"
-        source.mkdir(mode=0o700)
-        for f in family.files:
-            path = source / f.path
-            path.write_bytes(cp.hub.bodies[f.path])
-            path.chmod(0o600)
         scope_body = serialize(scope)
-        packet = serialize(source_packet(scope_body, digest(scope_body), source, proofs))
         metadata = dict(
             tenant_id="tenant-a",
             session_id="synthetic-execution-review",
@@ -198,11 +191,13 @@ def test_real_execution_closure_and_independently_authorized_review(cp, tmp_path
             if len(leases) == 1:
                 for body in [
                     scope_body,
-                    packet,
                     *[b for i, b in enumerate(proof_bodies) if i != 2],
                     *[cp.hub.bodies[f.path] for f in family.files],
                 ]:
                     store.write("tenant-a", body)
+                source = CustodySource(life, token, scope_body, digest(scope_body))
+                packet = serialize(source_packet(scope_body, digest(scope_body), source, proofs))
+                store.write("tenant-a", packet)
                 records.append(
                     store.append_event(records, **metadata, payload_sha256=digest(packet))
                 )
@@ -270,7 +265,6 @@ def test_real_execution_closure_and_independently_authorized_review(cp, tmp_path
             records,
             key.public_key().public_bytes_raw(),
             {digest(b): b for i, b in enumerate(proof_bodies) if i != 2},
-            source,
             probe,
         )
         # A real controller process exits after observing durable closure. Reopening
@@ -418,9 +412,7 @@ os._exit(79)
             Prefix=f"development/{A}/{snapshot_id}/{job_id}/",
         )
         assert remaining["KeyCount"] == 0
-        for f in family.files:
-            (source / f.path).unlink()
-        assert not list(source.iterdir())
+        assert not (tmp_path / "source-for-initial-validation").exists()
         record(
             "genuine-execution-cleanup",
             dict(
@@ -491,7 +483,6 @@ def test_failed_attempt_cannot_bootstrap_offline_authority(cp, tmp_path, termina
                 [],
                 b"",
                 {},
-                tmp_path,
                 probe,
             )
         assert not list(life.data.iterdir()) and cp.hub.calls == 0

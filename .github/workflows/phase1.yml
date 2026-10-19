@@ -69,7 +69,7 @@ jobs:
             --read-only --network none --memory 256m --cpus 1 --pids-limit 64 \
             -e PYTHONPATH=/workspace:/workspace/apps/api:/workspace/tests/unit \
             --tmpfs /tmp:rw,nosuid,nodev,noexec,size=64m "$CUSTODIAN_TEST_IMAGE" \
-            pytest -q tests/unit/test_custodian_lifecycle.py tests/unit/test_custodian_review.py
+            pytest -q tests/unit/test_custodian_lifecycle.py tests/unit/test_custodian_review.py tests/unit/test_custodian_source.py
           docker compose run --rm --no-deps --user 10002:10002 \
             -e PYTHONPATH=/workspace:/workspace/apps/api:/workspace/tests/unit tests \
             pytest -q tests/integration/test_execution_review.py

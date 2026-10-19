@@ -75,6 +75,11 @@ authorized by this engineering preparation.
    Execution closure releases its SQL authority. Verify the closure binding and
    separately enrolled owner key; authorize handoff through the scoped
    [offline review protocol](custodian-review.md), never a renewed execution lease.
+   Validate closure/review source through the registered read-only source view;
+   never reconstruct source in `/tmp` or an operator working directory. Verify
+   zero process core limits, actual cleanup supervision and no unmanaged exports.
+   Include paging/snapshot/host-copy and authorized delivery targets in the real
+   retention plan; synthetic success does not approve those operational targets.
    Give the independent reviewer only authorized A, pins/hashes/rights/scope, v2
    schema and source-only instructions. Stop. Codex cannot author the real reference.
 9. Later separate owner instruction is required to capture actual reviewer bytes,

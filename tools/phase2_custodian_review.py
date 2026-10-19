@@ -7,10 +7,8 @@ key, not provider identity, human review, or the truth of an annotation.
 
 import base64
 import re
-import tempfile
 import time
 from datetime import UTC, datetime
-from pathlib import Path
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -39,6 +37,7 @@ from tools.phase2_custodian_lifecycle import (
     stamp,
     strict,
 )
+from tools.phase2_custodian_source import CustodySource, protect_memory
 from tools.phase2_custodian_watchdog import LiveWatchdog
 
 OPERATIONS = {
@@ -86,6 +85,7 @@ class ReviewSession:
         require(type(watchdog) is LiveWatchdog, "verified_watchdog_required")
         self.watchdog = watchdog
         require(lifecycle.plan["version"] == REVIEW_VERSION, "review_lifecycle_required")
+        protect_memory()
         require(re.fullmatch(r"[A-Za-z][A-Za-z0-9_.-]{0,127}", session), "review_session")
         self.life, self.token, self.session = lifecycle, token, session
         self.binding_name = "review-" + session + "-binding"
@@ -117,7 +117,6 @@ class ReviewSession:
         records,
         public_key,
         proofs,
-        source,
         watchdog,
     ):
         """Verify real authenticated SQL closure, original output and source before detaching.
@@ -127,6 +126,7 @@ class ReviewSession:
         lease or DB credentials enter a grant or its recipient's Package A.
         """
         require(life.plan["version"] == REVIEW_VERSION, "review_lifecycle_required")
+        protect_memory()
         require(type(controller) is Controller, "authenticated_controller_required")
         manifest.verify_engine()
         require(type(watchdog) is LiveWatchdog, "verified_watchdog_required")
@@ -179,6 +179,7 @@ class ReviewSession:
             read(events[1].payload_sha256) == serialize(expected_prediction),
             "original_projection_required",
         )
+        source = CustodySource(life, token, scope_body, first.scope_sha256)
         originals = source_bytes(source, scope, proofs)
         for fact in expected_prediction.facts:
             validate_fact(fact.fact, scope, originals)
@@ -298,14 +299,10 @@ class ReviewSession:
             proofs[sha] = self._read(sha)
         validate_reference(body, digest(body), scope, self.binding["scope_sha256"], source, proofs)
 
-    def _source(self, root):
+    def _source(self):
         scope_body = self._read(self.binding["scope_sha256"])
         scope = decode(scope_body, self.binding["scope_sha256"], Scope)
-        for file in scope.files:
-            path = root / file.path
-            path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-            path.write_bytes(self._read(file.file_sha256))
-            path.chmod(0o600)
+        source = CustodySource(self.life, self.token, scope_body, self.binding["scope_sha256"])
         proofs = {
             sha: self._read(sha)
             for sha in [
@@ -316,7 +313,7 @@ class ReviewSession:
         if "analysis_sha256" in self.binding:
             sha = self.binding["analysis_sha256"]
             proofs[sha] = self._read(sha)
-        return scope, proofs
+        return source, proofs
 
     def perform(self, signed, approval, payload):
         """Returns only this operation's output; never exports a general Store/read handle.
@@ -347,42 +344,36 @@ class ReviewSession:
         require(records[-1][1] == grant["previous_head"], "review_head_changed")
         require(records[1][1] == self.binding["execution_head"], "execution_head_changed")
         output = payload
-        with tempfile.TemporaryDirectory(prefix="rv-review-") as temporary:
-            source = Path(temporary)
-            scope, proofs = self._source(source)
-            if operation == "handoff":
-                require(
-                    digest(payload) == self.binding["source_packet_sha256"], "source_only_handoff"
-                )
-                require(payload == self._read(digest(payload)), "handoff_changed")
-            elif operation in {"seal_reference", "reveal", "compare"}:
-                reference = (
-                    payload
-                    if operation == "seal_reference"
-                    else self._read(validate_chain(records)[4].payload_sha256)
-                )
-                self._validated_reference(reference, records, source, proofs)
-                if operation == "reveal":
-                    require(
-                        digest(payload) == self.binding["prediction_sha256"], "premature_reveal"
+        if operation == "handoff":
+            require(digest(payload) == self.binding["source_packet_sha256"], "source_only_handoff")
+            require(payload == self._read(digest(payload)), "handoff_changed")
+        elif operation in {"seal_reference", "reveal", "compare"}:
+            source, proofs = self._source()
+            reference = (
+                payload
+                if operation == "seal_reference"
+                else self._read(validate_chain(records)[4].payload_sha256)
+            )
+            self._validated_reference(reference, records, source, proofs)
+            if operation == "reveal":
+                require(digest(payload) == self.binding["prediction_sha256"], "premature_reveal")
+                decode(payload, self.binding["prediction_sha256"], Prediction)
+            elif operation == "compare":
+                require(payload == reference, "comparison_reference_changed")
+                output = serialize(
+                    score(
+                        reference,
+                        digest(reference),
+                        self._read(self.binding["prediction_sha256"]),
+                        self.binding["prediction_sha256"],
+                        self._read(self.binding["scope_sha256"]),
+                        self.binding["scope_sha256"],
+                        source,
+                        proofs,
                     )
-                    decode(payload, self.binding["prediction_sha256"], Prediction)
-                elif operation == "compare":
-                    require(payload == reference, "comparison_reference_changed")
-                    output = serialize(
-                        score(
-                            reference,
-                            digest(reference),
-                            self._read(self.binding["prediction_sha256"]),
-                            self.binding["prediction_sha256"],
-                            self._read(self.binding["scope_sha256"]),
-                            self.binding["scope_sha256"],
-                            source,
-                            proofs,
-                        )
-                    )
-            elif operation == "close":
-                require(payload == records[-1][0], "closure_head_required")
+                )
+        elif operation == "close":
+            require(payload == records[-1][0], "closure_head_required")
         screen_bytes(output)
         acknowledgment = dict(grant_sha256=digest(signed), output_sha256=digest(output))
         entries = {

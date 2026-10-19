@@ -1,5 +1,11 @@
 # Execution-to-review independent engineering handoff
 
+RV-09-01 follow-up: the independently identified temporary-source-copy defect is
+addressed by the [protected-evidence correction](rv09-01-verification.md). It removes
+filesystem reconstruction rather than relying on process-exit cleanup. The test
+results below remain the original integration evidence, not final-head proof of
+that later correction.
+
 Date: 2026-10-19. Draft [PR #9](https://github.com/Stevemeg/RepoVox/pull/9), unmerged,
 stacked on `925752b8df38668349b9ef5a45a34cac7d948253`. This follow-up preserves
 `43410390d9a4cc71c9dd429d10df2da0d5df05df`; it does not rewrite accepted history.

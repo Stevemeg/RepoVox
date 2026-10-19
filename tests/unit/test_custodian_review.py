@@ -518,7 +518,6 @@ def test_review_and_execution_authority_cannot_be_substituted(review, tmp_path):
             [],
             b"",
             {},
-            tmp_path,
             review.probe,
         )
     assert legacy.tick()["state"] == "CREATED" and not list(legacy.data.iterdir())

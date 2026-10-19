@@ -110,3 +110,7 @@ The additive [execution-to-review authority](../adr/0020-post-execution-custody-
 and [offline protocol](../development/custodian-review.md) remain subject to independent
 security/engineering review. Synthetic signed approvals are not real owner approvals,
 source-only references or human gold. Execution closure never extends retention.
+
+The [RV-09-01 source-cleanup correction](rv09-01-verification.md) eliminates
+unregistered review scratch; final independent acceptance remains required before
+any real execution. Official corpus counts and all freeze gates remain unchanged.

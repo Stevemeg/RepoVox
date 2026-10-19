@@ -63,8 +63,10 @@ def run(source, image, expected_daemon, evidence):
         "tools/phase2_custodian_adapter.py",
         "tools/phase2_custodian_watchdog.py",
         "tools/phase2_custodian_review.py",
+        "tools/phase2_custodian_source.py",
         "tests/unit/test_custodian_lifecycle.py",
         "tests/unit/test_custodian_review.py",
+        "tests/unit/test_custodian_source.py",
     ]:
         destination = sources / name
         destination.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
@@ -136,6 +138,10 @@ def run(source, image, expected_daemon, evidence):
             "/overlay/tests/unit/test_custodian_lifecycle.py",
             "/overlay/tests/unit/test_custodian_review.py",
         ],
+    )
+    container(
+        "10002:10002",
+        ["pytest", "-q", "--tb=short", "/overlay/tests/unit/test_custodian_source.py"],
     )
     creation = """
 import json
