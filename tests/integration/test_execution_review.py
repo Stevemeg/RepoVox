@@ -31,6 +31,7 @@ from repovox.evaluation.v2 import (
     serialize,
 )
 from sqlalchemy import text
+from test_custodian_lifecycle import available_tick
 from test_custodian_review import grant_for, start_watchdog
 from test_pilot_control import cp as cp
 from test_pilot_control import run
@@ -382,7 +383,7 @@ os._exit(79)
         head = session.records()[-1][0]
         signed, approval = grant_for(session, key, "close", head)
         session.perform(signed, approval, head)
-        assert life.tick()["state"] == "SEALED"
+        assert available_tick(life)["state"] == "SEALED"
         # Close does not modify the initial immutable receipt/deadline or SQL terminal state.
         assert (life.control / "identity.json").read_bytes() == canonical(receipt)
         assert cp.control.status(A, cp.attempt)["state"] == "EXECUTION_CLOSED"
@@ -405,7 +406,7 @@ os._exit(79)
         record("genuine-execution-review", result)
         # Explicit withdrawal cleans synthetic bytes without shortening any real deadline.
         life.transition(token, "WITHDRAWN")
-        assert life.tick()["state"] == "EXPIRED"
+        assert available_tick(life)["state"] == "EXPIRED"
         assert not list(life.data.iterdir())
         # The independent synthetic coordinator also removes its exact execution
         # spool. Review capabilities themselves contain no S3 or worker credentials.

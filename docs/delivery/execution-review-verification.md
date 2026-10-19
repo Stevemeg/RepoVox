@@ -80,7 +80,7 @@ Synthetic testing has no guest default route. New service namespace:
 | Actual local command group | Observed result |
 | --- | --- |
 | Full Linux application/service suite at recorded pre-handover-test tree | 634 passed, 84 skipped, 346 warnings, 151.09s |
-| Separate restricted lifecycle/review matrix | 77 passed; actual Linux files, processes, locks, deadlines and cleanup |
+| Separate restricted lifecycle/review matrix | 78 passed, no skips, 106.48s; actual Linux files, processes, locks, deadlines and cleanup |
 | Genuine execution-to-review suite using shipped collector | 5 passed, 1 warning, 114.04s |
 | Genuine claim identity/one-use handover regressions | 2 passed, 5.40s |
 | Genuine PostgreSQL and ordinary-worker crash/restart during protocol | 1 passed, 1 warning, 47.01s including fixture setup; original 45s custody lifetime unchanged |
@@ -141,6 +141,19 @@ event/nonce if denied at admission, or invalidation/cleanup after an entered wri
 The independent timed-write test still requires rejection/recovery during the write.
 No security timeout, role, capability, source limit or error classification is relaxed.
 Operational command errors and all stderr are retained separately from test passes.
+The first pushed integration run passed 635 application tests (84 skipped), then
+failed its separate restricted run: the direct Docker command omitted the Python
+module path needed by the watchdog subprocess, and concurrent cleanup exposed a
+pre-lock check racing SQLite journal unlink. The follow-up supplies that explicit
+module path and validates transient journal metadata only under the namespace lock;
+immutable path checks remain before locking. A real malicious journal hard-link
+regression requires rejection before SQLite opens it. No link check is suppressed
+inside the lock and no protected historical namespace is touched.
+An intermediate 76-pass/two-failure run also exposed test observations treating a
+live watchdog's nonblocking lock-busy result as failed closure. Those observations
+now handle only explicit BUSY within the existing one-second lock cap; final state
+assertions, integrity errors and all expiry deadlines remain strict. Busy is never
+reported as successful cleanup or retention readiness.
 The restart harness initially used the container-start clock instead of namespace
 creation, then default Docker shutdown waits exhausted the fixed custody lifetime.
 The latter run correctly failed with `retention_deadline`. The passing crash/restart

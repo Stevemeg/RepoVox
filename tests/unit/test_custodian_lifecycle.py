@@ -35,6 +35,22 @@ def record(name, value):
             json.dump(value, stream, indent=2)
 
 
+def available_tick(life):
+    """Drive a nonblocking cleanup observation within the normal one-second lock cap.
+
+    A busy watchdog is not completed cleanup or health proof. Retry only its explicit
+    lock-busy result; all integrity/expiry errors propagate and deadlines stay fixed.
+    """
+    until = time.monotonic() + 1.0
+    while True:
+        try:
+            return life.tick()
+        except BlockingIOError:
+            if time.monotonic() >= until:
+                raise
+            time.sleep(0.01)
+
+
 def fixture(
     parent,
     seconds=120,
@@ -657,6 +673,21 @@ def test_two_cleanup_processes(tmp_path):
         assert process.exitcode == 0
     assert life.tick()["state"] == "EXPIRED"
     assert not list(life.data.iterdir())
+
+
+def test_journal_hardlink_rejected_under_namespace_lock(tmp_path):
+    life, token = fixture(tmp_path)
+    foreign = tmp_path / "unapproved-journal"
+    foreign.write_bytes(b"synthetic invalid journal")
+    foreign.chmod(0o600)
+    os.link(foreign, life.control / "ledger.sqlite-journal")
+    # Pre-lock construction must not race SQLite unlinking a legitimate journal.
+    # Full validation under the lock still rejects a linked/malicious journal
+    # before SQLite can open it; no permission or integrity check is relaxed.
+    reopened = reopen(saved(life))
+    with pytest.raises(ValueError, match="custody_hardlink"):
+        reopened.tick()
+    assert foreign.read_bytes() == b"synthetic invalid journal"
 
 
 def test_real_v2_contract_wrappers_with_synthetic_source_only(case, tmp_path):

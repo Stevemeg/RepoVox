@@ -21,7 +21,7 @@ import pytest
 pytest.importorskip("fcntl")
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from test_custodian_lifecycle import fixture, record
+from test_custodian_lifecycle import available_tick, fixture, record
 from test_evaluation_v2 import case as case
 
 from tools import phase2_custodian_watchdog as watchdog
@@ -195,7 +195,7 @@ def test_complete_synthetic_chronology_and_closure(review):
     initial = review.session.records()
     records = advance(review, 8)
     assert records[:2] == initial and len(records) == 7
-    assert review.life.tick()["state"] == "SEALED"
+    assert available_tick(review.life)["state"] == "SEALED"
     with pytest.raises(ValueError, match="lifecycle_not_executable"):
         review.life.put(review.token, {"extra": b"no"})
     record(
@@ -351,8 +351,8 @@ def test_operation_deadline_recovery_cannot_promote_expired_intent(review, monke
         )
     monkeypatch.setattr(life, "_file", original)
     # Actual watchdog may already have invalidated/deleted the expired intent.
-    assert life.tick()["state"] in {"INVALIDATED", "EXPIRED"}
-    assert life.tick()["state"] == "EXPIRED"
+    assert available_tick(life)["state"] in {"INVALIDATED", "EXPIRED"}
+    assert available_tick(life)["state"] == "EXPIRED"
     assert not list(life.data.iterdir())
 
 
@@ -431,13 +431,13 @@ def test_capture_authorization_expiry_is_fail_closed(review, monkeypatch):
         review.session.perform(signed, approval, review.response)
     monkeypatch.setattr(review.life, "_file", original)
     if touched:
-        assert review.life.tick()["state"] in {"INVALIDATED", "EXPIRED"}
-        assert review.life.tick()["state"] == "EXPIRED"
+        assert available_tick(review.life)["state"] in {"INVALIDATED", "EXPIRED"}
+        assert available_tick(review.life)["state"] == "EXPIRED"
         assert not list(review.life.data.iterdir())
     else:
         # Bounded scheduling may expire the same unchanged grant at admission.
         # Earlier denial must have no response, nonce receipt or new custody event.
-        assert review.life.tick()["state"] == "ACTIVE"
+        assert available_tick(review.life)["state"] == "ACTIVE"
         assert len(review.session.records()) == 3
         assert not (review.life.data / capture_slot).exists()
         assert not (review.life.data / ("tenant-a-" + digest(review.response))).exists()
@@ -484,7 +484,7 @@ def test_close_crash_recovery_commits_seal_and_ack_together(review):
     process.join(5)
     assert process.exitcode == 86
     # Actual recovery must not leave an acknowledged close in ACTIVE custody.
-    assert review.life.tick()["state"] == "SEALED"
+    assert available_tick(review.life)["state"] == "SEALED"
     assert session.perform(signed, approval, payload)[0] == payload
     assert len(session.records()) == 7
 

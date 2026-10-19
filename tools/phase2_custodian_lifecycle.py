@@ -182,7 +182,7 @@ class Lifecycle:
         self.data, self.control = self.root / "data", self.root / "control"
         self.plan_sha = digest(canonical(plan))
         require(receipt["plan_sha256"] == self.plan_sha, "lifecycle_plan_changed")
-        self._paths()
+        self._paths(inspect_journal=False)
 
     @classmethod
     def create(cls, root, plan):
@@ -232,7 +232,7 @@ class Lifecycle:
         sync_dir(root.parent)
         return receipt
 
-    def _paths(self):
+    def _paths(self, *, inspect_journal=True):
         ancestry(self.root)
         require(info(self.root, True) == self.receipt["root"], "namespace_inode_changed")
         require(set(os.listdir(self.root)) == {"control", "data"}, "unexpected_namespace_entry")
@@ -247,6 +247,11 @@ class Lifecycle:
             "unexpected_control_entry",
         )
         for name in os.listdir(self.control):
+            # SQLite creates/unlinks its journal while holding the namespace lock.
+            # Pre-lock checks inspect immutable entries only; every database/read/
+            # write operation validates the journal strictly after taking the lock.
+            if name == "ledger.sqlite-journal" and not inspect_journal:
+                continue
             try:
                 info(self.control / name)
             except FileNotFoundError:
@@ -266,7 +271,7 @@ class Lifecycle:
     @contextmanager
     def watchdog_lock(self):
         """Lifetime singleton lock precedes namespace lock; writers never take it."""
-        self._paths()
+        self._paths(inspect_journal=False)
         fd = os.open(self.control / "watchdog.lock", os.O_RDWR | os.O_NOFOLLOW)
         try:
             require(
@@ -281,7 +286,7 @@ class Lifecycle:
     @contextmanager
     def locked(self, wait_seconds=1.0):
         identity()
-        self._paths()
+        self._paths(inspect_journal=False)
         fd = os.open(self.control / "lock", os.O_RDWR | os.O_NOFOLLOW)
         try:
             require(
