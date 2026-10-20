@@ -52,6 +52,7 @@ Deterministically generated disabled infrastructure and concrete synthetic polic
 - `infra/aws-retention/cleanup.policy.json`
 - `infra/aws-retention/verifier.policy.json`
 - `infra/aws-retention/cross-account-trust.policy.json`
+- `infrastructure/local/api.Dockerfile`
 
 Governance and documentation:
 
@@ -130,6 +131,13 @@ Final-head Linux CI results are added to the draft PR after actual execution. Th
 full workflow remains required: real disposable
 PostgreSQL/migrations, tenant/fencing/scope/restart, restricted custody, browser,
 frontend, contracts, audits and secret scanning. None is replaced by AWS mocks.
+
+The first Linux integration run at `b043785d5ae80be7463e81c6a5409b99c466acf5`
+failed the artifact-drift test because the existing Dockerfile did not copy the new
+`infra/aws-retention` directory: **1 failed, 853 passed, 104 skipped**. Run
+[39401509690](https://github.com/Stevemeg/RepoVox/actions/runs/39401509690) preserves
+that failure. Added the required COPY to the test/application image and retained
+the exact test assertion. No skip, fallback or security validation was weakened.
 
 ## Safety review and remaining provider tests
 
