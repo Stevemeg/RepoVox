@@ -83,7 +83,10 @@ def test_lambda_crash_after_delete_before_progress_recovers_without_false_succes
         {"InstanceIds": [instance.identifier]},
     )
     result = reconcile(cleaner, r, "lambda-recovery", lambda: 1246)
-    assert result["status"] == "VERIFYING"
+    assert result["outcome"] == "AWAITING_INDEPENDENT_VERIFICATION"
+    assert result["lifecycle_state"] == r.validate()["status"] == "CLEANING"
+    assert result["requested"] == 1 and result["incomplete"] == 0
+    assert result["deletion_verified"] is False
     # Only independent signed emptiness can complete. No canary or SDK success.
     assert r.validate()["status"] != "COMPLETE"
     h.done()
@@ -98,8 +101,108 @@ def test_credential_revocation_provider_outage_remains_incomplete(tmp_path, code
     h.auth()
     h.error("ec2", "terminate_instances", code, {"InstanceIds": [instance.identifier]})
     result = reconcile(Cleaner(h.sdk, [instance], lambda: None), r, "cleanup", lambda: 1200)
-    assert result["status"] == "VERIFYING" and r.validate()["status"] == "CLEANING"
+    assert result["outcome"] == "INCOMPLETE"
+    assert result["lifecycle_state"] == r.validate()["status"] == "CLEANING"
+    assert result["requested"] == 0 and result["incomplete"] == result["operations"] == 1
+    assert result["deletion_verified"] is False
+    assert "status" not in result  # No ambiguous lifecycle/result alias.
     h.done()
+
+
+@pytest.mark.parametrize("fail_first", [True, False])
+def test_partial_provider_failure_cannot_be_hidden_by_success(tmp_path, fail_first):
+    import json
+    import sqlite3
+
+    r, emulator = registry(tmp_path)
+    original_root = r.get("ROOT")
+    r.fence(1200)
+    h = Harness(["sts", "ec2"])
+    resources = [Native("compute", ACCOUNT, REGION, f"i-{number:017x}") for number in [1, 2]]
+    for index, resource in enumerate(resources):
+        h.auth()
+        args = {"InstanceIds": [resource.identifier]}
+        if (index == 0) == fail_first:
+            h.error("ec2", "terminate_instances", "AccessDenied", args)
+        else:
+            h.expect("ec2", "terminate_instances", {"TerminatingInstances": []}, args)
+    result = reconcile(Cleaner(h.sdk, resources, lambda: None), r, "partial", lambda: 1200)
+    assert result["outcome"] == "INCOMPLETE"
+    assert result["operations"] == 2 and result["requested"] == result["incomplete"] == 1
+    assert result["deletion_verified"] is False
+    assert result["lifecycle_state"] == r.validate()["status"] == "CLEANING"
+    assert r.get("ROOT") == original_root
+    with sqlite3.connect(emulator.path) as db:
+        durable = [
+            json.loads(body)["status"]
+            for (body,) in db.execute("SELECT body FROM items WHERE sk LIKE 'PROGRESS#%'")
+        ]
+    assert sorted(durable) == ["INCOMPLETE", "REQUESTED"]
+    h.done()
+
+
+def test_successful_requests_await_independent_absence_not_deletion_success(tmp_path):
+    r, _ = registry(tmp_path)
+    r.fence(1200)
+    h = Harness(["sts", "ec2"])
+    resource = Native("compute", ACCOUNT, REGION, "i-00000000000000001")
+    h.auth()
+    h.expect(
+        "ec2",
+        "terminate_instances",
+        {"TerminatingInstances": []},
+        {"InstanceIds": [resource.identifier]},
+    )
+    result = reconcile(Cleaner(h.sdk, [resource], lambda: None), r, "cleanup", lambda: 1200)
+    assert result == {
+        "version": "aws-cleanup-execution-result-1.0",
+        "outcome": "AWAITING_INDEPENDENT_VERIFICATION",
+        "lifecycle_state": "CLEANING",
+        "generation": 3,
+        "operations": 1,
+        "requested": 1,
+        "incomplete": 0,
+        "deletion_verified": False,
+    }
+    assert r.validate()["status"] == result["lifecycle_state"]
+    with pytest.raises(Refusal, match="write_settlement_unproven"):
+        r.challenge(1201, r.root["verifier_role"], r.root["signing_key_sha256"])
+    h.done()
+
+
+@pytest.mark.parametrize("expiry_point", ["before_request", "after_progress", "empty_tick"])
+def test_stale_cleanup_claim_never_returns_an_execution_result(tmp_path, expiry_point):
+    r, _ = registry(tmp_path)
+    r.fence(1200)
+    h = Harness(["sts", "ec2"])
+    resource = Native("compute", ACCOUNT, REGION, "i-00000000000000001")
+    resources = [] if expiry_point == "empty_tick" else [resource]
+    if expiry_point == "after_progress":
+        h.auth()
+        h.expect(
+            "ec2",
+            "terminate_instances",
+            {"TerminatingInstances": []},
+            {"InstanceIds": [resource.identifier]},
+        )
+        ticks = iter([1200, 1200, 1200, 1246])
+    else:
+        ticks = iter([1200, 1246])
+    with pytest.raises(Refusal, match="stale_claim"):
+        reconcile(Cleaner(h.sdk, resources, lambda: None), r, "stale", lambda: next(ticks))
+    assert r.validate()["status"] == "CLEANING"
+    h.done()
+
+
+def test_empty_tick_does_not_claim_absence(tmp_path):
+    r, _ = registry(tmp_path)
+    r.fence(1200)
+    h = Harness([])
+    result = reconcile(Cleaner(h.sdk, [], lambda: None), r, "empty", lambda: 1200)
+    assert result["outcome"] == "AWAITING_INDEPENDENT_VERIFICATION"
+    assert result["operations"] == result["requested"] == result["incomplete"] == 0
+    assert result["deletion_verified"] is False
+    assert result["lifecycle_state"] == r.validate()["status"] == "CLEANING"
 
 
 def test_execution_fence_stale_after_provider_request(tmp_path):

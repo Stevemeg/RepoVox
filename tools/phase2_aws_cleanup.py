@@ -1,6 +1,25 @@
 """Exact native delete requests. A successful request is never absence proof."""
 
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Literal, TypedDict
+
 from tools.phase2_cloud_retention_model import require
+
+if TYPE_CHECKING:
+    from tools.phase2_aws_registry import Registry
+
+
+class CleanupExecutionResult(TypedDict):
+    """Request execution only; never an independent deletion receipt."""
+
+    version: Literal["aws-cleanup-execution-result-1.0"]
+    outcome: Literal["INCOMPLETE", "AWAITING_INDEPENDENT_VERIFICATION"]
+    lifecycle_state: Literal["CLEANING"]
+    generation: int
+    operations: int
+    requested: int
+    incomplete: int
+    deletion_verified: Literal[False]
 
 
 class Cleaner:
@@ -51,8 +70,15 @@ class Cleaner:
         )
 
 
-def reconcile(cleaner, registry, worker, clock):
-    """One bounded Lambda-compatible tick. Recurrence survives COMPLETE."""
+def reconcile(
+    cleaner: Cleaner, registry: "Registry", worker: str, clock: Callable[[], int]
+) -> CleanupExecutionResult:
+    """One bounded request tick; no lifecycle advance or absence verification.
+
+    Provider failures return INCOMPLETE only after durable progress succeeds.
+    Lost claims or registry errors propagate instead of returning stale authority.
+    Recurrence survives COMPLETE, but this function cannot produce that receipt.
+    """
     token = registry.claim(worker, clock())
     outcomes = []
     for resource in cleaner.registered:
@@ -66,7 +92,20 @@ def reconcile(cleaner, registry, worker, clock):
         else:
             registry.progress(token, resource.commitment, "REQUESTED", clock())
             outcomes.append("REQUESTED")
-    return {"status": "VERIFYING", "operations": len(outcomes)}
+    # Also fence empty ticks and expiry/replacement after the last progress write.
+    # CLEANING is the lifecycle snapshot validated by this exact generation.
+    registry.check_claim(token, clock())
+    incomplete = outcomes.count("INCOMPLETE")
+    return {
+        "version": "aws-cleanup-execution-result-1.0",
+        "outcome": "INCOMPLETE" if incomplete else "AWAITING_INDEPENDENT_VERIFICATION",
+        "lifecycle_state": "CLEANING",
+        "generation": token["generation"],
+        "operations": len(outcomes),
+        "requested": outcomes.count("REQUESTED"),
+        "incomplete": incomplete,
+        "deletion_verified": False,
+    }
 
 
 def lambda_handler(event, context):

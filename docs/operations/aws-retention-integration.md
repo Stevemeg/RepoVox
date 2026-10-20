@@ -131,7 +131,29 @@ content is refused. Zero/multiple discovery candidates remain unresolved.
 Cleanup claims use conditional generation/lease checks; one worker wins. Each
 progress write rechecks owner, generation and current clock. SDK success means
 REQUESTED, never absent. Attachment races do not force detach. Errors remain
-INCOMPLETE; recurrence is not disabled. An in-flight provider call may finish after
+INCOMPLETE; recurrence is not disabled. The
+[AWS-10-01 correction](../delivery/aws-10-01-cleanup-result-correction.md) defines
+`aws-cleanup-execution-result-1.0` for each reconciliation tick:
+
+| Field | Meaning |
+| --- | --- |
+| `outcome: INCOMPLETE` | At least one operation failed and its INCOMPLETE progress was durably recorded; successful requests cannot mask it |
+| `outcome: AWAITING_INDEPENDENT_VERIFICATION` | No operation failed; accepted requests still prove no deletion, including an empty tick |
+| `lifecycle_state: CLEANING` | Registry state at the final successful claim check, bound to the returned `generation`; this tick does not advance the lifecycle |
+| `operations`, `requested`, `incomplete` | Completed execution outcomes; `operations = requested + incomplete`; REQUESTED is only the existing durable per-operation submission status |
+| `deletion_verified: false` | Literal false on every returned result; neither outcome nor REQUESTED is a deletion-success receipt |
+
+The formerly ambiguous unversioned `status: VERIFYING` return is removed. All
+in-repository callers use the new fields; no automatic legacy alias exists.
+Stale/expired/replaced claims and registry/progress failures raise instead of
+returning a result, including lease loss after the last progress write or on an
+empty tick. Durable progress may remain after a lost acknowledgment; idempotent
+reconciliation and independent verification remain necessary. Returned lifecycle
+state is a point-in-time, generation-bound observation, not future authority.
+Only the existing authenticated challenge/absence protocol can advance VERIFYING
+and COMPLETE; the cleanup execution function never emits a completion receipt.
+
+An in-flight provider call may finish after
 fencing or credential revocation. No AWS API supplies universal immediate write
 quiescence, so unproven settlement forbids a verification challenge. This package
 has no real settlement issuer; synthetic fixture rows are explicitly labelled.
