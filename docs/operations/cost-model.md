@@ -1,5 +1,11 @@
 # Self-hosted production and research cost model
 
+The [AWS smoke worksheet](aws-synthetic-test-budget.json) replaces the prior $25
+planning ceiling with **$10 total**, including contingency and cleanup. Its
+[assessment/runbook](aws-synthetic-test-runbook.md) is **BUDGET NOT PROVEN**; unknown
+expenses and outage persistence are not zero. The earlier monthly/seven-day cloud
+subtotals remain incomplete reference arithmetic, not quotes or approved totals.
+
 ## Independent evaluation retention costs
 
 The [cloud retention design](cloud-retention-design.md) adds a separate planning

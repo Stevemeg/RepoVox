@@ -1,5 +1,11 @@
 # Production deployment design
 
+The additive [AWS integration](aws-retention-integration.md) and
+[$10 synthetic proposal](aws-synthetic-test-runbook.md) are deployment-disabled.
+No AWS account, credential, resource or real custodian was activated. Independent
+IAM/API proof, a complete approved quote and single-use deployment authorization
+remain mandatory; changing a template boolean does not supply those approvals.
+
 The [independent evaluation-retention proposal](cloud-retention-design.md) is a
 separate disposable cloud design, not a deployment or change to this production
 architecture. Only offline mock tests are authorized. Real cloud tests, IAM

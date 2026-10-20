@@ -1,0 +1,125 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Exact resource binding; not usable before owner resource approval",
+  "Metadata": {
+    "Package": "aws-retention-package-1.0",
+    "Activation": "REQUIRES_SEPARATE_OWNER_AUTHORIZATION"
+  },
+  "Parameters": {
+    "DeploymentAuthorized": {
+      "Type": "String",
+      "Default": "false",
+      "AllowedValues": [
+        "false",
+        "true"
+      ]
+    },
+    "ApprovedAccount": {
+      "Type": "String",
+      "AllowedPattern": "[0-9]{12}"
+    },
+    "ApprovedRegion": {
+      "Type": "String"
+    },
+    "ApprovalSha256": {
+      "Type": "String",
+      "AllowedPattern": "[a-f0-9]{64}"
+    },
+    "CleanupRoleName": {
+      "Type": "String"
+    }
+  },
+  "Conditions": {
+    "Deploy": {
+      "Fn::And": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "DeploymentAuthorized"
+            },
+            "true"
+          ]
+        },
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "AWS::AccountId"
+            },
+            {
+              "Ref": "ApprovedAccount"
+            }
+          ]
+        },
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "AWS::Region"
+            },
+            {
+              "Ref": "ApprovedRegion"
+            }
+          ]
+        },
+        {
+          "Fn::Not": [
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "ApprovalSha256"
+                },
+                "0000000000000000000000000000000000000000000000000000000000000000"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "Resources": {
+    "ExactCleanupBinding": {
+      "Type": "AWS::IAM::Policy",
+      "Condition": "Deploy",
+      "Properties": {
+        "PolicyName": "RegisteredResourcesOnly",
+        "Roles": [
+          {
+            "Ref": "CleanupRoleName"
+          }
+        ],
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "ec2:TerminateInstances"
+              ],
+              "Resource": [
+                "arn:aws:ec2:us-east-1:111111111111:instance/i-00000000000000001"
+              ],
+              "Condition": {
+                "StringEquals": {
+                  "aws:RequestedRegion": "us-east-1"
+                }
+              }
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "ec2:DeleteVolume"
+              ],
+              "Resource": [
+                "arn:aws:ec2:us-east-1:111111111111:volume/vol-00000000000000001"
+              ],
+              "Condition": {
+                "StringEquals": {
+                  "aws:RequestedRegion": "us-east-1"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

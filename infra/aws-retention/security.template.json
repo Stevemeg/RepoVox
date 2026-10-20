@@ -1,0 +1,1039 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "RepoVox security account: immutable metadata and independent cleanup",
+  "Metadata": {
+    "Package": "aws-retention-package-1.0",
+    "Activation": "REQUIRES_SEPARATE_OWNER_AUTHORIZATION"
+  },
+  "Parameters": {
+    "DeploymentAuthorized": {
+      "Type": "String",
+      "Default": "false",
+      "AllowedValues": [
+        "false",
+        "true"
+      ]
+    },
+    "ApprovedAccount": {
+      "Type": "String",
+      "AllowedPattern": "[0-9]{12}"
+    },
+    "ApprovedRegion": {
+      "Type": "String"
+    },
+    "ApprovalSha256": {
+      "Type": "String",
+      "AllowedPattern": "[a-f0-9]{64}"
+    },
+    "CodeBucket": {
+      "Type": "String"
+    },
+    "CodeKey": {
+      "Type": "String"
+    },
+    "CodeVersion": {
+      "Type": "String"
+    },
+    "CodeSha256": {
+      "Type": "String"
+    },
+    "RegistryBucketName": {
+      "Type": "String"
+    },
+    "ExpiryUTC": {
+      "Type": "String"
+    },
+    "WorkloadCleanupRole": {
+      "Type": "String"
+    },
+    "WorkloadVerifierRole": {
+      "Type": "String"
+    },
+    "ExternalId": {
+      "Type": "String",
+      "MinLength": 32
+    },
+    "IncidentEndpoint": {
+      "Type": "String"
+    },
+    "SecondaryObserverPrincipal": {
+      "Type": "String"
+    },
+    "OrganizationId": {
+      "Type": "String"
+    }
+  },
+  "Conditions": {
+    "Deploy": {
+      "Fn::And": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "DeploymentAuthorized"
+            },
+            "true"
+          ]
+        },
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "AWS::AccountId"
+            },
+            {
+              "Ref": "ApprovedAccount"
+            }
+          ]
+        },
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "AWS::Region"
+            },
+            {
+              "Ref": "ApprovedRegion"
+            }
+          ]
+        },
+        {
+          "Fn::Not": [
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "ApprovalSha256"
+                },
+                "0000000000000000000000000000000000000000000000000000000000000000"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "Resources": {
+    "RegistryKey": {
+      "Type": "AWS::KMS::Key",
+      "Condition": "Deploy",
+      "Properties": {
+        "KeySpec": "SYMMETRIC_DEFAULT",
+        "KeyUsage": "ENCRYPT_DECRYPT",
+        "PendingWindowInDays": 30,
+        "KeyPolicy": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:root"
+                }
+              },
+              "Action": "kms:*",
+              "Resource": "*"
+            }
+          ]
+        }
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "VerifierKey": {
+      "Type": "AWS::KMS::Key",
+      "Condition": "Deploy",
+      "Properties": {
+        "KeySpec": "RSA_3072",
+        "KeyUsage": "SIGN_VERIFY",
+        "PendingWindowInDays": 30,
+        "KeyPolicy": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:root"
+                }
+              },
+              "Action": "kms:*",
+              "Resource": "*"
+            }
+          ]
+        }
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "Registry": {
+      "Type": "AWS::DynamoDB::Table",
+      "Condition": "Deploy",
+      "Properties": {
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "pk",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "sk",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "pk",
+            "KeyType": "HASH"
+          },
+          {
+            "AttributeName": "sk",
+            "KeyType": "RANGE"
+          }
+        ],
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS",
+          "KMSMasterKeyId": {
+            "Ref": "RegistryKey"
+          }
+        },
+        "DeletionProtectionEnabled": true,
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": false
+        }
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "RegistryArchive": {
+      "Type": "AWS::S3::Bucket",
+      "Condition": "Deploy",
+      "Properties": {
+        "BucketName": {
+          "Ref": "RegistryBucketName"
+        },
+        "ObjectLockEnabled": true,
+        "ObjectLockConfiguration": {
+          "ObjectLockEnabled": "Enabled",
+          "Rule": {
+            "DefaultRetention": {
+              "Mode": "COMPLIANCE",
+              "Days": 90
+            }
+          }
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "BucketOwnerEnforced"
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "IgnorePublicAcls": true,
+          "BlockPublicPolicy": true,
+          "RestrictPublicBuckets": true
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "aws:kms",
+                "KMSMasterKeyID": {
+                  "Ref": "RegistryKey"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "Incident": {
+      "Type": "AWS::SNS::Topic",
+      "Condition": "Deploy",
+      "Properties": {
+        "KmsMasterKeyId": "alias/aws/sns"
+      }
+    },
+    "IncidentSubscription": {
+      "Type": "AWS::SNS::Subscription",
+      "Condition": "Deploy",
+      "Properties": {
+        "TopicArn": {
+          "Ref": "Incident"
+        },
+        "Protocol": "https",
+        "Endpoint": {
+          "Ref": "IncidentEndpoint"
+        }
+      }
+    },
+    "FailureQueue": {
+      "Type": "AWS::SQS::Queue",
+      "Condition": "Deploy",
+      "Properties": {
+        "MessageRetentionPeriod": 1209600,
+        "SqsManagedSseEnabled": true
+      }
+    },
+    "CleanupRole": {
+      "Type": "AWS::IAM::Role",
+      "Condition": "Deploy",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "MaxSessionDuration": 3600,
+        "Policies": [
+          {
+            "PolicyName": "ExactPurpose",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/repovox/*:*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sns:Publish"
+                  ],
+                  "Resource": {
+                    "Ref": "Incident"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:SendMessage"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "FailureQueue",
+                      "Arn"
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:ConditionCheckItem"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "Registry",
+                      "Arn"
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sts:AssumeRole"
+                  ],
+                  "Resource": {
+                    "Ref": "WorkloadCleanupRole"
+                  },
+                  "Condition": {
+                    "StringEquals": {
+                      "sts:ExternalId": {
+                        "Ref": "ExternalId"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "CleanupLogs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Condition": "Deploy",
+      "Properties": {
+        "LogGroupName": "/repovox/Cleanup",
+        "RetentionInDays": 14
+      }
+    },
+    "Cleanup": {
+      "Type": "AWS::Lambda::Function",
+      "Condition": "Deploy",
+      "Properties": {
+        "Runtime": "python3.12",
+        "Handler": "tools.phase2_aws_cleanup.lambda_handler",
+        "Role": {
+          "Fn::GetAtt": [
+            "CleanupRole",
+            "Arn"
+          ]
+        },
+        "MemorySize": 256,
+        "Timeout": 30,
+        "ReservedConcurrentExecutions": 1,
+        "Code": {
+          "S3Bucket": {
+            "Ref": "CodeBucket"
+          },
+          "S3Key": {
+            "Ref": "CodeKey"
+          },
+          "S3ObjectVersion": {
+            "Ref": "CodeVersion"
+          }
+        },
+        "Environment": {
+          "Variables": {
+            "REPOVOX_ACTIVATION": "BLOCKED",
+            "APPROVED_CODE_SHA256": {
+              "Ref": "CodeSha256"
+            }
+          }
+        },
+        "LoggingConfig": {
+          "LogGroup": {
+            "Ref": "CleanupLogs"
+          }
+        },
+        "DeadLetterConfig": {
+          "TargetArn": {
+            "Fn::GetAtt": [
+              "FailureQueue",
+              "Arn"
+            ]
+          }
+        }
+      }
+    },
+    "VerifierRole": {
+      "Type": "AWS::IAM::Role",
+      "Condition": "Deploy",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "MaxSessionDuration": 3600,
+        "Policies": [
+          {
+            "PolicyName": "ExactPurpose",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/repovox/*:*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sns:Publish"
+                  ],
+                  "Resource": {
+                    "Ref": "Incident"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:SendMessage"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "FailureQueue",
+                      "Arn"
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sts:AssumeRole"
+                  ],
+                  "Resource": {
+                    "Ref": "WorkloadVerifierRole"
+                  },
+                  "Condition": {
+                    "StringEquals": {
+                      "sts:ExternalId": {
+                        "Ref": "ExternalId"
+                      }
+                    }
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "kms:Sign",
+                    "kms:GetPublicKey"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "VerifierKey",
+                      "Arn"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "VerifierLogs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Condition": "Deploy",
+      "Properties": {
+        "LogGroupName": "/repovox/Verifier",
+        "RetentionInDays": 14
+      }
+    },
+    "Verifier": {
+      "Type": "AWS::Lambda::Function",
+      "Condition": "Deploy",
+      "Properties": {
+        "Runtime": "python3.12",
+        "Handler": "tools.phase2_aws_cleanup.lambda_handler",
+        "Role": {
+          "Fn::GetAtt": [
+            "VerifierRole",
+            "Arn"
+          ]
+        },
+        "MemorySize": 256,
+        "Timeout": 30,
+        "ReservedConcurrentExecutions": 1,
+        "Code": {
+          "S3Bucket": {
+            "Ref": "CodeBucket"
+          },
+          "S3Key": {
+            "Ref": "CodeKey"
+          },
+          "S3ObjectVersion": {
+            "Ref": "CodeVersion"
+          }
+        },
+        "Environment": {
+          "Variables": {
+            "REPOVOX_ACTIVATION": "BLOCKED",
+            "APPROVED_CODE_SHA256": {
+              "Ref": "CodeSha256"
+            }
+          }
+        },
+        "LoggingConfig": {
+          "LogGroup": {
+            "Ref": "VerifierLogs"
+          }
+        },
+        "DeadLetterConfig": {
+          "TargetArn": {
+            "Fn::GetAtt": [
+              "FailureQueue",
+              "Arn"
+            ]
+          }
+        }
+      }
+    },
+    "SupervisorRole": {
+      "Type": "AWS::IAM::Role",
+      "Condition": "Deploy",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "MaxSessionDuration": 3600,
+        "Policies": [
+          {
+            "PolicyName": "ExactPurpose",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/repovox/*:*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sns:Publish"
+                  ],
+                  "Resource": {
+                    "Ref": "Incident"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:SendMessage"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "FailureQueue",
+                      "Arn"
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:ConditionCheckItem"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "Registry",
+                      "Arn"
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "cloudwatch:PutMetricData"
+                  ],
+                  "Resource": "*",
+                  "Condition": {
+                    "StringEquals": {
+                      "cloudwatch:namespace": "RepoVoxRetention"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "SupervisorLogs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Condition": "Deploy",
+      "Properties": {
+        "LogGroupName": "/repovox/Supervisor",
+        "RetentionInDays": 14
+      }
+    },
+    "Supervisor": {
+      "Type": "AWS::Lambda::Function",
+      "Condition": "Deploy",
+      "Properties": {
+        "Runtime": "python3.12",
+        "Handler": "tools.phase2_aws_cleanup.lambda_handler",
+        "Role": {
+          "Fn::GetAtt": [
+            "SupervisorRole",
+            "Arn"
+          ]
+        },
+        "MemorySize": 256,
+        "Timeout": 30,
+        "ReservedConcurrentExecutions": 1,
+        "Code": {
+          "S3Bucket": {
+            "Ref": "CodeBucket"
+          },
+          "S3Key": {
+            "Ref": "CodeKey"
+          },
+          "S3ObjectVersion": {
+            "Ref": "CodeVersion"
+          }
+        },
+        "Environment": {
+          "Variables": {
+            "REPOVOX_ACTIVATION": "BLOCKED",
+            "APPROVED_CODE_SHA256": {
+              "Ref": "CodeSha256"
+            }
+          }
+        },
+        "LoggingConfig": {
+          "LogGroup": {
+            "Ref": "SupervisorLogs"
+          }
+        },
+        "DeadLetterConfig": {
+          "TargetArn": {
+            "Fn::GetAtt": [
+              "FailureQueue",
+              "Arn"
+            ]
+          }
+        }
+      }
+    },
+    "PrimaryObservationRole": {
+      "Type": "AWS::IAM::Role",
+      "Condition": "Deploy",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Ref": "SecondaryObserverPrincipal"
+                }
+              },
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "StringEquals": {
+                  "sts:ExternalId": {
+                    "Ref": "ExternalId"
+                  },
+                  "aws:PrincipalOrgID": {
+                    "Ref": "OrganizationId"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "MaxSessionDuration": 3600,
+        "Policies": [
+          {
+            "PolicyName": "ExactPurpose",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "Registry",
+                      "Arn"
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "cloudwatch:GetMetricData"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "ScheduleGroup": {
+      "Type": "AWS::Scheduler::ScheduleGroup",
+      "Condition": "Deploy",
+      "Properties": {
+        "Name": "repovox-retention"
+      }
+    },
+    "ScheduleRole": {
+      "Type": "AWS::IAM::Role",
+      "Condition": "Deploy",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "scheduler.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceAccount": {
+                    "Ref": "AWS::AccountId"
+                  }
+                },
+                "ArnEquals": {
+                  "aws:SourceArn": {
+                    "Fn::GetAtt": [
+                      "ScheduleGroup",
+                      "Arn"
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "MaxSessionDuration": 3600,
+        "Policies": [
+          {
+            "PolicyName": "ExactPurpose",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "lambda:InvokeFunction"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": [
+                        "Cleanup",
+                        "Arn"
+                      ]
+                    },
+                    {
+                      "Fn::GetAtt": [
+                        "Supervisor",
+                        "Arn"
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:SendMessage"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "FailureQueue",
+                      "Arn"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "Expiry": {
+      "Type": "AWS::Scheduler::Schedule",
+      "Condition": "Deploy",
+      "Properties": {
+        "GroupName": {
+          "Ref": "ScheduleGroup"
+        },
+        "FlexibleTimeWindow": {
+          "Mode": "OFF"
+        },
+        "ScheduleExpression": {
+          "Fn::Sub": "at(${ExpiryUTC})"
+        },
+        "ScheduleExpressionTimezone": "UTC",
+        "State": "DISABLED",
+        "Target": {
+          "Arn": {
+            "Fn::GetAtt": [
+              "Cleanup",
+              "Arn"
+            ]
+          },
+          "RoleArn": {
+            "Fn::GetAtt": [
+              "ScheduleRole",
+              "Arn"
+            ]
+          },
+          "DeadLetterConfig": {
+            "Arn": {
+              "Fn::GetAtt": [
+                "FailureQueue",
+                "Arn"
+              ]
+            }
+          },
+          "RetryPolicy": {
+            "MaximumEventAgeInSeconds": 3600,
+            "MaximumRetryAttempts": 3
+          }
+        }
+      }
+    },
+    "Reconcile": {
+      "Type": "AWS::Scheduler::Schedule",
+      "Condition": "Deploy",
+      "Properties": {
+        "GroupName": {
+          "Ref": "ScheduleGroup"
+        },
+        "FlexibleTimeWindow": {
+          "Mode": "OFF"
+        },
+        "ScheduleExpression": "rate(1 minute)",
+        "ScheduleExpressionTimezone": "UTC",
+        "State": "DISABLED",
+        "Target": {
+          "Arn": {
+            "Fn::GetAtt": [
+              "Cleanup",
+              "Arn"
+            ]
+          },
+          "RoleArn": {
+            "Fn::GetAtt": [
+              "ScheduleRole",
+              "Arn"
+            ]
+          },
+          "DeadLetterConfig": {
+            "Arn": {
+              "Fn::GetAtt": [
+                "FailureQueue",
+                "Arn"
+              ]
+            }
+          },
+          "RetryPolicy": {
+            "MaximumEventAgeInSeconds": 3600,
+            "MaximumRetryAttempts": 3
+          }
+        }
+      }
+    },
+    "Monitor": {
+      "Type": "AWS::Scheduler::Schedule",
+      "Condition": "Deploy",
+      "Properties": {
+        "GroupName": {
+          "Ref": "ScheduleGroup"
+        },
+        "FlexibleTimeWindow": {
+          "Mode": "OFF"
+        },
+        "ScheduleExpression": "rate(1 minute)",
+        "ScheduleExpressionTimezone": "UTC",
+        "State": "DISABLED",
+        "Target": {
+          "Arn": {
+            "Fn::GetAtt": [
+              "Supervisor",
+              "Arn"
+            ]
+          },
+          "RoleArn": {
+            "Fn::GetAtt": [
+              "ScheduleRole",
+              "Arn"
+            ]
+          },
+          "DeadLetterConfig": {
+            "Arn": {
+              "Fn::GetAtt": [
+                "FailureQueue",
+                "Arn"
+              ]
+            }
+          },
+          "RetryPolicy": {
+            "MaximumEventAgeInSeconds": 3600,
+            "MaximumRetryAttempts": 3
+          }
+        }
+      }
+    },
+    "HeartbeatMissing": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Condition": "Deploy",
+      "Properties": {
+        "Namespace": "RepoVoxRetention",
+        "MetricName": "LoopProgress",
+        "Dimensions": [],
+        "Period": 60,
+        "EvaluationPeriods": 2,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "ComparisonOperator": "LessThanOrEqualToThreshold",
+        "TreatMissingData": "breaching",
+        "AlarmActions": [
+          {
+            "Ref": "Incident"
+          }
+        ]
+      }
+    },
+    "FailuresPresent": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Condition": "Deploy",
+      "Properties": {
+        "Namespace": "AWS/SQS",
+        "MetricName": "ApproximateNumberOfMessagesVisible",
+        "Dimensions": [
+          {
+            "Name": "QueueName",
+            "Value": {
+              "Fn::GetAtt": [
+                "FailureQueue",
+                "QueueName"
+              ]
+            }
+          }
+        ],
+        "Period": 60,
+        "EvaluationPeriods": 2,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "TreatMissingData": "breaching",
+        "AlarmActions": [
+          {
+            "Ref": "Incident"
+          }
+        ]
+      }
+    }
+  }
+}

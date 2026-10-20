@@ -1,0 +1,42 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeInstances",
+        "ec2:DescribeVolumes",
+        "ec2:DescribeSnapshots",
+        "ec2:DescribeImages",
+        "ec2:ListSnapshotsInRecycleBin",
+        "ec2:ListImagesInRecycleBin",
+        "ec2:ListVolumesInRecycleBin",
+        "backup:ListBackupVaults",
+        "backup:ListRecoveryPointsByBackupVault",
+        "rbin:ListRules",
+        "s3:ListAllMyBuckets",
+        "s3express:ListAllMyDirectoryBuckets"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "us-east-1"
+        }
+      }
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetBucketLocation",
+        "s3:ListBucketVersions",
+        "s3:ListBucketMultipartUploads"
+      ],
+      "Resource": "arn:aws:s3:::*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "us-east-1"
+        }
+      }
+    }
+  ]
+}

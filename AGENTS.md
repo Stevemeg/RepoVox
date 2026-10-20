@@ -12,6 +12,14 @@ RepoVox is solo-maintained by GitHub owner **Stevemeg**. Codex is the implementa
 
 ## No premature phase advancement
 
+The owner accepted offline CR-01..04 at `6b412e930dfcfd6b771a457d27633f5f7d5ac8e5`
+and authorized SDK adapters, disabled AWS IaC, simulated integration, security and
+$10 test planning only. Use `phase2/aws-retention-integration` stacked on that
+accepted PR #9 head; keep all PRs draft/unmerged. No AWS credentials, account change,
+deployment, paid test or real evidence is authorized. $10 is a planning ceiling,
+not spend approval. Reviewer-copy decision remains PENDING. Preserve frozen code.
+See [AWS integration contract](docs/operations/aws-retention-integration.md).
+
 Re-review of `43dbcfa178f0b6ffec1164bb5f051f0619d7e363` accepted offline CR-01,
 CR-03 and pending-decision CR-04. The owner authorized only a bounded CR-02 verifier
 coverage correction, synthetic tests and full Linux CI. Broader read enumeration
