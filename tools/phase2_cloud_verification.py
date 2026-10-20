@@ -16,6 +16,17 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from tools.phase2_cloud_retention_model import Resource, canonical, digest, require
 
 KINDS = ["bucket", "compute", "snapshot", "upload", "version", "volume"]
+INVENTORY_SCOPE = "DEDICATED_ACCOUNT_REGION"
+QUERY_VERSION = "absence-query-1.2"
+
+
+def require_inventory_scope(request):
+    require(
+        type(request) is dict
+        and request.get("version") == QUERY_VERSION
+        and request.get("inventory_scope") == INVENTORY_SCOPE,
+        "inventory_scope",
+    )
 
 
 class ReadOnlyFixtureInventory:
@@ -29,6 +40,7 @@ class ReadOnlyFixtureInventory:
         self.path, self.principal, self.credential = path, principal, credential
 
     def query(self, request):
+        require_inventory_scope(request)
         with sqlite3.connect(self.path.as_uri() + "?mode=ro", uri=True) as db:
             db.execute("BEGIN")
             row = db.execute(
@@ -49,14 +61,16 @@ class ReadOnlyFixtureInventory:
                 Resource(**json.loads(body))
                 for (body,) in db.execute("SELECT body FROM resources WHERE present=1")
             ]
-        expected = {tuple(identity) for identity in request["identities"]}
-        parents = {identity[-1] for identity in expected if identity[0] == "bucket"}
-        selected = [
-            r
-            for r in resources
-            if r.namespace == request["namespace"] or r.identity in expected or r.parent in parents
-        ]
-        return sorted(digest(canonical(asdict(r))) for r in selected)
+        # Read coverage is account/region-wide, NOT a deletion allowlist. Parent
+        # metadata may be absent (detached disks) or unusable (snapshot copies).
+        # Never narrow absence evidence using namespace, tenant, tags or lineage.
+        for resource in resources:
+            require(
+                (resource.account, resource.region) == (request["account"], request["region"]),
+                "provider_resource_boundary",
+            )
+            require(resource.kind in KINDS, "provider_resource_kind")
+        return sorted(digest(canonical(asdict(r))) for r in resources)
 
 
 class OfflineVerifier:
@@ -101,7 +115,8 @@ def challenge(ledger, now):
         resources = ledger.resources(db)
         manifest = ledger.manifest
         request = dict(
-            version="absence-query-1.1",
+            version=QUERY_VERSION,
+            inventory_scope=INVENTORY_SCOPE,
             root=ledger.expected,
             generation=generation,
             catalog=digest(canonical(sorted(r.commitment for r in resources))),
@@ -124,6 +139,7 @@ def challenge(ledger, now):
 
 
 def accept_observation(ledger, request, envelope, now):
+    require_inventory_scope(request)
     body, signature = envelope
     require(
         type(body) is bytes and len(body) <= 256000 and type(signature) is bytes,
@@ -189,7 +205,8 @@ def accept_observation(ledger, request, envelope, now):
         ledger.audit(db, "ABSENCE_VERIFIED")
         db.commit()
     return dict(
-        version="synthetic-cleanup-receipt-1.1",
+        version="synthetic-cleanup-receipt-1.2",
+        inventory_scope=INVENTORY_SCOPE,
         registry=ledger.expected,
         status="COMPLETE",
         verified_at=now,

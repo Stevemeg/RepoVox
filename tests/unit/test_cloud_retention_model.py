@@ -218,7 +218,7 @@ def test_unmanaged_source_copy_and_unregistered_delete_rejected(tmp_path):
         cloud.delete(unknown, manifest)
 
 
-def test_unrelated_sentinel_unchanged(tmp_path):
+def test_unrelated_sentinel_unchanged_without_account_wide_absence(tmp_path):
     manifest, _, cloud, controller = fixture(tmp_path)
     unrelated = replace(
         manifest.resources[1], identifier="vol-22222222222222222", namespace="unrelated"
@@ -226,7 +226,10 @@ def test_unrelated_sentinel_unchanged(tmp_path):
     cloud.resources[unrelated.identity] = unrelated
     cloud.present.add(unrelated.identity)
     assert controller.reconcile(2000) == "VERIFYING"
-    controller.verify(2001, observer(cloud))
+    with pytest.raises(Refusal, match="protected_resources_remain"):
+        controller.verify(2001, observer(cloud))
+    with pytest.raises(Refusal, match="unregistered_delete"):
+        cloud.delete(unrelated, manifest)
     assert cloud.present == {unrelated.identity}
 
 

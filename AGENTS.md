@@ -12,6 +12,11 @@ RepoVox is solo-maintained by GitHub owner **Stevemeg**. Codex is the implementa
 
 ## No premature phase advancement
 
+Re-review of `43dbcfa178f0b6ffec1164bb5f051f0619d7e363` accepted offline CR-01,
+CR-03 and pending-decision CR-04. The owner authorized only a bounded CR-02 verifier
+coverage correction, synthetic tests and full Linux CI. Broader read enumeration
+must not grant broader cleanup. No real evidence, key access, AWS, spending or pilot.
+
 The owner accepted the cloud design at `95aa6d265038f0b111eec91770690ebd2016a363`
 for design-stage engineering only and authorized CR-01..04 offline corrections:
 native exact identities, independent authenticated absence verification, durable

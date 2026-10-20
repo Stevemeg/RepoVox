@@ -4,6 +4,11 @@ Status: Design-stage engineering accepted at
 `95aa6d265038f0b111eec91770690ebd2016a363`; CR-01..04 corrections proposed for
 independent re-review. Date: 2026-10-20. No deployment or pilot approval.
 
+Re-review of `43dbcfa178f0b6ffec1164bb5f051f0619d7e363` accepted CR-01/CR-03 for
+the offline model and CR-04 as a pending, fail-closed owner decision. CR-02 coverage
+remains open pending independent review of the account/region-wide read correction.
+See the [coverage report](../delivery/cloud-verifier-coverage-correction.md).
+
 ## Problem
 
 The owner cannot provide an always-on laptop/VM or overnight incident response.
@@ -34,7 +39,7 @@ not establish real provider behavior. See the [design/failure matrix](../operati
 [cost inputs](../operations/cloud-retention-costs.json) and
 [verification/handoff](../delivery/cloud-retention-design-verification.md).
 
-The [1.1 correction contract](../operations/cloud-retention-review-contract.md)
+The [correction contract](../operations/cloud-retention-review-contract.md)
 defines native compound identities, an independently authenticated read-only
 verifier/signing interface and durable one-use dynamic-ID creation intents.
 Older mock ledgers are rejected without migration. The

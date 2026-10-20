@@ -1,6 +1,6 @@
 # Cloud retention review corrections
 
-Version: `cloud-retention-review-contract-1.1`. Date: 2026-10-20.
+Version: `cloud-retention-review-contract-1.2`. Date: 2026-10-20.
 Normative **offline design/model** contract, not live cloud authorization. Design
 at `95aa6d265038f0b111eec91770690ebd2016a363` was independently accepted for
 design-stage engineering only. These corrections require independent re-review.
@@ -54,6 +54,55 @@ validity. The independently authenticated read-only provider connection obtains
 its own inventory. It must enumerate all approved parents, versions, delete markers,
 uploads and compute/storage, including unexpected children regardless of tags.
 The cleaner's cached list, success response or credentials are not evidence.
+
+### Enumeration scope and relationship completeness
+
+CR-02 re-review of `43dbcfa178f0b6ffec1164bb5f051f0619d7e363` found that the original
+namespace/identity/S3-parent filter could omit EBS descendants. The corrected
+fixed read profile is **DEDICATED_ACCOUNT_REGION**: enumerate every present resource
+of the six supported kinds in the exact account/region, with no namespace, tenant,
+tag, registered-ID or parent filter. No matching lineage is needed for inclusion.
+Each returned row must agree with the authenticated endpoint account/region;
+wrong-boundary rows and unsupported kinds refuse verification. A legitimate unrelated
+resource also prevents an empty-account receipt. It never becomes deletable merely
+because it was enumerated. A shared workload account cannot use this empty-account
+profile and must remain blocked rather than silently switch to a narrower query.
+
+| Relationship relevant to discovery | Why parent-only matching is insufficient |
+| --- | --- |
+| Compute to attached EBS volumes | Must inspect every attachment, including unexpected volumes and multiple attachments; detachment can remove the surviving edge |
+| EBS volume to snapshots | An unregistered snapshot can refer to a registered volume after that volume is deleted; namespace/tags do not determine inclusion |
+| Snapshot to restored volume; volume to copied volume | Derived volumes can be detached and have no compute parent; the mock's single parent field is not a complete provider lineage graph |
+| Snapshot copies and backups | Copied snapshots can have an arbitrary source-volume ID; lineage inference alone cannot prove coverage |
+| S3 buckets to versions/delete markers/uploads | Include all keys/versions/uploads in every supported bucket in scope, including unregistered destinations; unknown parent names cannot be filtered out |
+
+AWS describes [all volume attachments and snapshot/copy origin fields](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Volume.html),
+[attachment instance identity](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VolumeAttachment.html)
+and [snapshot source-volume limitations for copies](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Snapshot.html).
+These relationships inform discovery and diagnostics, **not deletion authority**.
+The offline inventory includes disconnected/transitive descendants conservatively
+without pretending its single-parent schema represents all those AWS fields.
+
+Provider-wide enumeration here means account/region-wide for supported kinds, not
+every AWS service, other accounts/regions, replicas, AMIs, backups or host exports.
+The fixture executes an exhaustive read transaction; a real adapter still needs
+independent ownership/region checks, all API pages, permission/error detection,
+S3 bucket-region discovery and settled writes. Unknown or inaccessible destinations
+cannot be declared absent. Unsupported storage/copy paths remain prohibited until
+separately reviewed. Provider-wide enumeration does not itself authorize metadata
+access in a shared account or erase original resource-approval requirements.
+
+Parent-scoped enumeration would compute typed transitive descendants from exact
+registered roots, including foreign-namespace volumes/snapshots. It cannot by itself
+recover detached/copy lineage or unknown exports. That alternative is **not accepted
+as an absence proof** by this implementation. It would require a separately approved
+scope contract, proven complete relationship evidence and independent tests.
+
+`absence-query-1.2` and `synthetic-cleanup-receipt-1.2` explicitly bind/record the
+fixed inventory scope. Signatures and durable nonces bind the full scoped request.
+Legacy 1.1 or narrowed queries are refused, never reinterpreted as account-wide.
+The immutable root/model 1.1 and SQLite version 110 are unchanged; no old row,
+expiry, registration or custody record is rewritten or migrated.
 
 Canonical observations bind the complete challenge, observation time, all kind
 coverage, exhaustive-enumeration flag and remaining commitments. Acceptance verifies

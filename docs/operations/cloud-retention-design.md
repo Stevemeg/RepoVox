@@ -58,6 +58,10 @@ flowchart LR
   opaque identifiers/commitments only, no source, predictions or private references.
 - Verifier: separate read-only cloud role and independently obtained inventories;
   it cannot delete or treat a cleaner's success response as absence evidence.
+  The corrected offline proof enumerates all six supported resource kinds in the
+  dedicated account/region, independent of labels or parent links. Unrelated
+  remaining resources block COMPLETE but acquire no cleanup authority. See the
+  [coverage contract and limitations](cloud-retention-review-contract.md).
 - Secondary-region observer: opaque health/registry commitments only. No protected
   replica or competing multi-writer fence. Detect primary-region silence externally.
 - Contracted incident service: separately approved, audited break-glass access.
