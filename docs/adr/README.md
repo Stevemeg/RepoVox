@@ -1,5 +1,8 @@
 # Architectural decisions
 
+Independent cloud-retention design: [ADR-0021](0021-independent-cloud-retention.md),
+mock-only preparation; no paid deployment or real-pilot authorization.
+
 Post-execution custody: [ADR-0020](0020-post-execution-custody-authority.md), proposed
 for independent review; no real-pilot activation or official corpus acceptance.
 
@@ -27,3 +30,5 @@ All proposed for Phase 0 review, dated 2026-10-08. Acceptance follows independen
 | [017](0017-pilot-control-plane-safety.md) | Durable pilot authorization, fenced cancellation and mandatory original-file scope |
 | [018](0018-isolated-retention-runtime.md) | Isolated runtime identity, executable bytes and bounded retention readiness |
 | [019](0019-growing-evaluation-custodian.md) | Durable growing evidence, write-intent recovery and fenced expiry |
+| [020](0020-post-execution-custody-authority.md) | Separate execution leases and bounded owner-key custody review grants |
+| [021](0021-independent-cloud-retention.md) | External immutable registry, cleanup fencing, reconciliation and honest cloud guarantees |

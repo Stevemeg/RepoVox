@@ -1,5 +1,20 @@
 # Self-hosted production and research cost model
 
+## Independent evaluation retention costs
+
+The [cloud retention design](cloud-retention-design.md) adds a separate planning
+ledger, not a change to product/video economics or an approved spend. Its
+[reference inputs](cloud-retention-costs.json) and
+[offline calculator](../../tools/phase2_cloud_budget.py) preserve unknown costs,
+charge all modeled usage without free-tier credits, and use 730-hour planning
+proration. Run `python tools/phase2_cloud_budget.py --hours 730` for monthly and
+`--hours 168` for an illustrative seven-day three-family attempt. These are known
+reference subtotals plus explicitly unquoted services/24-hour incident response,
+not complete regional budgets. Exact provider/account, tax, transfer and responder
+quotes are required before provisioning; no resource or purchase is authorized.
+
+## Existing product and research baseline
+
 Phase 2B [effort observations](../ai/evaluation-effort.json) record zero actual cash
 spend and unmeasured human preparation/review hours. No approved pilot throughput exists.
 The [batch plan](../development/evaluation-batches.md) requires measured annotation,

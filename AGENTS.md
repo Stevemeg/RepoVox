@@ -12,6 +12,13 @@ RepoVox is solo-maintained by GitHub owner **Stevemeg**. Codex is the implementa
 
 ## No premature phase advancement
 
+The owner authorized independent cloud-retention architecture and mock-only
+synthetic engineering on 2026-10-20. Continue the draft PR #9 branch; preserve
+accepted analyzer/scorer, control SQL, custody and historical deadlines. No AWS
+provisioning, paid resource, real evidence, acquisition or pilot is authorized.
+Stop at design/security review and separate test-budget approval. See
+[ADR-0021](docs/adr/0021-independent-cloud-retention.md).
+
 The owner authorized execution-to-review integration on 2026-10-19, continuing
 draft PR #9. Separate genuine SQL execution leases from bounded offline owner-key
 review grants; use disposable synthetic PostgreSQL/Linux custody verification.

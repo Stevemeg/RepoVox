@@ -1,5 +1,11 @@
 # Delivery roadmap and phase gates
 
+Owner-authorized 2026-10-20 [independent cloud-retention preparation](../operations/cloud-retention-design.md)
+adds architecture and offline synthetic tests only. It changes no EVAL-ENTRY
+threshold/count, source-fact/scoring contract or accepted control-plane SQL.
+Cloud deployment and real-pilot execution remain separately gated. See
+[review evidence](cloud-retention-design-verification.md).
+
 Current authority, 2026-10-12: owner accepted Phase 0 `e35d8ef8a8a53cb34e46271a9813b5332ea42c1f`
 and Phase 1 `ec09b733ab3ceffe592ad96d07902b92596dfd1b`, then authorized Phase 2 static
 analysis/evaluation preparation. PRs remain unmerged. The proposal below is preserved

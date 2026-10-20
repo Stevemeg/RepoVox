@@ -1,5 +1,10 @@
 # Production deployment design
 
+The [independent evaluation-retention proposal](cloud-retention-design.md) is a
+separate disposable cloud design, not a deployment or change to this production
+architecture. Only offline mock tests are authorized. Real cloud tests, IAM
+activation and any pilot need separate budget/owner approval and independent review.
+
 Phase 2B [protected evaluation storage](../development/evaluation-storage.md) remains an
 offline owner-authorized custodian boundary, separate from application workers and
 public Git. No official store, reviewer access or backup was provisioned; synthetic
