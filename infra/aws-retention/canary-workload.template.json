@@ -1,0 +1,295 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "OFFLINE ONLY: workload IAM/STS canary, no custody or retention service",
+  "Metadata": {
+    "Package": "aws-control-canary-preflight-1.0",
+    "Activation": "REQUIRES_SEPARATE_OWNER_AUTHORIZATION",
+    "LiveHarness": "NOT_IMPLEMENTED"
+  },
+  "Parameters": {
+    "DeploymentAuthorized": {
+      "Type": "String",
+      "Default": "false",
+      "AllowedValues": [
+        "false",
+        "true"
+      ]
+    },
+    "ApprovedAccount": {
+      "Type": "String",
+      "AllowedPattern": "[0-9]{12}"
+    },
+    "ApprovedRegion": {
+      "Type": "String",
+      "AllowedValues": [
+        "us-east-1"
+      ]
+    },
+    "ApprovalSha256": {
+      "Type": "String",
+      "AllowedPattern": "[a-f0-9]{64}"
+    },
+    "Namespace": {
+      "Type": "String",
+      "AllowedPattern": "[a-f0-9]{16}"
+    },
+    "ExternalId": {
+      "Type": "String",
+      "MinLength": 32,
+      "MaxLength": 64
+    },
+    "OrganizationId": {
+      "Type": "String",
+      "AllowedPattern": "o-[a-z0-9]{10,32}"
+    },
+    "PeerAccount": {
+      "Type": "String",
+      "AllowedPattern": "[0-9]{12}"
+    },
+    "NotBeforeUtc": {
+      "Type": "String",
+      "AllowedPattern": "[0-9TZ:-]{20}"
+    },
+    "NotAfterUtc": {
+      "Type": "String",
+      "AllowedPattern": "[0-9TZ:-]{20}"
+    }
+  },
+  "Conditions": {
+    "Deploy": {
+      "Fn::And": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "DeploymentAuthorized"
+            },
+            "true"
+          ]
+        },
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "AWS::AccountId"
+            },
+            {
+              "Ref": "ApprovedAccount"
+            }
+          ]
+        },
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "AWS::Region"
+            },
+            {
+              "Ref": "ApprovedRegion"
+            }
+          ]
+        },
+        {
+          "Fn::Not": [
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "ApprovalSha256"
+                },
+                "0000000000000000000000000000000000000000000000000000000000000000"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "Resources": {
+    "Probe": {
+      "Type": "AWS::IAM::Role",
+      "Condition": "Deploy",
+      "Properties": {
+        "RoleName": {
+          "Fn::Sub": "rv-canary-${Namespace}-Probe"
+        },
+        "MaxSessionDuration": 3600,
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Sub": "arn:aws:iam::${PeerAccount}:role/rv-canary-${Namespace}-Caller"
+                }
+              },
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "StringEquals": {
+                  "sts:ExternalId": {
+                    "Ref": "ExternalId"
+                  },
+                  "aws:PrincipalOrgID": {
+                    "Ref": "OrganizationId"
+                  },
+                  "aws:RequestedRegion": {
+                    "Ref": "ApprovedRegion"
+                  }
+                },
+                "DateGreaterThanEquals": {
+                  "aws:CurrentTime": {
+                    "Ref": "NotBeforeUtc"
+                  }
+                },
+                "DateLessThan": {
+                  "aws:CurrentTime": {
+                    "Ref": "NotAfterUtc"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "CanaryOnly",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "iam:GetRole"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:role/rv-canary-${Namespace}-Probe"
+                    }
+                  ],
+                  "Condition": {
+                    "DateGreaterThanEquals": {
+                      "aws:CurrentTime": {
+                        "Ref": "NotBeforeUtc"
+                      }
+                    },
+                    "DateLessThan": {
+                      "aws:CurrentTime": {
+                        "Ref": "NotAfterUtc"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete"
+    },
+    "Audit": {
+      "Type": "AWS::IAM::Role",
+      "Condition": "Deploy",
+      "Properties": {
+        "RoleName": {
+          "Fn::Sub": "rv-canary-${Namespace}-Audit"
+        },
+        "MaxSessionDuration": 3600,
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Sub": "arn:aws:iam::${PeerAccount}:role/rv-canary-${Namespace}-Verifier"
+                }
+              },
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "StringEquals": {
+                  "sts:ExternalId": {
+                    "Ref": "ExternalId"
+                  },
+                  "aws:PrincipalOrgID": {
+                    "Ref": "OrganizationId"
+                  },
+                  "aws:RequestedRegion": {
+                    "Ref": "ApprovedRegion"
+                  }
+                },
+                "DateGreaterThanEquals": {
+                  "aws:CurrentTime": {
+                    "Ref": "NotBeforeUtc"
+                  }
+                },
+                "DateLessThan": {
+                  "aws:CurrentTime": {
+                    "Ref": "NotAfterUtc"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "CanaryOnly",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "iam:ListRoles"
+                  ],
+                  "Resource": "*",
+                  "Condition": {
+                    "DateGreaterThanEquals": {
+                      "aws:CurrentTime": {
+                        "Ref": "NotBeforeUtc"
+                      }
+                    },
+                    "DateLessThan": {
+                      "aws:CurrentTime": {
+                        "Ref": "NotAfterUtc"
+                      }
+                    }
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "iam:GetRole",
+                    "iam:GetRolePolicy",
+                    "iam:ListRolePolicies",
+                    "iam:ListAttachedRolePolicies"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:role/rv-canary-${Namespace}-Probe"
+                    },
+                    {
+                      "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:role/rv-canary-${Namespace}-Audit"
+                    }
+                  ],
+                  "Condition": {
+                    "DateGreaterThanEquals": {
+                      "aws:CurrentTime": {
+                        "Ref": "NotBeforeUtc"
+                      }
+                    },
+                    "DateLessThan": {
+                      "aws:CurrentTime": {
+                        "Ref": "NotAfterUtc"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "DeletionPolicy": "Delete",
+      "UpdateReplacePolicy": "Delete"
+    }
+  }
+}

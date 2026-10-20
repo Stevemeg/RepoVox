@@ -1,0 +1,39 @@
+{
+  "version": "aws-control-canary-cost-worksheet-1.0",
+  "profile": "IAM_STS_ONLY",
+  "reference_date": "2026-10-20",
+  "primary_region": "us-east-1",
+  "secondary_region": "us-west-2",
+  "ceiling_usd": 10,
+  "active_minutes": 30,
+  "teardown_reserve_minutes": 30,
+  "followup_hours": 24,
+  "free_tier_or_credits_assumed": false,
+  "rows": [
+    {"item": "IAM roles and STS", "region": "GLOBAL / regional STS us-east-1 and us-west-2", "quantity": "4 roles; at most 100 application requests", "known_reference_usd": 0, "source": "https://docs.aws.amazon.com/IAM/latest/UserGuide/introduction.html", "basis": "Service features offered at no additional charge; not a free-tier assumption"},
+    {"item": "CloudFormation native IAM resources", "region": "us-east-1 in two accounts", "quantity": "2 stacks / 4 AWS::IAM::Role resources", "known_reference_usd": 0, "source": "https://aws.amazon.com/cloudformation/pricing/", "basis": "AWS::* provider operations have no additional service charge; installed third-party hooks are a separate unknown"},
+    {"item": "Existing Organizations service", "region": "GLOBAL", "quantity": "existing organization only; 0 account or organization creation", "known_reference_usd": 0, "source": "https://docs.aws.amazon.com/organizations/latest/userguide/pricing.html", "basis": "No additional Organizations fee; underlying services still charge"},
+    {"item": "CloudTrail event history", "region": "us-east-1 and us-west-2", "quantity": "existing default management history only", "known_reference_usd": 0, "source": "https://aws.amazon.com/cloudtrail/pricing/", "basis": "No-charge event history; no new trail or Lake. Paid organization trails/destinations not assumed absent"},
+    {"item": "Compute, storage, KMS, DDB, Lambda, Scheduler, SNS/SQS, metrics, log groups and networking resources", "region": "both regions", "quantity": "0 created", "known_reference_usd": 0, "basis": "Excluded by exact proposed resource inventory, not a zero unit-price claim"},
+    {"item": "Existing regional/organization audit configuration and hooks", "region": "both regions / management account", "known_reference_usd": null, "unknown": "Owner must disclose CloudTrail copies, S3/KMS/Logs/Lake, Config recorders, Security Hub, custom hooks, automatic remediations, subscriptions and retention. Full downstream request, storage and query prices/quantities needed"},
+    {"item": "Internet/API transfer and operator connectivity", "region": "us-east-1 and us-west-2", "known_reference_usd": null, "unknown": "Account-specific transfer classification/bytes, existing paid endpoints/proxy/VPN and operator connection costs. No VPC/NAT/endpoints or CloudShell provisioned by this test"},
+    {"item": "Account, support, taxes, currency, payment and operator costs", "region": "billing jurisdiction unknown", "known_reference_usd": null, "unknown": "Payer/support allocation, tax jurisdiction/rate, currency conversion/payment fees and time-limited primary/backup operator quote or explicit actual zero incremental compensation evidence"},
+    {"item": "Failure, delayed teardown and retained audit metadata", "region": "both regions / downstream audit destinations", "known_reference_usd": null, "unknown": "No bound on outages, intervention or downstream log/metadata retention yet. IAM roles incur no direct storage charge, but logging/security liabilities can persist after role deletion"},
+    {"item": "Contingency and residual-liability reserve", "region": "all approved destinations", "known_reference_usd": null, "unknown": "Allocate the remaining portion of the $10 ceiling only after a complete quote; reserve is not extra spending permission or a hard provider cap"}
+  ],
+  "known_reference_subtotal_usd": 0,
+  "complete_account_specific_quote": false,
+  "fixed_fee_total_usd": null,
+  "duration_based_total_usd": null,
+  "tax_operator_failure_inclusive_total_usd": null,
+  "maximum_residual_liability_usd": null,
+  "budget_disposition": "BUDGET NOT PROVEN",
+  "spending_authorized": false,
+  "optional_not_in_this_canary": {
+    "KMS": "0 keys. New RSA-3072 service key needs a separate quote for key-hours, Sign/GetPublicKey/Verify requests, CloudTrail and administration. Reference storage $1/key-month prorated hourly; no key-storage fee while pending deletion, but canceling deletion retroactively charges. Minimum deletion wait 7 days, possibly 24 hours longer; PendingDeletion is not absence. No use of owner key. Requires revised inventory, policies, budget and approval.",
+    "DynamoDB": "0 tables. A future single-region conditional/transaction test needs regional read/write/transaction units, storage and failed-condition accounting, encryption/audit costs and explicit no PITR/backup/stream/export/replica. No such behavior is proved by this canary.",
+    "KMS_reference": "https://aws.amazon.com/kms/pricing/",
+    "KMS_deletion_reference": "https://docs.aws.amazon.com/kms/latest/developerguide/deleting-keys.html",
+    "DynamoDB_reference": "https://aws.amazon.com/dynamodb/pricing/"
+  }
+}

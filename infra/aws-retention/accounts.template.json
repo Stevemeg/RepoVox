@@ -1,0 +1,107 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Optional organization account reservation; owner management-account approval required",
+  "Metadata": {
+    "Package": "aws-retention-package-1.0",
+    "Activation": "REQUIRES_SEPARATE_OWNER_AUTHORIZATION"
+  },
+  "Parameters": {
+    "DeploymentAuthorized": {
+      "Type": "String",
+      "Default": "false",
+      "AllowedValues": [
+        "false",
+        "true"
+      ]
+    },
+    "ApprovedAccount": {
+      "Type": "String",
+      "AllowedPattern": "[0-9]{12}"
+    },
+    "ApprovedRegion": {
+      "Type": "String"
+    },
+    "ApprovalSha256": {
+      "Type": "String",
+      "AllowedPattern": "[a-f0-9]{64}"
+    },
+    "WorkloadEmail": {
+      "Type": "String"
+    },
+    "SecurityEmail": {
+      "Type": "String"
+    }
+  },
+  "Conditions": {
+    "Deploy": {
+      "Fn::And": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "DeploymentAuthorized"
+            },
+            "true"
+          ]
+        },
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "AWS::AccountId"
+            },
+            {
+              "Ref": "ApprovedAccount"
+            }
+          ]
+        },
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "AWS::Region"
+            },
+            {
+              "Ref": "ApprovedRegion"
+            }
+          ]
+        },
+        {
+          "Fn::Not": [
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "ApprovalSha256"
+                },
+                "0000000000000000000000000000000000000000000000000000000000000000"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "Resources": {
+    "WorkloadAccount": {
+      "Type": "AWS::Organizations::Account",
+      "Condition": "Deploy",
+      "Properties": {
+        "AccountName": "RepoVox-Workload",
+        "Email": {
+          "Ref": "WorkloadEmail"
+        }
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "SecurityAccount": {
+      "Type": "AWS::Organizations::Account",
+      "Condition": "Deploy",
+      "Properties": {
+        "AccountName": "RepoVox-Security",
+        "Email": {
+          "Ref": "SecurityEmail"
+        }
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    }
+  }
+}

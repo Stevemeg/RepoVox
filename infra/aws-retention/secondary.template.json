@@ -1,0 +1,314 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "RepoVox secondary region independent health-of-monitor",
+  "Metadata": {
+    "Package": "aws-retention-package-1.0",
+    "Activation": "REQUIRES_SEPARATE_OWNER_AUTHORIZATION"
+  },
+  "Parameters": {
+    "DeploymentAuthorized": {
+      "Type": "String",
+      "Default": "false",
+      "AllowedValues": [
+        "false",
+        "true"
+      ]
+    },
+    "ApprovedAccount": {
+      "Type": "String",
+      "AllowedPattern": "[0-9]{12}"
+    },
+    "ApprovedRegion": {
+      "Type": "String"
+    },
+    "ApprovalSha256": {
+      "Type": "String",
+      "AllowedPattern": "[a-f0-9]{64}"
+    },
+    "ObserverImage": {
+      "Type": "String"
+    },
+    "PrimaryReadRole": {
+      "Type": "String"
+    },
+    "ExternalId": {
+      "Type": "String",
+      "MinLength": 32
+    }
+  },
+  "Conditions": {
+    "Deploy": {
+      "Fn::And": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "DeploymentAuthorized"
+            },
+            "true"
+          ]
+        },
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "AWS::AccountId"
+            },
+            {
+              "Ref": "ApprovedAccount"
+            }
+          ]
+        },
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "AWS::Region"
+            },
+            {
+              "Ref": "ApprovedRegion"
+            }
+          ]
+        },
+        {
+          "Fn::Not": [
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "ApprovalSha256"
+                },
+                "0000000000000000000000000000000000000000000000000000000000000000"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "Resources": {
+    "Incident": {
+      "Type": "AWS::SNS::Topic",
+      "Condition": "Deploy",
+      "Properties": {
+        "KmsMasterKeyId": "alias/aws/sns"
+      }
+    },
+    "ObserverLogs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Condition": "Deploy",
+      "Properties": {
+        "LogGroupName": "/repovox/secondary",
+        "RetentionInDays": 14
+      }
+    },
+    "ObserverRole": {
+      "Type": "AWS::IAM::Role",
+      "Condition": "Deploy",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "MaxSessionDuration": 3600,
+        "Policies": [
+          {
+            "PolicyName": "ExactPurpose",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sts:AssumeRole"
+                  ],
+                  "Resource": {
+                    "Ref": "PrimaryReadRole"
+                  },
+                  "Condition": {
+                    "StringEquals": {
+                      "sts:ExternalId": {
+                        "Ref": "ExternalId"
+                      }
+                    }
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "cloudwatch:PutMetricData"
+                  ],
+                  "Resource": "*",
+                  "Condition": {
+                    "StringEquals": {
+                      "cloudwatch:namespace": "RepoVoxRetentionSecondary"
+                    }
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sns:Publish"
+                  ],
+                  "Resource": {
+                    "Ref": "Incident"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/repovox/*:*"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "Observer": {
+      "Type": "AWS::Lambda::Function",
+      "Condition": "Deploy",
+      "Properties": {
+        "PackageType": "Image",
+        "Code": {
+          "ImageUri": {
+            "Ref": "ObserverImage"
+          }
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "ObserverRole",
+            "Arn"
+          ]
+        },
+        "MemorySize": 128,
+        "Timeout": 30,
+        "ReservedConcurrentExecutions": 1,
+        "Environment": {
+          "Variables": {
+            "REPOVOX_ACTIVATION": "BLOCKED"
+          }
+        }
+      }
+    },
+    "ScheduleGroup": {
+      "Type": "AWS::Scheduler::ScheduleGroup",
+      "Condition": "Deploy",
+      "Properties": {
+        "Name": "repovox-secondary"
+      }
+    },
+    "ScheduleRole": {
+      "Type": "AWS::IAM::Role",
+      "Condition": "Deploy",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "scheduler.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceAccount": {
+                    "Ref": "AWS::AccountId"
+                  }
+                },
+                "ArnEquals": {
+                  "aws:SourceArn": {
+                    "Fn::GetAtt": [
+                      "ScheduleGroup",
+                      "Arn"
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "MaxSessionDuration": 3600,
+        "Policies": [
+          {
+            "PolicyName": "ExactPurpose",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "lambda:InvokeFunction"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "Observer",
+                      "Arn"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "Observe": {
+      "Type": "AWS::Scheduler::Schedule",
+      "Condition": "Deploy",
+      "Properties": {
+        "GroupName": {
+          "Ref": "ScheduleGroup"
+        },
+        "FlexibleTimeWindow": {
+          "Mode": "OFF"
+        },
+        "ScheduleExpression": "rate(1 minute)",
+        "State": "DISABLED",
+        "Target": {
+          "Arn": {
+            "Fn::GetAtt": [
+              "Observer",
+              "Arn"
+            ]
+          },
+          "RoleArn": {
+            "Fn::GetAtt": [
+              "ScheduleRole",
+              "Arn"
+            ]
+          }
+        }
+      }
+    },
+    "MissingProgress": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Condition": "Deploy",
+      "Properties": {
+        "Namespace": "RepoVoxRetentionSecondary",
+        "MetricName": "PrimaryProgress",
+        "Period": 60,
+        "EvaluationPeriods": 2,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "ComparisonOperator": "LessThanOrEqualToThreshold",
+        "TreatMissingData": "breaching",
+        "AlarmActions": [
+          {
+            "Ref": "Incident"
+          }
+        ]
+      }
+    }
+  }
+}

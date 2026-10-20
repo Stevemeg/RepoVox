@@ -1,5 +1,11 @@
 # Self-hosted production and research cost model
 
+The [AWS smoke worksheet](aws-synthetic-test-budget.json) replaces the prior $25
+planning ceiling with **$10 total**, including contingency and cleanup. Its
+[assessment/runbook](aws-synthetic-test-runbook.md) is **BUDGET NOT PROVEN**; unknown
+expenses and outage persistence are not zero. The earlier monthly/seven-day cloud
+subtotals remain incomplete reference arithmetic, not quotes or approved totals.
+
 ## Independent evaluation retention costs
 
 The [cloud retention design](cloud-retention-design.md) adds a separate planning
@@ -148,5 +154,14 @@ Proposed owner-reviewed pilot production budget **$2,000/month** including conti
 Delivery: cumulative bytes <=3 final-video sizes/job over retention, <=2 concurrent streams/grant and owner aggregate enforced atomically; range/download replay counts actual bytes, min accounting quantum 64 KiB. Signed grants expire <=5 min and deletion/logout revokes. Failed upstream byte reservation released only on confirmed non-delivery; egress has no free unbounded tier. Bandwidth quota increase requires explicit pricing/budget policy.
 
 ## Limits and refresh procedure
+
+The proposed [30-minute IAM/STS-only AWS canary](aws-control-canary-preflight.md)
+has a separate [regional cost-input worksheet](aws-control-canary-costs.json).
+Its known additional-service-charge subtotal is $0 because it creates only IAM
+roles through native CloudFormation; account audit, operator, tax and failure
+exposure remain unknown. **BUDGET NOT PROVEN** under the $10 total ceiling. This
+does not replace the larger four-hour AWS test estimate, authorize a free tier,
+or establish a deployable retention service. See the separate
+[single-use approval proposal](aws-control-canary-approval.json).
 
 Obtain region-specific quotes for EC2/RDS/Redis/ALB/NAT/S3/EBS/Cognito and model/provider license terms before provisioning. Include taxes, payment fees, customer support, extra availability GPU and disaster reserve in commercial pricing; those are excluded from this technical planning estimate. Network/backup allowances may prove low. Dataset licensing/review time may dominate GPU expense. Update JSON with measured aggregate throughput/p95/load durations, repeat offline tests/table generation, attach quote date/region and compare worst-case failed jobs. No benchmark, paid account, GPU run or production deployment was executed here.

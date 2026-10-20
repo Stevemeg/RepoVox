@@ -1,5 +1,12 @@
 # Delivery roadmap and phase gates
 
+Owner-authorized AWS adapter/IaC work continues accepted offline CR-01..04 from
+`6b412e930dfcfd6b771a457d27633f5f7d5ac8e5`. The
+[integration handoff](aws-integration-verification.md) and
+[$10 smoke proposal](../operations/aws-synthetic-test-runbook.md) remain offline,
+disabled and subject to independent review, complete cost evidence and separate
+owner deployment authorization. No official corpus/count/freeze change follows.
+
 Owner-authorized 2026-10-20 [independent cloud-retention preparation](../operations/cloud-retention-design.md)
 adds architecture and offline synthetic tests only. It changes no EVAL-ENTRY
 threshold/count, source-fact/scoring contract or accepted control-plane SQL.

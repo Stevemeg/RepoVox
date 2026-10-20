@@ -1,9 +1,9 @@
 name: Phase 1 and 2 quality gates
 on:
   pull_request:
-    branches: [main, phase0/foundation, phase1/saas-foundation, phase2/repository-intelligence, phase2/eval-entry, phase2/ai-audited-pilot, phase2/canonical-fact-remediation, phase2/source-fact-v2-evaluation, phase2/pilot-control-plane-safety]
+    branches: [main, phase0/foundation, phase1/saas-foundation, phase2/repository-intelligence, phase2/eval-entry, phase2/ai-audited-pilot, phase2/canonical-fact-remediation, phase2/source-fact-v2-evaluation, phase2/pilot-control-plane-safety, phase2/retention-runtime-verification]
   push:
-    branches: [phase1/saas-foundation, phase2/repository-intelligence, phase2/eval-entry, phase2/ai-audited-pilot, phase2/canonical-fact-remediation, phase2/source-fact-v2-evaluation, phase2/pilot-control-plane-safety, phase2/retention-runtime-verification]
+    branches: [phase1/saas-foundation, phase2/repository-intelligence, phase2/eval-entry, phase2/ai-audited-pilot, phase2/canonical-fact-remediation, phase2/source-fact-v2-evaluation, phase2/pilot-control-plane-safety, phase2/retention-runtime-verification, phase2/aws-retention-integration]
 permissions:
   contents: read
 concurrency:
@@ -25,7 +25,18 @@ jobs:
       - run: uv run ruff check apps/api tests tools/phase1*.py tools/phase2*.py
       - run: uv run ruff format --check apps/api tests tools/phase1*.py tools/phase2*.py
       - run: uv run mypy
+      - name: Additional AWS script body type checks (existing strict application gate unchanged)
+        run: uv run mypy --explicit-package-bases --follow-imports silent --ignore-missing-imports --allow-untyped-defs --allow-untyped-calls --allow-any-generics --check-untyped-defs tools/phase2_aws*.py
       - run: uv run pytest tests/unit -q
+      - name: Disabled AWS package drift, budget and CloudFormation validation (no credentials)
+        run: |
+          PYTHONPATH=. uv run python tools/phase2_aws_infrastructure.py --check
+          PYTHONPATH=. uv run python tools/phase2_aws_budget.py
+          python -m venv /tmp/repovox-cfn-lint
+          /tmp/repovox-cfn-lint/bin/pip install pip==26.2.0
+          /tmp/repovox-cfn-lint/bin/pip install cfn-lint==1.52.0
+          /tmp/repovox-cfn-lint/bin/cfn-lint --template infra/aws-retention/*.template.json
+          uv run pip-audit --path /tmp/repovox-cfn-lint/lib/python3.12/site-packages
       - name: Accepted Phase 0 documentation and contracts
         run: |
           uv run python tools/check_docs.py
