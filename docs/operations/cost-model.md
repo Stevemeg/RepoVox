@@ -155,4 +155,13 @@ Delivery: cumulative bytes <=3 final-video sizes/job over retention, <=2 concurr
 
 ## Limits and refresh procedure
 
+The proposed [30-minute IAM/STS-only AWS canary](aws-control-canary-preflight.md)
+has a separate [regional cost-input worksheet](aws-control-canary-costs.json).
+Its known additional-service-charge subtotal is $0 because it creates only IAM
+roles through native CloudFormation; account audit, operator, tax and failure
+exposure remain unknown. **BUDGET NOT PROVEN** under the $10 total ceiling. This
+does not replace the larger four-hour AWS test estimate, authorize a free tier,
+or establish a deployable retention service. See the separate
+[single-use approval proposal](aws-control-canary-approval.json).
+
 Obtain region-specific quotes for EC2/RDS/Redis/ALB/NAT/S3/EBS/Cognito and model/provider license terms before provisioning. Include taxes, payment fees, customer support, extra availability GPU and disaster reserve in commercial pricing; those are excluded from this technical planning estimate. Network/backup allowances may prove low. Dataset licensing/review time may dominate GPU expense. Update JSON with measured aggregate throughput/p95/load durations, repeat offline tests/table generation, attach quote date/region and compare worst-case failed jobs. No benchmark, paid account, GPU run or production deployment was executed here.
