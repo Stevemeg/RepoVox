@@ -104,7 +104,7 @@ diagnostics alongside later results, never substitute reconstructed logs.
 
 Local combined new/accepted cloud regression suite: **216 passed, zero skipped**
 (91.89 seconds), before final binding hardening. The final new AWS suite has **64**
-cases, including 19 independent
+cases before final verifier-enrollment hardening, including 19 independent
 service/security cases rerun after strengthening cross-account signer separation.
 Full Windows unit suite: **743 passed, 39 skipped**, 338 warnings (140.26 seconds).
 POSIX skips are not counted as passes. Ruff and formatting (143 files), strict
@@ -112,6 +112,10 @@ application mypy (57 files), docs (97 Markdown/613 links/36 JSON), 32 planning t
 and original cost checks passed. The final registry-binding hardening and additional
 negative case were followed by **41 affected tests passing** (21.86 seconds). The
 full Windows count above precedes that last added case; final Linux CI covers it.
+Final self-review additionally pinned verifier role/public-key commitments in the
+immutable root rather than permitting challenge callers to choose trust anchors.
+Two negative substitution cases and a cross-account service-signing run cover that
+hardening; the final AWS suite has 66 cases. This is additive to the accepted model.
 Extra AWS script body checks supplement, rather
 than weaken, the application's unchanged strict typing scope.
 

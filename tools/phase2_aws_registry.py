@@ -39,6 +39,8 @@ class Registry:
                 "expires",
                 "resources",
                 "creation_slots",
+                "verifier_role",
+                "signing_key_sha256",
             }
             <= set(root_body),
             "root_binding_fields",
@@ -51,6 +53,20 @@ class Registry:
             "root_identity",
         )
         require(re.fullmatch(r"[a-f0-9]{64}", root_body["manifest_sha256"]), "source_commitment")
+        require(
+            re.fullmatch(r"[a-f0-9]{64}", root_body["signing_key_sha256"]), "service_key_binding"
+        )
+        require(
+            re.fullmatch(
+                r"arn:aws:iam::" + root_body["account"] + r":role/[A-Za-z0-9_+=,.@/-]+",
+                root_body["verifier_role"],
+            ),
+            "service_role_binding",
+        )
+        require(
+            all(type(root_body[k]) is int for k in ["created", "authorization_expires", "expires"]),
+            "fixed_deadlines",
+        )
         require(
             root_body["created"]
             < root_body["authorization_expires"]
@@ -334,6 +350,11 @@ class Registry:
         )
 
     def challenge(self, now, verifier_role, key_sha):
+        require(
+            (verifier_role, key_sha)
+            == (self.root["verifier_role"], self.root["signing_key_sha256"]),
+            "pinned_verifier_authority",
+        )
         state = self.validate()
         require(
             state["status"] in {"CLEANING", "VERIFYING", "COMPLETE"} and state["outstanding"] == 0,

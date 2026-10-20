@@ -1,6 +1,7 @@
 """Offline policy structure and service-signature tests, not effective AWS IAM."""
 
 import hashlib
+from copy import deepcopy
 from dataclasses import replace
 
 import pytest
@@ -9,6 +10,7 @@ from aws_fixtures import (
     ANCHOR,
     BOUNDARY,
     REGION,
+    ROOT_BODY,
     Harness,
     empty_inventory,
 )
@@ -48,10 +50,12 @@ def signed(key, body):
 
 
 def request_fixture(tmp_path, key):
-    r, emulator = registry(tmp_path)
     der = key.public_key().public_bytes(
         serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
     )
+    root = deepcopy(ROOT_BODY)
+    root["signing_key_sha256"] = digest(der)
+    r, emulator = registry(tmp_path, root)
     r.fence(1200)
     token = r.claim("cleaner", 1200)
     emulator.seed("SETTLEMENT", generation=token["generation"], sha256="b" * 64)
@@ -61,10 +65,15 @@ def request_fixture(tmp_path, key):
 
 def test_independent_inventory_to_kms_service_signature_and_nonce(tmp_path, service_key):
     r, request, der = request_fixture(tmp_path, service_key)
-    reader = Harness(["sts", "ec2", "backup", "rbin", "s3"])
+    reader = Harness(
+        ["sts", "ec2", "backup", "rbin", "s3"], replace(BOUNDARY, root=request["root"])
+    )
     empty_inventory(reader)
     signing_boundary = replace(
-        BOUNDARY, account="222222222222", role="arn:aws:iam::222222222222:role/SigningService"
+        BOUNDARY,
+        account="222222222222",
+        role="arn:aws:iam::222222222222:role/SigningService",
+        root=request["root"],
     )
     signer = Harness(["sts", "kms"], signing_boundary)
     signer.auth(

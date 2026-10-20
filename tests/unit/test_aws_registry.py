@@ -2,6 +2,7 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
+from dataclasses import replace
 from threading import Barrier
 
 import pytest
@@ -11,11 +12,15 @@ from tools.phase2_aws_registry import Registry
 from tools.phase2_cloud_retention_model import Refusal, canonical
 
 
-def registry(tmp_path):
+def registry(tmp_path, root_body=None):
     emulator = LocalDynamo(tmp_path / "disposable.sqlite")
     # Registry SDK interface uses the SQLite fixture; no cloud SDK/network.
-    emulator.boundary = BOUNDARY
-    instance = Registry(emulator, "synthetic-registry", deepcopy(ROOT_BODY), ANCHOR)
+    from tools.phase2_cloud_retention_model import digest
+
+    root = deepcopy(ROOT_BODY if root_body is None else root_body)
+    anchor = digest(canonical(root))
+    emulator.boundary = replace(BOUNDARY, root=anchor)
+    instance = Registry(emulator, "synthetic-registry", root, anchor)
     instance.initialize()
     instance.activate("a" * 64, 1100)
     return instance, emulator
@@ -177,6 +182,20 @@ def test_missing_source_or_attempt_binding_cannot_initialize(tmp_path):
     with pytest.raises(Refusal, match="root_binding_fields"):
         Registry(emulator, "fixture", body, anchor)
     assert emulator.calls == []
+
+
+@pytest.mark.parametrize(
+    "role,key_sha",
+    [
+        ("arn:aws:iam::111111111111:role/Substitute", "a" * 64),
+        (BOUNDARY.role, "f" * 64),
+    ],
+)
+def test_challenge_cannot_enroll_caller_chosen_verifier(tmp_path, role, key_sha):
+    r, _ = registry(tmp_path)
+    r.fence(1200)
+    with pytest.raises(Refusal, match="pinned_verifier_authority"):
+        r.challenge(1200, role, key_sha)
 
 
 def test_stalled_health_blocks_writes_and_heartbeat_cannot_extend_expiry(tmp_path):

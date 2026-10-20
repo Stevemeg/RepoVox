@@ -19,6 +19,8 @@ ROOT_BODY = dict(
     owner="synthetic-owner",
     attempt="synthetic-attempt",
     manifest_sha256="c" * 64,
+    verifier_role="arn:aws:iam::111111111111:role/Verifier",
+    signing_key_sha256="a" * 64,
     resources=[],
     account=ACCOUNT,
     region=REGION,
@@ -179,8 +181,9 @@ class LocalDynamo:
 
     def seed(self, sk, **fields):
         with sqlite3.connect(self.path) as db:
-            item = dict(pk=ANCHOR, sk=sk, **fields)
-            db.execute("INSERT OR REPLACE INTO items VALUES(?,?,?)", (ANCHOR, sk, json.dumps(item)))
+            anchor = self.boundary.root
+            item = dict(pk=anchor, sk=sk, **fields)
+            db.execute("INSERT OR REPLACE INTO items VALUES(?,?,?)", (anchor, sk, json.dumps(item)))
 
 
 def empty_inventory(h, overrides=None):
