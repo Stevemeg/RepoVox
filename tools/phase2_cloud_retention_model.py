@@ -44,8 +44,83 @@ class Resource:
     key: str = ""
 
     @property
+    def identity(self):
+        # Provider IDs are scoped, not globally unique. Never URL/path/Unicode normalize.
+        return (self.kind, self.account, self.region, self.parent, self.key, self.identifier)
+
+    @property
     def commitment(self):
         return digest(canonical(asdict(self)))
+
+
+def utf8_size(value, maximum, code):
+    require(type(value) is str, code)
+    try:
+        size = len(value.encode("utf-8", errors="strict"))
+    except UnicodeError:
+        raise Refusal(code) from None
+    require(0 < size <= maximum, code)
+
+
+def validate_resources(resources, manifest):
+    require(0 < len(resources) <= 100, "resource_limit")
+    require(len({r.identity for r in resources}) == len(resources), "duplicate_resource")
+    require(sum(r.kind == "compute" for r in resources) == 1, "one_runtime")
+    for r in resources:
+        require(
+            re.fullmatch(r"[a-f0-9]{64}", r.provisioning_sha256)
+            and r.provisioning_sha256 != "0" * 64,
+            "provisioning_receipt",
+        )
+        require(
+            (r.account, r.region, r.namespace, r.tenant)
+            == (manifest.account, manifest.region, manifest.namespace, manifest.tenant),
+            "resource_boundary",
+        )
+        if r.kind in {"version", "upload"}:
+            # S3 VersionId <=1024 UTF-8 bytes. UploadId has no documented small
+            # maximum: 16KiB is our explicit protocol cap, not an AWS assertion.
+            utf8_size(r.identifier, 1024 if r.kind == "version" else 16384, "resource_id")
+            utf8_size(r.key, 1024, "object_key")
+        elif r.kind == "bucket":
+            require(
+                re.fullmatch(r"[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]", r.identifier)
+                and ".." not in r.identifier,
+                "resource_id",
+            )
+        elif r.kind in {"compute", "volume", "snapshot"}:
+            prefix = {"compute": "i", "volume": "vol", "snapshot": "snap"}[r.kind]
+            require(
+                re.fullmatch(prefix + r"-(?:[a-f0-9]{8}|[a-f0-9]{17})", r.identifier), "resource_id"
+            )
+        else:
+            raise Refusal("unsupported_resource")
+        if r.kind in {"volume", "snapshot", "version", "upload"}:
+            parent_kind = {
+                "volume": "compute",
+                "snapshot": "volume",
+                "version": "bucket",
+                "upload": "bucket",
+            }[r.kind]
+            require(
+                sum(p.identifier == r.parent and p.kind == parent_kind for p in resources) == 1,
+                "resource_parent",
+            )
+        else:
+            require(not r.parent, "unexpected_parent")
+        if r.kind not in {"version", "upload"}:
+            require(not r.key, "unexpected_key")
+
+
+@dataclass(frozen=True)
+class CreationSlot:
+    """One approved provider call, exact parent/key; never a wildcard prefix."""
+
+    operation: str
+    kind: str
+    parent: str
+    key: str
+    request_sha256: str
 
 
 @dataclass(frozen=True)
@@ -62,15 +137,33 @@ class Manifest:
     authorization_expires: int
     resources: tuple[Resource, ...]
     mode: str = "SYNTHETIC_ONLY"
-    version: str = "cloud-retention-model-1.0"
+    version: str = "cloud-retention-model-1.1"
     custodian_uid: int = 10002
     custodian_gid: int = 10002
     capability_mask: int = 0
     no_new_privileges: bool = True
+    verifier_public_key: str = ""
+    verifier_principal: str = ""
+    cleanup_principal: str = ""
+    creation_slots: tuple[CreationSlot, ...] = ()
 
     def validate(self):
         require(self.mode == "SYNTHETIC_ONLY", "real_activation_forbidden")
-        require(self.version == "cloud-retention-model-1.0", "model_version")
+        require(self.version == "cloud-retention-model-1.1", "model_version")
+        require(re.fullmatch(r"[a-f0-9]{64}", self.verifier_public_key), "verifier_key")
+        require(
+            re.fullmatch(
+                r"arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]{1,128}", self.verifier_principal
+            ),
+            "verifier_principal",
+        )
+        require(
+            re.fullmatch(
+                r"arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]{1,128}", self.cleanup_principal
+            )
+            and self.cleanup_principal != self.verifier_principal,
+            "separate_cleanup_principal",
+        )
         require(
             type(self.custodian_uid) is int
             and self.custodian_uid == 10002
@@ -92,40 +185,33 @@ class Manifest:
             and self.expires - self.created <= 30 * 86400,
             "fixed_deadlines",
         )
-        require(0 < len(self.resources) <= 100, "resource_limit")
-        ids = {r.identifier: r for r in self.resources}
-        require(len(ids) == len(self.resources), "duplicate_resource")
-        require(sum(r.kind == "compute" for r in self.resources) == 1, "one_runtime")
-        for r in self.resources:
+        validate_resources(self.resources, self)
+        require(len(self.creation_slots) <= 20, "slot_limit")
+        require(len(self.resources) + len(self.creation_slots) <= 100, "resource_limit")
+        require(
+            len({s.operation for s in self.creation_slots}) == len(self.creation_slots),
+            "duplicate_slot",
+        )
+        require(
+            len({(s.kind, s.parent, s.key) for s in self.creation_slots})
+            == len(self.creation_slots),
+            "duplicate_destination",
+        )
+        for s in self.creation_slots:
+            require(re.fullmatch(r"[a-f0-9]{64}", s.operation), "operation_id")
+            require(re.fullmatch(r"[a-f0-9]{64}", s.request_sha256), "request_commitment")
+            require(s.kind in {"version", "upload"}, "dynamic_kind")
+            utf8_size(s.key, 1024, "object_key")
             require(
-                re.fullmatch(r"[a-f0-9]{64}", r.provisioning_sha256)
-                and r.provisioning_sha256 != "0" * 64,
-                "provisioning_receipt",
+                any(r.kind == "bucket" and r.identifier == s.parent for r in self.resources),
+                "slot_parent",
             )
             require(
-                (r.account, r.region, r.namespace, r.tenant)
-                == (self.account, self.region, self.namespace, self.tenant),
-                "resource_boundary",
+                not any(
+                    (r.kind, r.parent, r.key) == (s.kind, s.parent, s.key) for r in self.resources
+                ),
+                "destination_not_fresh",
             )
-            require(re.fullmatch(r"[A-Za-z0-9_-]{1,100}", r.identifier), "resource_id")
-            require(
-                r.kind in {"compute", "volume", "snapshot", "bucket", "version", "upload"},
-                "unsupported_resource",
-            )
-            if r.kind in {"volume", "snapshot", "version", "upload"}:
-                parent_kind = {
-                    "volume": "compute",
-                    "snapshot": "volume",
-                    "version": "bucket",
-                    "upload": "bucket",
-                }[r.kind]
-                require(r.parent in ids and ids[r.parent].kind == parent_kind, "resource_parent")
-            else:
-                require(not r.parent, "unexpected_parent")
-            if r.kind in {"version", "upload"}:
-                require(re.fullmatch(r"objects/[a-f0-9]{64}", r.key), "opaque_object_key")
-            else:
-                require(not r.key, "unexpected_key")
 
     @property
     def body(self):
@@ -147,6 +233,7 @@ class Ledger:
             require(not path.exists(), "exclusive_registry")
             with self.connect() as db:
                 db.executescript("""
+                  PRAGMA user_version=110;
                   CREATE TABLE registry(body BLOB NOT NULL);
                   CREATE TRIGGER immutable_update BEFORE UPDATE ON registry
                     BEGIN SELECT RAISE(ABORT,'immutable_registry'); END;
@@ -157,6 +244,20 @@ class Ledger:
                   CREATE TABLE actions(resource TEXT PRIMARY KEY, status TEXT);
                   CREATE TABLE incidents(reason TEXT PRIMARY KEY, status TEXT);
                   CREATE TABLE audit(seq INTEGER PRIMARY KEY, body BLOB, sha TEXT);
+                  CREATE TABLE create_intents(operation TEXT PRIMARY KEY, body BLOB NOT NULL);
+                  CREATE TRIGGER immutable_intent_update BEFORE UPDATE ON create_intents
+                    BEGIN SELECT RAISE(ABORT,'immutable_intent'); END;
+                  CREATE TRIGGER immutable_intent_delete BEFORE DELETE ON create_intents
+                    BEGIN SELECT RAISE(ABORT,'immutable_intent'); END;
+                  CREATE TABLE intent_status(operation TEXT PRIMARY KEY, status TEXT NOT NULL);
+                  CREATE TABLE registrations(seq INTEGER PRIMARY KEY, operation TEXT UNIQUE,
+                    body BLOB NOT NULL, sha TEXT NOT NULL, previous TEXT NOT NULL);
+                  CREATE TRIGGER immutable_registration_update BEFORE UPDATE ON registrations
+                    BEGIN SELECT RAISE(ABORT,'immutable_registration'); END;
+                  CREATE TRIGGER immutable_registration_delete BEFORE DELETE ON registrations
+                    BEGIN SELECT RAISE(ABORT,'immutable_registration'); END;
+                  CREATE TABLE observations(nonce TEXT PRIMARY KEY, request BLOB NOT NULL,
+                    consumed INTEGER NOT NULL DEFAULT 0, response_sha TEXT);
                 """)
                 db.execute("INSERT INTO registry VALUES(?)", (manifest.body,))
                 db.execute("INSERT INTO state VALUES(1,'CREATED',1,0,'',0)")
@@ -174,6 +275,7 @@ class Ledger:
             db.close()
 
     def validate(self, db):
+        require(db.execute("PRAGMA user_version").fetchone()[0] == 110, "ledger_version")
         rows = db.execute("SELECT body FROM registry").fetchall()
         require(len(rows) == 1 and digest(rows[0][0]) == self.expected, "registry_integrity")
         previous = "0" * 64
@@ -191,6 +293,66 @@ class Ledger:
                 "audit_integrity",
             )
             previous = sha
+        self.resources(db)
+
+    def resources(self, db):
+        """Exact root resources plus immutable, intent-bound provider responses."""
+        result = list(self.manifest.resources)
+        slots = {s.operation: s for s in self.manifest.creation_slots}
+        intents = {}
+        for operation, body, status in db.execute(
+            "SELECT i.operation,i.body,s.status FROM create_intents i "
+            "LEFT JOIN intent_status s USING(operation)"
+        ):
+            try:
+                record = json.loads(body)
+                require(
+                    operation in slots
+                    and record
+                    == dict(root=self.expected, slot=asdict(slots[operation]), generation=1)
+                    and status in {"PREPARED", "DISPATCHED", "REGISTERED"},
+                    "intent_integrity",
+                )
+            except (TypeError, ValueError, KeyError):
+                raise Refusal("intent_integrity") from None
+            intents[operation] = status
+        previous = self.expected
+        for seq, operation, body, sha, prior in db.execute(
+            "SELECT * FROM registrations ORDER BY seq"
+        ):
+            try:
+                resource = Resource(**json.loads(body))
+            except (ValueError, TypeError):
+                raise Refusal("registration_integrity") from None
+            require(
+                operation in slots and intents.get(operation) == "REGISTERED", "registration_intent"
+            )
+            slot = slots[operation]
+            require(
+                (resource.kind, resource.parent, resource.key, resource.provisioning_sha256)
+                == (slot.kind, slot.parent, slot.key, slot.request_sha256),
+                "registration_scope",
+            )
+            require(
+                prior == previous
+                and sha == digest(canonical([seq, operation, digest(body), prior])),
+                "registration_integrity",
+            )
+            previous = sha
+            result.append(resource)
+        require(
+            sum(s == "REGISTERED" for s in intents.values())
+            == len(result) - len(self.manifest.resources),
+            "registration_missing",
+        )
+        validate_resources(result, self.manifest)
+        return tuple(result)
+
+    def inventory(self):
+        with self.connect() as db:
+            db.execute("BEGIN")
+            self.validate(db)
+            return self.resources(db)
 
     def audit(self, db, event):
         row = db.execute("SELECT seq,sha FROM audit ORDER BY seq DESC LIMIT 1").fetchone()
@@ -252,7 +414,7 @@ class Ledger:
             self.validate(db)
             state, fence, ready = db.execute("SELECT status,generation,ready FROM state").fetchone()
             require(tenant == self.manifest.tenant, "tenant")
-            require(resource in self.manifest.resources, "unregistered_copy")
+            require(resource in self.resources(db), "unregistered_copy")
             require(
                 self.manifest.created <= now < self.manifest.authorization_expires,
                 "authorization_expired",
@@ -317,24 +479,25 @@ class MockCloud:
 
     def __init__(self, resources, account, region):
         self.account, self.region = account, region
-        self.resources = {r.identifier: r for r in resources}
+        self.resources = {r.identity: r for r in resources}
         self.present = set(self.resources)
         self.fail = set()
         self.calls = []
         self.quiesced = False
         self.quiesce_available = True
+        self.creation_in_flight = False
         self.guest_running = True
         self.recycled = set()
         self.lock = threading.RLock()
 
-    def inventory(self, manifest):
+    def inventory(self, manifest, resources=None):
         with self.lock:
             require(
                 (self.account, self.region) == (manifest.account, manifest.region),
                 "provider_boundary",
             )
             require("inventory" not in self.fail, "provider_unavailable")
-            expected = {r.identifier: r for r in manifest.resources}
+            expected = {r.identity: r for r in resources or manifest.resources}
             for key in self.present & expected.keys():
                 require(self.resources[key] == expected[key], "provider_identity")
             owned = {
@@ -347,23 +510,31 @@ class MockCloud:
                 require(expected[key] == observed, "provider_identity")
             return tuple(sorted(owned))
 
-    def quiesce(self, manifest):
+    def quiesce(self, manifest, resources=None):
         with self.lock:
-            self.inventory(manifest)
+            self.inventory(manifest, resources)
             require(self.quiesce_available, "writers_not_quiescent")
             self.quiesced = True
 
-    def delete(self, resource, manifest):
+    def delete(self, resource, manifest, resources=None):
         with self.lock:
-            self.inventory(manifest)
-            require(resource in manifest.resources, "unregistered_delete")
+            self.inventory(manifest, resources)
+            require(resource in (resources or manifest.resources), "unregistered_delete")
             require(self.quiesced, "writers_not_quiescent")
-            require(resource.identifier not in self.fail, "provider_unavailable")
-            require(resource.identifier not in self.recycled, "provider_retention_hold")
-            if resource.identifier not in self.present:
+            require(resource.identity not in self.fail, "provider_unavailable")
+            require(resource.identity not in self.recycled, "provider_retention_hold")
+            if resource.identity not in self.present:
                 return  # Idempotent not-found only after boundary/inventory checks.
             if resource.kind == "volume":
-                require(resource.parent not in self.present, "volume_still_attached")
+                require(
+                    not any(
+                        r.kind == "compute"
+                        and r.identifier == resource.parent
+                        and r.identity in self.present
+                        for r in self.resources.values()
+                    ),
+                    "volume_still_attached",
+                )
             if resource.kind == "bucket":
                 require(
                     not any(
@@ -373,7 +544,7 @@ class MockCloud:
                     "bucket_not_empty",
                 )
             self.calls.append((resource.kind, resource.commitment))
-            self.present.remove(resource.identifier)
+            self.present.remove(resource.identity)
 
 
 class MockAlerts:
@@ -397,10 +568,11 @@ class Controller:
 
     def reconcile(self, now, worker="cleaner", crash_after_delete=False):
         manifest = self.ledger.manifest
+        resources = self.ledger.inventory()
         status = self.ledger.snapshot()[0]
         if status == "COMPLETE":
             # Reconciliation remains active and independently checks absence again.
-            if self.cloud.inventory(manifest):
+            if self.cloud.inventory(manifest, resources):
                 self.ledger.incident("POST_COMPLETION_DRIFT")
                 raise Refusal("post_completion_resource")
             return "COMPLETE"
@@ -408,7 +580,12 @@ class Controller:
         if generation is None:
             return "COMPLETE"
         try:
-            self.cloud.quiesce(manifest)
+            # Dynamic identities must be recovered before exact deletion is possible.
+            from tools.phase2_cloud_registration import Registration
+
+            Registration(self.ledger).recover(self.cloud, now)
+            resources = self.ledger.inventory()
+            self.cloud.quiesce(manifest, resources)
             rank = {
                 "compute": 0,
                 "upload": 1,
@@ -417,7 +594,7 @@ class Controller:
                 "volume": 4,
                 "bucket": 5,
             }
-            for resource in sorted(manifest.resources, key=lambda r: (rank[r.kind], r.identifier)):
+            for resource in sorted(resources, key=lambda r: (rank[r.kind], r.identity)):
 
                 def intent(db, resource=resource):
                     db.execute(
@@ -425,7 +602,7 @@ class Controller:
                     )
 
                 self.ledger.fenced_transaction(worker, generation, now, intent)
-                self.cloud.delete(resource, manifest)  # No DB lock across provider I/O.
+                self.cloud.delete(resource, manifest, resources)  # No DB lock across provider I/O.
                 if crash_after_delete:
                     raise InterruptedError("synthetic_crash")
 
@@ -455,32 +632,9 @@ class Controller:
             return "OVERDUE_INCOMPLETE" if now >= manifest.expires else "INCOMPLETE"
 
     def verify(self, now, observer):
-        require(
-            type(observer) is MockCloud and observer is not self.cloud, "separate_observer_required"
-        )
-        require(
-            observer.resources is self.cloud.resources and observer.present is self.cloud.present,
-            "independent_inventory_view",
-        )
-        require(not observer.inventory(self.ledger.manifest), "protected_resources_remain")
-        with self.ledger.connect() as db:
-            db.execute("BEGIN IMMEDIATE")
-            self.ledger.validate(db)
-            status, ready = db.execute("SELECT status,ready FROM state").fetchone()
-            require(status in {"VERIFYING", "COMPLETE"} and not ready, "verification_state")
-            require(now >= self.ledger.manifest.created, "clock")
-            if status != "COMPLETE":
-                db.execute("UPDATE state SET status='COMPLETE'")
-                self.ledger.audit(db, "ABSENCE_VERIFIED")
-            db.commit()
-        return dict(
-            version="synthetic-cleanup-receipt-1.0",
-            registry=self.ledger.expected,
-            status="COMPLETE",
-            verified_at=now,
-            remaining=0,
-            real_cloud_proof=False,
-        )
+        from tools.phase2_cloud_verification import verify_absence
+
+        return verify_absence(self.ledger, observer, now)
 
 
 def health(ledger, now, runtime_progress_at, reconciler_progress_at):

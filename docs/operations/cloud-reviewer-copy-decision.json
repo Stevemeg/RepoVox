@@ -1,0 +1,29 @@
+{
+  "version": "reviewer-copy-decision-1.0",
+  "mode": "PENDING_OWNER_DECISION_RECORD_ONLY",
+  "status": "PENDING_OWNER_DECISION",
+  "owner": "Stevemeg",
+  "selected_option": null,
+  "approved_public_key_fingerprint": null,
+  "approval_evidence_sha256": null,
+  "signed_operation_grant_sha256": null,
+  "attempt": null,
+  "namespace": null,
+  "source_package_commitments": [],
+  "original_retention_expires_utc": null,
+  "registered_destinations": [],
+  "options": [
+    "MANAGED_REVIEW",
+    "CONTRACTED_PROCESSOR",
+    "NO_EXPORT_NO_HANDOFF"
+  ],
+  "provisioning_authorized": false,
+  "handoff_authorized": false,
+  "blocking_conditions": [
+    "No copy-handling option has been approved by the owner.",
+    "No destination, processor contract or independent deletion-verification evidence is approved.",
+    "Actual source-only handoff requires the accepted separate owner-signed operation grant.",
+    "Uncontrolled chat uploads, clipboard, downloads, caches, backups and provider copies cannot qualify through a local receipt.",
+    "AWS deployment, spending, real protected evidence and pilot execution remain unauthorized."
+  ]
+}

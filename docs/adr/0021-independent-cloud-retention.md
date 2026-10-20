@@ -1,6 +1,8 @@
 # ADR-0021: External cloud fencing and verified retention cleanup
 
-Status: Proposed for independent security/engineering review. Date: 2026-10-20.
+Status: Design-stage engineering accepted at
+`95aa6d265038f0b111eec91770690ebd2016a363`; CR-01..04 corrections proposed for
+independent re-review. Date: 2026-10-20. No deployment or pilot approval.
 
 ## Problem
 
@@ -31,6 +33,14 @@ Lambda handler, IAM deployment or replacement Store. SQLite/mock concurrency doe
 not establish real provider behavior. See the [design/failure matrix](../operations/cloud-retention-design.md),
 [cost inputs](../operations/cloud-retention-costs.json) and
 [verification/handoff](../delivery/cloud-retention-design-verification.md).
+
+The [1.1 correction contract](../operations/cloud-retention-review-contract.md)
+defines native compound identities, an independently authenticated read-only
+verifier/signing interface and durable one-use dynamic-ID creation intents.
+Older mock ledgers are rejected without migration. The
+[reviewer-copy owner decision](../operations/cloud-reviewer-copy-decision.json)
+remains explicitly pending; uncontrolled third-party exports cannot qualify.
+No actual provider adapter, credential or real approval is supplied by fixtures.
 
 ## Consequences and acceptance boundary
 

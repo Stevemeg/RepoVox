@@ -2,11 +2,13 @@
 
 import json
 import sqlite3
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from threading import Barrier
 
 import pytest
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from tools.phase2_cloud_retention_model import (
     Controller,
@@ -16,9 +18,15 @@ from tools.phase2_cloud_retention_model import (
     MockCloud,
     Refusal,
     Resource,
+    canonical,
     digest,
     health,
 )
+from tools.phase2_cloud_verification import OfflineVerifier, ReadOnlyFixtureInventory
+
+# Publicly labeled disposable signing material, never an owner enrollment key.
+FIXTURE_SIGNER = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
+VERIFIER_PRINCIPAL = "arn:aws:iam::222222222222:role/synthetic-verifier"
 
 
 def fixture(tmp_path, activate=True):
@@ -38,9 +46,9 @@ def fixture(tmp_path, activate=True):
         )
 
     resources = (
-        resource("compute", "i-synthetic"),
-        resource("volume", "vol-synthetic", "i-synthetic"),
-        resource("snapshot", "snap-synthetic", "vol-synthetic"),
+        resource("compute", "i-0123456789abcdef0"),
+        resource("volume", "vol-0123456789abcdef0", "i-0123456789abcdef0"),
+        resource("snapshot", "snap-0123456789abcdef0", "vol-0123456789abcdef0"),
         resource("bucket", "synthetic-bucket"),
         resource("version", "opaque-version-1", "synthetic-bucket", "objects/" + "a" * 64),
         resource("version", "opaque-version-2", "synthetic-bucket", "objects/" + "a" * 64),
@@ -58,18 +66,53 @@ def fixture(tmp_path, activate=True):
         2000,
         1900,
         resources,
+        verifier_public_key=FIXTURE_SIGNER.public_key().public_bytes_raw().hex(),
+        verifier_principal=VERIFIER_PRINCIPAL,
+        cleanup_principal="arn:aws:iam::222222222222:role/synthetic-cleaner",
     )
     ledger = Ledger(tmp_path / "synthetic.sqlite", manifest, manifest.commitment, create=True)
     cloud = MockCloud(resources, account, region)
+    cloud.test_directory = tmp_path.resolve()
     if activate:
         ledger.activate(1001, supervision_verified=True, inventory_verified=True)
     return manifest, ledger, cloud, Controller(ledger, cloud)
 
 
+def provider_fixture(path, resources, account="111111111111", region="us-east-1"):
+    """Only legacy fixture setup serializes cloud state; verifier has no shared objects."""
+    from dataclasses import asdict
+
+    with sqlite3.connect(path) as db:
+        db.executescript(
+            "CREATE TABLE principals(principal TEXT,credential_sha TEXT,permission TEXT);"
+            "CREATE TABLE endpoint(account TEXT,region TEXT);"
+            "CREATE TABLE resources(body BLOB,present INTEGER);"
+        )
+        db.execute(
+            "INSERT INTO principals VALUES(?,?,?)",
+            (VERIFIER_PRINCIPAL, digest(b"synthetic-read-only-credential"), "READ_ONLY_VERIFIER"),
+        )
+        db.execute("INSERT INTO endpoint VALUES(?,?)", (account, region))
+        db.executemany(
+            "INSERT INTO resources VALUES(?,1)", [(canonical(asdict(r)),) for r in resources]
+        )
+    return OfflineVerifier(
+        ReadOnlyFixtureInventory(path, VERIFIER_PRINCIPAL, b"synthetic-read-only-credential"),
+        FIXTURE_SIGNER,
+    )
+
+
+def cloud_identity(cloud, identifier):
+    return next(r.identity for r in cloud.resources.values() if r.identifier == identifier)
+
+
 def observer(cloud):
-    view = MockCloud((), cloud.account, cloud.region)
-    view.resources, view.present = cloud.resources, cloud.present
-    return view
+    return provider_fixture(
+        cloud.test_directory / (uuid.uuid4().hex + ".sqlite"),
+        [cloud.resources[k] for k in cloud.present],
+        cloud.account,
+        cloud.region,
+    )
 
 
 def test_vm_off_cleanup_and_independent_absence(tmp_path):
@@ -141,15 +184,15 @@ def test_sql_immutable_original_registry(tmp_path):
         ("region", "eu-west-1"),
         ("tenant", "tenantB"),
         ("namespace", "anotherNs"),
-        ("identifier", "vol-foreign"),
+        ("identifier", "vol-33333333333333333"),
     ],
 )
 def test_resource_substitution_never_deleted(tmp_path, field, value):
     manifest, _, cloud, controller = fixture(tmp_path)
     r = manifest.resources[1]
-    cloud.resources[r.identifier] = replace(r, **{field: value})
+    cloud.resources[r.identity] = replace(r, **{field: value})
     assert controller.reconcile(2000) == "OVERDUE_INCOMPLETE"
-    assert cloud.calls == [] and r.identifier in cloud.present
+    assert cloud.calls == [] and r.identity in cloud.present
 
 
 @pytest.mark.parametrize("field,value", [("account", "222222222222"), ("region", "eu-west-1")])
@@ -162,14 +205,14 @@ def test_wrong_api_endpoint_boundary(tmp_path, field, value):
 
 def test_unmanaged_source_copy_and_unregistered_delete_rejected(tmp_path):
     manifest, ledger, cloud, controller = fixture(tmp_path)
-    unknown = replace(manifest.resources[1], identifier="vol-unapproved")
-    cloud.resources[unknown.identifier] = unknown
-    cloud.present.add(unknown.identifier)
+    unknown = replace(manifest.resources[1], identifier="vol-11111111111111111")
+    cloud.resources[unknown.identity] = unknown
+    cloud.present.add(unknown.identity)
     with pytest.raises(Refusal, match="unregistered_copy"):
         ledger.admission(unknown, 1, manifest.tenant, 1002)
     assert controller.reconcile(2000) == "OVERDUE_INCOMPLETE"
     assert not cloud.calls
-    cloud.present.remove(unknown.identifier)
+    cloud.present.remove(unknown.identity)
     cloud.quiesce(manifest)
     with pytest.raises(Refusal, match="unregistered_delete"):
         cloud.delete(unknown, manifest)
@@ -177,12 +220,14 @@ def test_unmanaged_source_copy_and_unregistered_delete_rejected(tmp_path):
 
 def test_unrelated_sentinel_unchanged(tmp_path):
     manifest, _, cloud, controller = fixture(tmp_path)
-    unrelated = replace(manifest.resources[1], identifier="vol-sentinel", namespace="unrelated")
-    cloud.resources[unrelated.identifier] = unrelated
-    cloud.present.add(unrelated.identifier)
+    unrelated = replace(
+        manifest.resources[1], identifier="vol-22222222222222222", namespace="unrelated"
+    )
+    cloud.resources[unrelated.identity] = unrelated
+    cloud.present.add(unrelated.identity)
     assert controller.reconcile(2000) == "VERIFYING"
     controller.verify(2001, observer(cloud))
-    assert cloud.present == {unrelated.identifier}
+    assert cloud.present == {unrelated.identity}
 
 
 def test_duplicate_cleanup_and_reconciliation_remains_enabled(tmp_path):
@@ -192,7 +237,7 @@ def test_duplicate_cleanup_and_reconciliation_remains_enabled(tmp_path):
     calls = list(cloud.calls)
     assert controller.reconcile(3000) == "COMPLETE" and cloud.calls == calls
     # A resource returning after completion must not be concealed by the receipt.
-    cloud.present.add("vol-synthetic")
+    cloud.present.add(cloud_identity(cloud, "vol-0123456789abcdef0"))
     with pytest.raises(Refusal, match="post_completion_resource"):
         controller.reconcile(3001)
 
@@ -206,9 +251,12 @@ def test_scheduler_failure_does_not_disable_recurring_reconciliation(tmp_path):
 
 def test_provider_failure_partial_progress_and_recovery(tmp_path):
     _, ledger, cloud, controller = fixture(tmp_path)
-    cloud.fail.add("vol-synthetic")
+    cloud.fail.add(cloud_identity(cloud, "vol-0123456789abcdef0"))
     assert controller.reconcile(2000) == "OVERDUE_INCOMPLETE"
-    assert "vol-synthetic" in cloud.present and "i-synthetic" not in cloud.present
+    assert (
+        cloud_identity(cloud, "vol-0123456789abcdef0") in cloud.present
+        and cloud_identity(cloud, "i-0123456789abcdef0") not in cloud.present
+    )
     assert ledger.snapshot()[0] != "COMPLETE"
     cloud.fail.clear()
     reopened = Ledger(ledger.path, ledger.manifest, ledger.expected)
@@ -290,9 +338,9 @@ def test_inflight_writes_must_be_quiescent_before_delete(tmp_path):
 
 def test_recycle_bin_or_legal_hold_cannot_be_claimed_deleted(tmp_path):
     _, _, cloud, controller = fixture(tmp_path)
-    cloud.recycled.add("snap-synthetic")
+    cloud.recycled.add(cloud_identity(cloud, "snap-0123456789abcdef0"))
     assert controller.reconcile(2000) == "OVERDUE_INCOMPLETE"
-    assert "snap-synthetic" in cloud.present
+    assert cloud_identity(cloud, "snap-0123456789abcdef0") in cloud.present
 
 
 def test_separate_independent_verification_required(tmp_path):
@@ -301,11 +349,11 @@ def test_separate_independent_verification_required(tmp_path):
     with pytest.raises(Refusal, match="separate_observer_required"):
         controller.verify(2001, cloud)
     fake_empty = MockCloud((), cloud.account, cloud.region)
-    with pytest.raises(Refusal, match="independent_inventory_view"):
+    with pytest.raises(Refusal, match="separate_observer_required"):
         controller.verify(2001, fake_empty)
     reader = observer(cloud)
-    reader.fail.add("inventory")
-    with pytest.raises(Refusal, match="provider_unavailable"):
+    reader.reader.credential = b"wrong-synthetic-credential"
+    with pytest.raises(Refusal, match="verifier_provider_authentication"):
         controller.verify(2001, reader)
 
 
@@ -332,7 +380,7 @@ def test_early_cleanup_and_receipts_refused(tmp_path):
     _, _, cloud, controller = fixture(tmp_path)
     with pytest.raises(Refusal, match="not_due"):
         controller.reconcile(1500)
-    with pytest.raises(Refusal, match="protected_resources_remain"):
+    with pytest.raises(Refusal, match="verification_state"):
         controller.verify(1500, observer(cloud))
 
 
@@ -461,7 +509,7 @@ def test_post_completion_drift_is_durably_escalated(tmp_path):
     manifest, ledger, cloud, controller = fixture(tmp_path)
     controller.reconcile(2000)
     controller.verify(2001, observer(cloud))
-    cloud.present.add("vol-synthetic")
+    cloud.present.add(cloud_identity(cloud, "vol-0123456789abcdef0"))
     with pytest.raises(Refusal, match="post_completion_resource"):
         controller.reconcile(2002)
     sink = MockAlerts()
@@ -480,7 +528,7 @@ def test_unapproved_incident_body_is_not_persisted(tmp_path):
 def test_changed_provisioning_receipt_refused_before_deletion(tmp_path):
     manifest, _, cloud, controller = fixture(tmp_path)
     original = manifest.resources[0]
-    cloud.resources[original.identifier] = replace(original, provisioning_sha256="a" * 64)
+    cloud.resources[original.identity] = replace(original, provisioning_sha256="a" * 64)
     assert controller.reconcile(2000) == "OVERDUE_INCOMPLETE" and not cloud.calls
 
 

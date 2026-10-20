@@ -1,7 +1,11 @@
 # Independent cloud retention design
 
-Version: `cloud-retention-design-1.0`. Date: 2026-10-20. Proposed, not deployed or
-independently accepted. Examples are synthetic. [Decision](../adr/0021-independent-cloud-retention.md) |
+Version: `cloud-retention-design-1.1`. Date: 2026-10-20. Design 1.0 independently
+accepted at `95aa6d265038f0b111eec91770690ebd2016a363` for design only; CR-01..04
+corrections await re-review. Not deployed. Examples are synthetic.
+[Correction contract](cloud-retention-review-contract.md) |
+[Owner copy decision: pending](cloud-reviewer-copy-decision.md) |
+[Decision](../adr/0021-independent-cloud-retention.md) |
 [verification](../delivery/cloud-retention-design-verification.md) |
 [local custody](../development/custodian-lifecycle.md) |
 [signed review](../development/custodian-review.md).
