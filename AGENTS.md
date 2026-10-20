@@ -12,6 +12,51 @@ RepoVox is solo-maintained by GitHub owner **Stevemeg**. Codex is the implementa
 
 ## No premature phase advancement
 
+Re-review of `43dbcfa178f0b6ffec1164bb5f051f0619d7e363` accepted offline CR-01,
+CR-03 and pending-decision CR-04. The owner authorized only a bounded CR-02 verifier
+coverage correction, synthetic tests and full Linux CI. Broader read enumeration
+must not grant broader cleanup. No real evidence, key access, AWS, spending or pilot.
+
+The owner accepted the cloud design at `95aa6d265038f0b111eec91770690ebd2016a363`
+for design-stage engineering only and authorized CR-01..04 offline corrections:
+native exact identities, independent authenticated absence verification, durable
+dynamic registration and an explicit pending owner decision for reviewer copies.
+Continue draft PR #9, mock-only tests and documentation. No cloud provisioning,
+spending, real evidence/pilot, reveal, scoring or merge. Deployment remains blocked.
+
+The owner authorized independent cloud-retention architecture and mock-only
+synthetic engineering on 2026-10-20. Continue the draft PR #9 branch; preserve
+accepted analyzer/scorer, control SQL, custody and historical deadlines. No AWS
+provisioning, paid resource, real evidence, acquisition or pilot is authorized.
+Stop at design/security review and separate test-budget approval. See
+[ADR-0021](docs/adr/0021-independent-cloud-retention.md).
+
+The owner authorized execution-to-review integration on 2026-10-19, continuing
+draft PR #9. Separate genuine SQL execution leases from bounded offline owner-key
+review grants; use disposable synthetic PostgreSQL/Linux custody verification.
+Preserve accepted analyzer/scorer, migration 0004 and historical evidence. No real
+acquisition, A/B generation, reference, reveal, scoring, persistent migration or
+Phase 3. Stop at final independent review. See
+[ADR-0020](docs/adr/0020-post-execution-custody-authority.md).
+
+The owner subsequently authorized the additive growing-custodian lifecycle and
+complete isolated synthetic verification, continuing on the PR #9 branch. Preserve
+all accepted analyzer/scorer/control-plane code and historical evidence. New local
+SQLite retention metadata is not an application DB migration. Stop for independent
+security/engineering review and fresh owner execution confirmation before any real
+acquisition or prediction. See [ADR-0019](docs/adr/0019-growing-evaluation-custodian.md).
+
+The owner authorized coordinated Phase 2 completion work on 2026-10-18, including
+a dedicated VMware Ubuntu environment and isolated retention/runtime verification.
+Use `phase2/retention-runtime-verification` stacked on accepted control plane
+`925752b8df38668349b9ef5a45a34cac7d948253`. Preserve analyzer/scorer
+`711184e82128c7b0a6f3978cfc1cf13975db39ef`, control-plane SQL, historical custody
+and official UNFROZEN gates. New operational code requires independent review;
+synthetic-only retention must not be activated for growing real custody. A future
+real attempt remains conditional on all runtime/custody/control-plane gates and
+the accepted source-only review chronology. No merges, production, paid services,
+training or Phase 3. See [ADR-0018](docs/adr/0018-isolated-retention-runtime.md).
+
 The owner authorized the Phase 2C-E control-plane safety correction on 2026-10-16,
 stacked on accepted `711184e82128c7b0a6f3978cfc1cf13975db39ef`. Use
 `phase2/pilot-control-plane-safety`: durable attempt fencing, mandatory scoped

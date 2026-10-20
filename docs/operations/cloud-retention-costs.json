@@ -1,0 +1,38 @@
+{
+  "version": "cloud-retention-reference-costs-1.0",
+  "mode": "REFERENCE_SUBTOTAL_NOT_BUDGET_AUTHORIZATION",
+  "review_date": "2026-10-20",
+  "reference_region": "us-east-1",
+  "planning_month_hours": 730,
+  "free_tier_assumed": false,
+  "regional_quote_verified": false,
+  "notes": [
+    "Published reference rates/worked examples are not an account-specific quote",
+    "730-hour proration is planning arithmetic, not exact billing-unit certification",
+    "None of these numbers authorizes spend; unknown items are never zero",
+    "Snapshots/replicas/NAT disabled initially; enabling needs new scope and quote",
+    "Three-family 7-day example assumes all infrastructure on for 168 hours"
+  ],
+  "items": [
+    {"name": "t3_medium_linux", "usd_per_unit": 0.0418, "monthly_units": 730, "unit": "hour", "basis": "Published US East Linux table; Standard credits selected", "source": "https://aws.amazon.com/ec2/instance-types/t3/"},
+    {"name": "gp3_all_three_disks", "usd_per_unit": 0.08, "monthly_units": 70, "unit": "GB-month", "basis": "Published worked-example rate; exact regional offer still needed", "source": "https://aws.amazon.com/ebs/pricing/"},
+    {"name": "one_public_ipv4", "usd_per_unit": 0.005, "monthly_units": 730, "unit": "hour", "basis": "Published public IPv4 rate; no inbound ports", "source": "https://aws.amazon.com/vpc/pricing/"},
+    {"name": "eight_custom_metrics", "usd_per_unit": 0.30, "monthly_units": 8, "unit": "metric-month", "basis": "Published highest tier in US East pricing example", "source": "https://aws.amazon.com/cloudwatch/pricing/"},
+    {"name": "ten_standard_alarms", "usd_per_unit": 0.10, "monthly_units": 10, "unit": "metric-alarm-month", "basis": "Published standard-resolution example", "source": "https://aws.amazon.com/cloudwatch/pricing/"},
+    {"name": "lambda_requests", "usd_per_unit": 0.0000002, "monthly_units": 96360, "unit": "request", "basis": "Published $0.20/million, no free tier; invocation count is workload assumption", "source": "https://aws.amazon.com/lambda/pricing/"},
+    {"name": "lambda_compute", "usd_per_unit": 0.0000166667, "monthly_units": 12334.08, "unit": "GB-second", "basis": "Published x86 example; assumes 96360 calls at 1s/128MB, not benchmarked", "source": "https://aws.amazon.com/lambda/pricing/"},
+    {"name": "scheduler_invocations", "usd_per_unit": 0.000001, "monthly_units": 96361, "unit": "invocation", "basis": "Published $1/million; conservatively charge all planned ticks, no free tier", "source": "https://aws.amazon.com/eventbridge/pricing/"},
+    {"name": "dynamodb_write_units", "usd_per_unit": 0.000000625, "monthly_units": 175200, "unit": "write-request-unit", "basis": "AWS worked example; transaction double-write cost included in quantity assumption", "source": "https://aws.amazon.com/blogs/database/rate-limiting-calls-to-amazon-dynamodb-using-python-boto3-part-2-distributed-coordination/"},
+    {"name": "dynamodb_read_units", "usd_per_unit": 0.000000125, "monthly_units": 350400, "unit": "read-request-unit", "basis": "AWS worked example; reads are workload assumption", "source": "https://aws.amazon.com/blogs/database/rate-limiting-calls-to-amazon-dynamodb-using-python-boto3-part-2-distributed-coordination/"},
+    {"name": "opaque_s3_metadata", "usd_per_unit": 0.023, "monthly_units": 0.1, "unit": "GB-month", "basis": "Official US East worked example; no protected S3 payload enabled", "source": "https://docs.aws.amazon.com/solutions/latest/live-streaming-on-aws-with-amazon-s3/cost-example-1.html"},
+    {"name": "metadata_s3_put_list", "usd_per_unit": 0.000005, "monthly_units": 10000, "unit": "request", "basis": "Official worked example; bounded write/list count assumption", "source": "https://docs.aws.amazon.com/solutions/latest/live-streaming-on-aws-with-amazon-s3/cost-example-1.html"},
+    {"name": "sqs_standard_requests", "usd_per_unit": 0.0000004, "monthly_units": 259200, "unit": "request", "basis": "Official AWS messaging worked example; confirm exact current regional rate", "source": "https://aws.amazon.com/blogs/messaging-and-targeting/building-a-scalable-messaging-api-with-aws-end-user-messaging-and-ses/"},
+    {"name": "two_kms_keys", "usd_per_unit": 1, "monthly_units": 2, "unit": "key-month", "basis": "Published per-key storage price; request charges excluded pending quote", "source": "https://aws.amazon.com/kms/pricing/"},
+    {"name": "SNS_delivery_SMS_or_incident_integration", "usd_per_unit": null, "monthly_units": null},
+    {"name": "CloudTrail_SSM_log_storage_ingestion_and_API_overages", "usd_per_unit": null, "monthly_units": null},
+    {"name": "DynamoDB_storage_S3_GET_KMS_requests_and_metadata_replication", "usd_per_unit": null, "monthly_units": null},
+    {"name": "network_egress_endpoints_and_region_specific_differences", "usd_per_unit": null, "monthly_units": null},
+    {"name": "contracted_24x7_incident_response", "usd_per_unit": null, "monthly_units": null},
+    {"name": "tax_and_currency_conversion", "usd_per_unit": null, "monthly_units": null}
+  ]
+}

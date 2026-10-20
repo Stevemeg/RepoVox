@@ -29,13 +29,18 @@ from sqlalchemy.exc import DBAPIError
 
 
 class SyntheticHub(GitHubHTTP):
-    def __init__(self):
+    def __init__(self, language="python"):
         super().__init__()
         self.bodies = {
             "app.py": b"def approved():\n    return 3\n",
             "README.md": b"Synthetic source context.\n",
             "tests/extra.py": b"def excluded_sentinel():\n    return 9\n",
         }
+        if language != "python":
+            del self.bodies["app.py"]
+            self.bodies["app." + ("js" if language == "javascript" else "ts")] = (
+                b"export function approved() { return 3; }\n"
+            )
         stream = io.BytesIO()
         with tarfile.open(fileobj=stream, mode="w:gz") as archive:
             for path, body in self.bodies.items():
@@ -61,7 +66,7 @@ class SyntheticHub(GitHubHTTP):
 
 
 @pytest.fixture
-def cp(clients, admin, settings):
+def cp(clients, admin, settings, request):
     # New nonprivileged login credentials exist only in this disposable test cluster.
     engines = []
     for name, group in [
@@ -76,7 +81,9 @@ def cp(clients, admin, settings):
             c.execute(text(f"GRANT {group} TO {name}"))
         engines.append(create_engine(admin.url.set(username=name, password=password)))
     control = Controller(engines[0])
-    hub = SyntheticHub()
+    parameters = getattr(request, "param", "python")
+    deferred = isinstance(parameters, dict) and parameters.get("defer", False)
+    hub = SyntheticHub(parameters["language"] if isinstance(parameters, dict) else parameters)
     engine_root = Path(repovox.analysis.__file__).parent
     family = Family(
         id="sample",
@@ -87,9 +94,10 @@ def cp(clients, admin, settings):
                 path=p,
                 sha256=digest(hub.bodies[p]),
                 size=len(hub.bodies[p]),
-                role="source" if p.endswith(".py") else "context",
+                role="context" if p == "README.md" else "source",
             )
-            for p in ["app.py", "README.md"]
+            for p in hub.bodies
+            if not p.startswith("tests/")
         ),
     )
     manifest = Manifest(
@@ -115,9 +123,11 @@ def cp(clients, admin, settings):
         "a" * 40,
         datetime.now(UTC).isoformat(),
     )
-    jid = control.admit(A, attempt, 1, "sample", pid, snapshot)
-    assert jid
-    job = clients[0].get(f"/v1/jobs/{jid}").json()
+    job = None
+    if not deferred:
+        jid = control.admit(A, attempt, 1, "sample", pid, snapshot)
+        assert jid
+        job = clients[0].get(f"/v1/jobs/{jid}").json()
     worker = Executor(engines[1], A, S3Storage(settings), hub)
     with worker.engine.connect() as c:
         assert c.scalar(text("SHOW transaction_isolation")) == "read committed"
@@ -127,7 +137,7 @@ def cp(clients, admin, settings):
         manifest=manifest,
         attempt=attempt,
         job=job,
-        stage=UUID(job["stages"][1]["id"]),
+        stage=UUID(job["stages"][1]["id"]) if job else None,
         hub=hub,
         admin=admin,
         clients=clients,

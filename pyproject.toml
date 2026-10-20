@@ -31,6 +31,7 @@ dev = [
     "pip-audit>=2.9,<3",
     "jsonschema==4.26.0",
     "trustme==1.2.1",
+    "cryptography==50.0.2", # Offline custody grant verification; never a worker authority.
 ]
 
 [build-system]
@@ -42,6 +43,7 @@ packages = ["apps/api/repovox"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = [".", "tests/unit"]
 addopts = "-ra"
 
 [tool.ruff]

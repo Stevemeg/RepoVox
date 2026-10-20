@@ -1,5 +1,10 @@
 # Production deployment design
 
+The [independent evaluation-retention proposal](cloud-retention-design.md) is a
+separate disposable cloud design, not a deployment or change to this production
+architecture. Only offline mock tests are authorized. Real cloud tests, IAM
+activation and any pilot need separate budget/owner approval and independent review.
+
 Phase 2B [protected evaluation storage](../development/evaluation-storage.md) remains an
 offline owner-authorized custodian boundary, separate from application workers and
 public Git. No official store, reviewer access or backup was provisioned; synthetic
@@ -103,5 +108,12 @@ Project/account deletion sets tombstone transactionally, revokes grants/work imm
 Launch needs private self-hosted Director/TTS with approved model evaluation/license/security, GPU capacity/health/rollback and separate research roles, plus HTTPS/session security, private objects, resource isolation, durable jobs/quota, migrations, CI gates, restore/rollback, basic logs/metrics/alerts and owner incident runbooks. Defer CDN, active-active/multi-region, sophisticated autoscaling, Kubernetes, data warehouse, team roles, subscription billing and advanced editing. At 10k videos/month, increase reviewed GPU and CPU bounded concurrency after benchmark/cost review and database/Redis sizing checks; architecture does not grant automatic phase expansion.
 
 ## Model and research artifact retention
+
+Offline exploratory custody uses the separate [review authorization contract](../development/custodian-review.md)
+and [growing lifecycle](../development/custodian-lifecycle.md), proposed for independent
+review. It is never a routine API/worker mount. Execution closure releases SQL leases;
+owner-authorized review cannot extend the original custody authorization or retention.
+No real watchdog is activated by synthetic verification. Existing November 14 and 16
+custodians and owner-managed host copies retain their original cleanup obligations.
 
 Private registry retains current and prior verified releases plus notices/eval lineage while rollback support required; never public by default. Model object allowance 60GiB plus 80GiB encrypted local disk per GPU in costs. Research dataset storage 100GiB initial estimate, immutable versions/access/deletion in training strategy, distinct from 24h customer source/30-day media. Retain candidate training checkpoints <=90 days absent promotion/rights need; prune with dependency manifest. Rights/privacy tombstone withdraws dependent adapters immediately and purges live copies <=24h; clean retraining/evaluation before re-promotion. Dataset manifests/tombstone hashes retained as minimum provenance without deleted source. No backup restore can bypass suppression ledger.

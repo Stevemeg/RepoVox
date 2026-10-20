@@ -1,0 +1,49 @@
+{
+  "mode": "SYNTHETIC_PREVIEW_NOT_DEPLOYABLE",
+  "workload_account": "111111111111",
+  "security_account": "222222222222",
+  "region": "us-east-1",
+  "cleanup_identity_policy_preview": {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Sid": "TerminateOnlyApprovedRuntime",
+        "Effect": "Allow",
+        "Action": ["ec2:TerminateInstances"],
+        "Resource": ["arn:aws:ec2:us-east-1:111111111111:instance/i-00000000000000001"],
+        "Condition": {"StringEquals": {"aws:RequestedRegion": "us-east-1"}}
+      },
+      {
+        "Sid": "DeleteOnlyThreeApprovedDisks",
+        "Effect": "Allow",
+        "Action": ["ec2:DeleteVolume"],
+        "Resource": [
+          "arn:aws:ec2:us-east-1:111111111111:volume/vol-00000000000000001",
+          "arn:aws:ec2:us-east-1:111111111111:volume/vol-00000000000000002",
+          "arn:aws:ec2:us-east-1:111111111111:volume/vol-00000000000000003"
+        ],
+        "Condition": {"StringEquals": {"aws:RequestedRegion": "us-east-1"}}
+      },
+      {
+        "Sid": "DescribeReadOnlyException",
+        "Effect": "Allow",
+        "Action": ["ec2:DescribeInstances", "ec2:DescribeVolumes", "ec2:DescribeSnapshots"],
+        "Resource": "*",
+        "Condition": {"StringEquals": {"aws:RequestedRegion": "us-east-1"}}
+      }
+    ]
+  },
+  "omitted_not_authorized": [
+    "Real account IDs, owner approval, resource registration receipts and deployment",
+    "Cross-account role trust, ExternalId/session binding and permissions boundaries",
+    "Scheduler source-bound trust, immutable registry and DynamoDB policies",
+    "Application SCPs, effective IAM tests and incident break-glass contract",
+    "S3 protected writes/cleanup, snapshots, backups, replicas and host exports"
+  ],
+  "optional_extension_notes": [
+    "EBS snapshot ARN has an empty account component; verify actual ownership independently",
+    "Optional S3 DeleteObjectVersion needs exact bucket/key ARN and s3:VersionId condition",
+    "AbortMultipartUpload is exact-key scoped; registry must additionally validate UploadId",
+    "Do not attach this preview as a complete deployment policy"
+  ]
+}

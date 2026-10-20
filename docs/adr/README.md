@@ -1,5 +1,11 @@
 # Architectural decisions
 
+Independent cloud-retention design: [ADR-0021](0021-independent-cloud-retention.md),
+mock-only preparation; no paid deployment or real-pilot authorization.
+
+Post-execution custody: [ADR-0020](0020-post-execution-custody-authority.md), proposed
+for independent review; no real-pilot activation or official corpus acceptance.
+
 Phase 2 proposals: [ADR-0010 static boundary](0010-phase2-static-analysis-boundary.md)
 and [ADR-0011 parser isolation](0011-parser-process-isolation.md).
 Phase 2 review corrections: [ADR-0012 independent gold/pairing](0012-independent-gold-contract.md).
@@ -22,3 +28,7 @@ All proposed for Phase 0 review, dated 2026-10-08. Acceptance follows independen
 | [015](0015-canonical-source-fact-semantics.md) | Additive canonical source semantics, qualified static bindings and truthful artifact versioning |
 | [016](0016-independent-source-fact-v2-evaluation.md) | Independent v2 references, exact scoring, unknown verdicts and private blind custody |
 | [017](0017-pilot-control-plane-safety.md) | Durable pilot authorization, fenced cancellation and mandatory original-file scope |
+| [018](0018-isolated-retention-runtime.md) | Isolated runtime identity, executable bytes and bounded retention readiness |
+| [019](0019-growing-evaluation-custodian.md) | Durable growing evidence, write-intent recovery and fenced expiry |
+| [020](0020-post-execution-custody-authority.md) | Separate execution leases and bounded owner-key custody review grants |
+| [021](0021-independent-cloud-retention.md) | External immutable registry, cleanup fencing, reconciliation and honest cloud guarantees |

@@ -8,6 +8,7 @@ COPY apps/api apps/api
 COPY tools tools
 COPY docs docs
 COPY tests tests
+COPY infrastructure/retention infrastructure/retention
 COPY README.md AGENTS.md ./
 RUN uv sync --frozen --no-cache && useradd --create-home --uid 10001 repovox && mkdir /storage-config && chown repovox /storage-config
 ENV PATH="/workspace/.venv/bin:$PATH" PYTHONUNBUFFERED=1

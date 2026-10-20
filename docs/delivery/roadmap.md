@@ -1,5 +1,11 @@
 # Delivery roadmap and phase gates
 
+Owner-authorized 2026-10-20 [independent cloud-retention preparation](../operations/cloud-retention-design.md)
+adds architecture and offline synthetic tests only. It changes no EVAL-ENTRY
+threshold/count, source-fact/scoring contract or accepted control-plane SQL.
+Cloud deployment and real-pilot execution remain separately gated. See
+[review evidence](cloud-retention-design-verification.md).
+
 Current authority, 2026-10-12: owner accepted Phase 0 `e35d8ef8a8a53cb34e46271a9813b5332ea42c1f`
 and Phase 1 `ec09b733ab3ceffe592ad96d07902b92596dfd1b`, then authorized Phase 2 static
 analysis/evaluation preparation. PRs remain unmerged. The proposal below is preserved
@@ -97,3 +103,20 @@ EVAL-ENTRY gates and Phase 2B decision register remain unchanged.
 8. Any external AI evaluation requires separately explicit approval, permitted data/terms and budget; not required for normal production. Authorize next phase only after independent validation; do not merge this PR without it.
 
 These decisions do not block review of Phase 0 proposals; they block treating proposals as authority to implement, spend or launch.
+
+The owner-authorized growing-custodian correction is tracked by
+[ADR-0019](../adr/0019-growing-evaluation-custodian.md) and its
+[independent-review handoff](custodian-lifecycle-verification.md). This closes an
+engineering preparation gap only after review. [Official evidence requirements and
+the fresh-attempt runbook](../development/phase2-official-evidence.md) preserve every
+EVAL-ENTRY threshold, zero verified counts, pending human appointment and UNFROZEN
+status. No real attempt, corpus freeze, merge, production or Phase 3 is implied.
+
+The additive [execution-to-review authority](../adr/0020-post-execution-custody-authority.md)
+and [offline protocol](../development/custodian-review.md) remain subject to independent
+security/engineering review. Synthetic signed approvals are not real owner approvals,
+source-only references or human gold. Execution closure never extends retention.
+
+The [RV-09-01 source-cleanup correction](rv09-01-verification.md) eliminates
+unregistered review scratch; final independent acceptance remains required before
+any real execution. Official corpus counts and all freeze gates remain unchanged.
