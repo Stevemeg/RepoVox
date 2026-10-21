@@ -1,6 +1,8 @@
 # Isolated offline source-to-video feasibility review
 
 Date: 2026-10-21. Status: experimental implementation for independent review only.
+**Shared full-CI security audit BLOCKED; owner explicitly directed that the
+accepted dependency/tooling baseline remain untouched. No waiver or green CI claim.**
 Branch `experiment/offline-source-to-video`, based on reviewed
 `e3a3ece1b5d3b320dc0f0d2bbe05241b39f8714d`. Separate draft review PR; all existing
 PRs remain unmerged. Final SHA/CI links are recorded in the draft PR after checks.
@@ -170,6 +172,43 @@ installed version, license and executable hashes are captured before use.
 Download/disk usage is recorded by apt. No local or production installation changed.
 This bounded tooling correction does not weaken a media assertion or skip a test.
 
+## Actual Linux result and unchanged-baseline audit blocker
+
+At `e084b00b995e2a8f308db88ab09e7e669dae68f9`, media workflow
+[39539588131](https://github.com/Stevemeg/RepoVox/actions/runs/39539588131) passed:
+**37 tests, zero skipped**, real rendering and bounded cleanup. Runtime UID/GID
+1001:1001; a new network namespace reported only interface `lo`. Ubuntu FFmpeg
+6.1.1-3ubuntu5 came from signed official repositories; apt reported 62.8 MB download,
+173 MB installed, 87 packages. The synthetic-only artifact is
+`fictional-media-39539588131-1` (artifact 12319206083), archive SHA-256
+`f1a1eb6b8719e8551a24ffaed18dba30c25faa72107228c6cac17d40f23b271b`,
+expiry 2026-10-28 03:39:07 UTC. It is not a protected evaluation packet.
+
+Shared workflow [39539588135](https://github.com/Stevemeg/RepoVox/actions/runs/39539588135)
+passed application units (**812 passed, 99 skipped**), service integration
+(**886 passed, 104 skipped**), restricted custody (**97 passed**), genuine
+execution/review PostgreSQL (**5 passed**), frontend (**17 passed**) and browser
+(**1 passed**), plus formatting/types/docs/contracts and secret scanning. Its final
+Python dependency audit **failed** on existing `certifi 2026.7.22`,
+`PYSEC-2026-4320`, with 2026.10.19 listed as the fix. The entire shared workflow is
+therefore **FAILED**, not passed; these component results do not waive the gate.
+
+The [upstream certifi advisory](https://github.com/certifi/python-certifi/security/advisories/GHSA-6q48-6c7w-9gw2)
+and [Python security announcement](https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576)
+confirm the CA incident. The latter also recommends pip 26.2.2+ and uv 0.13.4+;
+updating only standalone certifi does not repair vendored CA stores. There is no
+evidence here that a compromise actually occurred. A concrete certifi-only
+lockfile proposal was prepared **outside Git, not applied**, using published PyPI
+artifact digests. A complete separately authorized remediation must also review
+bootstrap/build tooling and rerun audits/regressions. No runtime, lockfile, trusted
+CA, accepted security implementation or failed-audit suppression was changed.
+
+Owner response on 2026-10-21: **"Keep baseline untouched; report the CI blocker."**
+This is a scope decision, not security acceptance. The final documentation-only
+head is rechecked by both workflows; its exact results remain in the draft PR.
+The media review package is available, but the original all-checks-pass criterion
+remains unmet until this external baseline-security decision is resolved.
+
 ## Dependencies, compatibility and external limits
 
 No new Python dependency or model. Python 3.11/3.12 stdlib plus existing locked Pydantic
@@ -198,3 +237,5 @@ paid service, model work, merge or release promotion.
 
 **OFFLINE MEDIA FEASIBILITY SPIKE READY FOR INDEPENDENT REVIEW — NO ROADMAP PHASE
 ADVANCEMENT.** This is a proposed review disposition, not independent acceptance.
+Shared security CI remains blocked as described above; no clean-CI or product
+acceptance is claimed.
