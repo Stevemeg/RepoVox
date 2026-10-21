@@ -1,0 +1,57 @@
+name: Isolated offline media feasibility
+on:
+  push:
+    branches: [experiment/offline-source-to-video]
+  pull_request:
+    branches: [phase2/aws-retention-integration]
+permissions:
+  contents: read
+concurrency:
+  group: offline-media-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  fictional-media:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: '${{ github.event.pull_request.head.sha || github.sha }}'
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Existing locked tooling only; no media/model package installation
+        run: |
+          python -m pip install uv==0.11.29
+          uv sync --frozen
+          command -v ffmpeg
+          command -v ffprobe
+          ffmpeg -version
+          ffprobe -version
+          sha256sum "$(command -v ffmpeg)" "$(command -v ffprobe)"
+      - name: Isolated code checks (fixture source stays inert data)
+        run: |
+          uv run ruff check experiments/offline_media
+          uv run ruff format --check experiments/offline_media
+          uv run mypy --strict --follow-imports silent experiments/offline_media/contracts.py experiments/offline_media/raster.py experiments/offline_media/runner.py
+      - name: Actual decoding and forced-termination tests with no network interface
+        run: |
+          sudo unshare --net --setgid "$(id -g)" --setuid "$(id -u)" -- env PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 "$PWD/.venv/bin/python" -m pytest experiments/offline_media/tests -q
+      - name: Render synthetic artifact in separate network namespace
+        run: |
+          sudo unshare --net --setgid "$(id -g)" --setuid "$(id -u)" -- "$PWD/.venv/bin/python" -c 'import os,socket; print({"uid":os.getuid(),"gid":os.getgid(),"network_interfaces":socket.if_nameindex()}); assert socket.if_nameindex()==[(1,"lo")]'
+          sudo unshare --net --setgid "$(id -g)" --setuid "$(id -u)" -- "$PWD/.venv/bin/python" -m experiments.offline_media render --output "$RUNNER_TEMP/repovox-fictional-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+      - name: Preserve synthetic-only media and machine evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: fictional-media-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/repovox-fictional-${{ github.run_id }}-${{ github.run_attempt }}/published
+          retention-days: 7
+          if-no-files-found: error
+      - name: Bound cleanup through the experiment inventory only
+        if: always()
+        run: |
+          RUN_ROOT="$RUNNER_TEMP/repovox-fictional-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          if test -f "$RUN_ROOT/identity.json"; then
+            "$PWD/.venv/bin/python" -m experiments.offline_media cleanup --output "$RUN_ROOT"
+          fi

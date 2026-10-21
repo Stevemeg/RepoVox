@@ -12,6 +12,14 @@ RepoVox is solo-maintained by GitHub owner **Stevemeg**. Codex is the implementa
 
 ## No premature phase advancement
 
+On 2026-10-21 the owner authorized only an isolated offline fictional source-to-video
+feasibility spike on `experiment/offline-source-to-video` from `e3a3ece1`. Keep it
+under `experiments/offline_media`, outside the production application. Deterministic
+local raster/FFmpeg rendering, synthetic tone, adversarial tests and a separate
+draft review PR are permitted. No real source/evaluation, models, cloud, accepted
+component changes, production endpoints, Phase 3/6 advancement or gate acceptance.
+See [spike handoff](docs/delivery/offline-media-feasibility.md).
+
 The owner accepted offline CR-01..04 at `6b412e930dfcfd6b771a457d27633f5f7d5ac8e5`
 and authorized SDK adapters, disabled AWS IaC, simulated integration, security and
 $10 test planning only. Use `phase2/aws-retention-integration` stacked on that

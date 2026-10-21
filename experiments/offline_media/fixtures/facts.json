@@ -1,0 +1,170 @@
+{
+  "version": "fictional-media-grounding-1.0",
+  "synthetic": true,
+  "sources": [
+    {
+      "path": "ripple.py",
+      "sha256": "58c5492528d9e6a30a4f82757293745608f069b7f9264b3fa47b2ba4bd2a488f",
+      "bytes": 91
+    },
+    {
+      "path": "spark.js",
+      "sha256": "c0bd4f55105d3e9fb95d9ddccad6e4305a2e64dcce3fdf96191ffd0083dab0cd",
+      "bytes": 86
+    },
+    {
+      "path": "comet.ts",
+      "sha256": "c42e4c99a54f94fb4e6109d58771ef6a850c813d335e957abd0e683a3ff72101",
+      "bytes": 141
+    }
+  ],
+  "facts": [
+    {
+      "id": "f_python_brighten",
+      "language": "python",
+      "kind": "declaration",
+      "subject": "brighten",
+      "status": "observed_syntax",
+      "citation": {
+        "path": "ripple.py",
+        "sha256": "58c5492528d9e6a30a4f82757293745608f069b7f9264b3fa47b2ba4bd2a488f",
+        "start_byte": 0,
+        "end_byte": 13,
+        "start_line": 1,
+        "end_line": 1,
+        "quote": "def brighten("
+      }
+    },
+    {
+      "id": "f_python_lantern",
+      "language": "python",
+      "kind": "declaration",
+      "subject": "lantern",
+      "status": "observed_syntax",
+      "citation": {
+        "path": "ripple.py",
+        "sha256": "58c5492528d9e6a30a4f82757293745608f069b7f9264b3fa47b2ba4bd2a488f",
+        "start_byte": 44,
+        "end_byte": 56,
+        "start_line": 5,
+        "end_line": 5,
+        "quote": "def lantern("
+      }
+    },
+    {
+      "id": "f_python_call",
+      "language": "python",
+      "kind": "static_call",
+      "subject": "lantern",
+      "target": "brighten",
+      "status": "observed_syntax",
+      "citation": {
+        "path": "ripple.py",
+        "sha256": "58c5492528d9e6a30a4f82757293745608f069b7f9264b3fa47b2ba4bd2a488f",
+        "start_byte": 68,
+        "end_byte": 90,
+        "start_line": 6,
+        "end_line": 6,
+        "quote": "return brighten(value)"
+      }
+    },
+    {
+      "id": "f_javascript_double",
+      "language": "javascript",
+      "kind": "declaration",
+      "subject": "double",
+      "status": "observed_syntax",
+      "citation": {
+        "path": "spark.js",
+        "sha256": "c0bd4f55105d3e9fb95d9ddccad6e4305a2e64dcce3fdf96191ffd0083dab0cd",
+        "start_byte": 0,
+        "end_byte": 16,
+        "start_line": 1,
+        "end_line": 1,
+        "quote": "function double("
+      }
+    },
+    {
+      "id": "f_javascript_orbit",
+      "language": "javascript",
+      "kind": "declaration",
+      "subject": "orbit",
+      "status": "observed_syntax",
+      "citation": {
+        "path": "spark.js",
+        "sha256": "c0bd4f55105d3e9fb95d9ddccad6e4305a2e64dcce3fdf96191ffd0083dab0cd",
+        "start_byte": 44,
+        "end_byte": 59,
+        "start_line": 2,
+        "end_line": 2,
+        "quote": "function orbit("
+      }
+    },
+    {
+      "id": "f_javascript_call",
+      "language": "javascript",
+      "kind": "static_call",
+      "subject": "orbit",
+      "target": "double",
+      "status": "observed_syntax",
+      "citation": {
+        "path": "spark.js",
+        "sha256": "c0bd4f55105d3e9fb95d9ddccad6e4305a2e64dcce3fdf96191ffd0083dab0cd",
+        "start_byte": 66,
+        "end_byte": 83,
+        "start_line": 3,
+        "end_line": 3,
+        "quote": "return double(n);"
+      }
+    },
+    {
+      "id": "f_typescript_increment",
+      "language": "typescript",
+      "kind": "declaration",
+      "subject": "increment",
+      "status": "observed_syntax",
+      "citation": {
+        "path": "comet.ts",
+        "sha256": "c42e4c99a54f94fb4e6109d58771ef6a850c813d335e957abd0e683a3ff72101",
+        "start_byte": 21,
+        "end_byte": 40,
+        "start_line": 2,
+        "end_line": 2,
+        "quote": "function increment("
+      }
+    },
+    {
+      "id": "f_typescript_comet",
+      "language": "typescript",
+      "kind": "declaration",
+      "subject": "comet",
+      "status": "observed_syntax",
+      "citation": {
+        "path": "comet.ts",
+        "sha256": "c42e4c99a54f94fb4e6109d58771ef6a850c813d335e957abd0e683a3ff72101",
+        "start_byte": 82,
+        "end_byte": 97,
+        "start_line": 3,
+        "end_line": 3,
+        "quote": "function comet("
+      }
+    },
+    {
+      "id": "f_typescript_call",
+      "language": "typescript",
+      "kind": "static_call",
+      "subject": "comet",
+      "target": "increment",
+      "status": "observed_syntax",
+      "citation": {
+        "path": "comet.ts",
+        "sha256": "c42e4c99a54f94fb4e6109d58771ef6a850c813d335e957abd0e683a3ff72101",
+        "start_byte": 118,
+        "end_byte": 138,
+        "start_line": 4,
+        "end_line": 4,
+        "quote": "return increment(n);"
+      }
+    }
+  ]
+}
