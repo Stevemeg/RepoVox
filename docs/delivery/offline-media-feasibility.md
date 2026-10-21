@@ -160,9 +160,19 @@ symlink skip is explicitly exercised on Linux. Existing application units:
 final-head Linux CI, artifact hashes and exact commands are attached to the draft
 PR after completion; pending checks are never counted as passes.
 
+Initial Linux media CI at `7f4f9880f255c2dbde6b9a902244bf09d50ddb13` failed
+before media tests: the GitHub Ubuntu image had no `ffmpeg` command. Both the push
+run 39539225086 and PR run 39539354863 are preserved failures, not passing renders.
+The follow-up explicitly installs the Ubuntu package from the runner's signed
+`ubuntu.sources` only (excluding other source directories), without recommends,
+PPA, unsigned overrides or a model/Python-media dependency. Candidate origin,
+installed version, license and executable hashes are captured before use.
+Download/disk usage is recorded by apt. No local or production installation changed.
+This bounded tooling correction does not weaken a media assertion or skip a test.
+
 ## Dependencies, compatibility and external limits
 
-No new dependency or model. Python 3.11/3.12 stdlib plus existing locked Pydantic
+No new Python dependency or model. Python 3.11/3.12 stdlib plus existing locked Pydantic
 2.14.1 (MIT); existing pytest/Ruff/mypy. Already installed Windows FFmpeg/FFprobe
 8.1.2 Gyan GPLv3-or-later build/libx264, native AAC. No binary redistribution or
 third-party fonts/music. See [FFmpeg licensing](https://ffmpeg.org/legal.html).

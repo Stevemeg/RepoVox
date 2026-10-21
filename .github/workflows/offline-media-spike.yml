@@ -20,14 +20,24 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
-      - name: Existing locked tooling only; no media/model package installation
+      - name: Existing locked Python tooling; no model or media Python package
         run: |
           python -m pip install uv==0.11.29
           uv sync --frozen
+      - name: Explicit reviewed FFmpeg provisioning from signed Ubuntu repositories only
+        run: |
+          test -f /etc/apt/sources.list.d/ubuntu.sources
+          cat /etc/apt/sources.list.d/ubuntu.sources
+          APT_SOURCE=(-o Dir::Etc::sourcelist=sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=-)
+          sudo apt-get "${APT_SOURCE[@]}" update
+          apt-cache "${APT_SOURCE[@]}" policy ffmpeg
+          sudo apt-get "${APT_SOURCE[@]}" install --yes --no-install-recommends ffmpeg
           command -v ffmpeg
           command -v ffprobe
+          dpkg-query -W ffmpeg
           ffmpeg -version
           ffprobe -version
+          ffmpeg -L
           sha256sum "$(command -v ffmpeg)" "$(command -v ffprobe)"
       - name: Isolated code checks (fixture source stays inert data)
         run: |

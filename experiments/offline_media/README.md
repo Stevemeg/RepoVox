@@ -131,8 +131,16 @@ threads do not enforce a universal OS memory/CPU ceiling. Allow about 200 MiB fo
 this observed render and modest disk space; allocation/storage failure stops
 publication and leaves a registered cleanup inventory.
 
-The dedicated CI workflow requires preinstalled codecs, installs only existing
-locked repository tooling, runs actual media/kill tests and render under a Linux
+The dedicated CI workflow installs FFmpeg explicitly from the disposable Ubuntu
+runner's signed Ubuntu repositories (only `ubuntu.sources`, no PPA/third-party
+source or unsigned-package override), and records package source, resolved version,
+license and executable hashes before use. This is a CI-only system dependency,
+not a local silent download or production change. Allow additional package download
+and disk space (apt reports actual quantities); the FFmpeg dependency tree can be
+substantial. Ubuntu updates may change exact binaries; versions/hashes and same-
+binary repeat tests define reproducibility, not a claimed universal bitstream.
+No model, media Python dependency or binary redistribution. Existing locked Python
+tooling is unchanged. CI runs actual media/kill tests and render under a Linux
 network namespace with only loopback, then uploads **synthetic-only** evidence for
 seven days. No AWS/owner credentials or protected evidence. The normal full Linux
 quality workflow remains enabled for this stacked PR. No production media endpoint,
