@@ -4,13 +4,20 @@ Phase 1 implements a development-only SaaS foundation following the accepted Pha
 
 ## Start
 
-Install Docker Desktop with Linux containers, Docker Compose v2, Python 3.11+ and Node 24.18.0. Allow at least 15 GB free disk space for images, dependencies and builds; actual storage use varies. From the repository root:
+Install Docker Desktop with Linux containers, Docker Compose v2, Python 3.11+ and Node 24.22.1. Allow at least 15 GB free disk space for images, dependencies and builds; actual storage use varies. From the repository root:
 
 ```powershell
 python tools/phase1_env.py
 docker compose up -d --build
 docker compose ps -a
 ```
+
+Use the exact `.node-version` runtime before `npm ci` in `apps/web`; its project
+configuration rejects incompatible Node engines and requires HTTPS certificate
+validation. Run `node tools/security_node.mjs` and
+`node --test tools/security_node.test.mjs` from the repository root. The inspector
+rejects trust/startup overrides; do not remove them silently to obtain a pass.
+See the [security evidence and remaining debt](../security/node-next-remediation.md).
 
 The first command creates an ignored `.env` with distinct random local values and refuses to overwrite an existing file. `.env.example` lists names and placeholders. The historical `MINIO_ROOT_*` variable names identify local S3 bootstrap credentials; the actual local server is [SeaweedFS](../adr/0009-local-object-storage.md). Only its bootstrap containers receive those credentials. The API/worker receive a bucket-scoped service credential. API database role is `rv_app`, worker role `rv_worker`; migration role `rv_migrator` is separate. None has superuser/BYPASSRLS. PostgreSQL's local bootstrap administrator is confined to bootstrap and disposable test administration.
 
