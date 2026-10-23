@@ -12,6 +12,13 @@ RepoVox is solo-maintained by GitHub owner **Stevemeg**. Codex is the implementa
 
 ## No premature phase advancement
 
+On 2026-10-23 the owner authorized an isolated draft security remediation from
+`0aad19c041f9a854a60ea4636c202c03abd9ee82` on `security/python-ca-bootstrap`.
+Patch certifi and pip/uv bootstrap trust stores, verify disposable images and full
+regressions, and stop for independent security review. Keep PRs #9/#10/#11 heads
+unchanged, draft and unmerged; no deployment, real custody, keys, cloud or phase
+advancement. See [security handoff](docs/security/python-trust-remediation.md).
+
 On 2026-10-21 the owner authorized only an isolated offline fictional source-to-video
 feasibility spike on `experiment/offline-source-to-video` from `e3a3ece1`. Keep it
 under `experiments/offline_media`, outside the production application. Deterministic
