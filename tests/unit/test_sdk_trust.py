@@ -129,7 +129,9 @@ def test_wrong_interpreter_package_path(tmp_path, monkeypatch):
 
 def test_actual_minimal_interpreter_has_no_silent_fallback(tmp_path):
     target = tmp_path / "without-sdk"
-    venv.EnvBuilder(with_pip=False).create(target)
+    # The restricted Linux runner's /tmp is noexec. Standard venv symlinks use
+    # the trusted installed interpreter; never execute copied scratch binaries.
+    venv.EnvBuilder(with_pip=False, symlinks=os.name == "posix").create(target)
     binary = target / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
     script = "from repovox.sdk_trust import approved_trust; approved_trust()"
     result = subprocess.run(
@@ -156,6 +158,18 @@ def test_missing_certifi_import_even_if_metadata_exists(monkeypatch):
     monkeypatch.setattr(builtins, "__import__", absent)
     with pytest.raises(trust.SDKTrustError, match="unavailable"):
         client()
+
+
+@pytest.mark.parametrize(
+    "field,value", [("__version__", "1.43.111"), ("__file__", "/shadowed/botocore.py")]
+)
+def test_cached_or_shadowed_sdk_module_rejected(field, value, monkeypatch):
+    import botocore
+
+    monkeypatch.setattr(botocore, field, value)
+    with patch("botocore.session.Session", side_effect=AssertionError("transport reached")):
+        with pytest.raises(trust.SDKTrustError, match="imported SDK differs"):
+            client()
 
 
 def test_selected_path_and_transport_mutation_rejected(monkeypatch):

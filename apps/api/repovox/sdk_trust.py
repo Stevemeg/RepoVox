@@ -95,9 +95,20 @@ def approved_trust(*, verify: object = True, config: Any = None) -> dict[str, An
             raise SDKTrustError("unsupported boto3 version")
         cert_path = _installed_file("certifi", "certifi/cacert.pem")
         fallback = _installed_file("botocore", "botocore/cacert.pem")
+        import botocore
+        import botocore.httpsession
         import certifi
         from botocore.httpsession import get_cert_path
 
+        if (
+            botocore.__version__ != SDK_VERSION
+            or Path(botocore.__file__).resolve()
+            != _installed_file("botocore", "botocore/__init__.py")
+            or Path(botocore.httpsession.__file__).resolve()
+            != _installed_file("botocore", "botocore/httpsession.py")
+            or Path(certifi.__file__).resolve() != _installed_file("certifi", "certifi/__init__.py")
+        ):
+            raise SDKTrustError("imported SDK differs from selected distribution")
         chosen = get_cert_path(True)
         if (
             Path(certifi.where()).resolve() != cert_path

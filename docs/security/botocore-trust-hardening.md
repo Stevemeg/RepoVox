@@ -123,6 +123,8 @@ all ambient override classes, invalid/custom verify paths, verify=False/None,
 proxy/client certificates, default shared files, changed selected path/transport,
 wrong interpreter, unknown versions, offline Stubber behavior, transport-construction
 inventory and a real socket audit refusal before the socket can connect.
+Imported SDK versions/module locations must agree with the selected distribution,
+including cached or shadowed modules; metadata alone cannot attest the loaded code.
 
 The original focused test failed because an extra fixture-level refusal changed
 the expected existing AWS error class. The harness retains the accepted independent
@@ -130,6 +132,10 @@ before-send refusal, and the added TLS hook validates trust without replacing th
 error. Original failure logs are preserved. Lint/type issues were fixed without
 waivers. Full Linux, PostgreSQL, restricted custody, Node/frontend/browser, audits,
 media and secret-scan results are reported at the exact final head in the draft PR.
+Initial Linux integration rejected the new minimal-venv test's copied interpreter
+on the existing noexec scratch mount. The test now uses standard POSIX venv
+symlinks to the trusted installed interpreter, preserving noexec, assertions and
+the actual empty environment. No copied scratch executable or permission waiver.
 
 The first host environment selected old Python 3.11.0. The cfn-lint lock's existing
 networkx 3.7 requires Python 3.12, so that installation failed and was preserved;
