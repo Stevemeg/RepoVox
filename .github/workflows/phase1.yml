@@ -18,6 +18,14 @@ jobs:
         with: {fetch-depth: 0, ref: '${{ github.event.pull_request.head.sha || github.sha }}'}
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
+      - name: Refresh system trust from signed Ubuntu sources (USN-8944-1)
+        run: |
+          test -f /etc/apt/sources.list.d/ubuntu.sources
+          APT_SOURCE=(-o Dir::Etc::sourcelist=sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=-)
+          sudo apt-get "${APT_SOURCE[@]}" update
+          sudo apt-get "${APT_SOURCE[@]}" install --yes --only-upgrade ca-certificates
+          sudo update-ca-certificates --fresh
+          dpkg-query -W ca-certificates
       - name: Install controlled tooling and locked dependencies
         run: |
           python tools/security_bootstrap.py --repair-ensurepip
@@ -82,6 +90,12 @@ jobs:
         with: {python-version: '3.12'}
       - name: Hash-anchored host tooling for unchanged recovery smoke
         run: |
+          test -f /etc/apt/sources.list.d/ubuntu.sources
+          APT_SOURCE=(-o Dir::Etc::sourcelist=sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=-)
+          sudo apt-get "${APT_SOURCE[@]}" update
+          sudo apt-get "${APT_SOURCE[@]}" install --yes --only-upgrade ca-certificates
+          sudo update-ca-certificates --fresh
+          dpkg-query -W ca-certificates
           python tools/security_bootstrap.py --repair-ensurepip
           uv sync --frozen
           python tools/security_trust.py --uv --seed

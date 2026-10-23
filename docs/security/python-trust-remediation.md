@@ -17,6 +17,14 @@ roots. [uv 0.13.4](https://github.com/astral-sh/uv/releases/tag/0.13.4) updates 
 embedded `webpki-root-certs` to 1.0.10. Its roots are independent of Python certifi.
 No evidence of an actual RepoVox compromise is asserted.
 
+System trust is an independent path too: signed Ubuntu
+[USN-8944-1](https://ubuntu.com/security/notices/USN-8944-1) and Debian
+[DSA-6572-1](https://lists.debian.org/debian-security-announce/2026/msg00487.html)
+remove affected roots. All disposable Python CI jobs refresh only official
+Ubuntu source metadata/CA packages before bootstrapping and inspect effective
+roots. The API image refreshes signed Debian CA packages. No system trust check
+is disabled to accommodate a stale runner image.
+
 ## Installation inventory
 
 | Surface at original head | Original affected component | Draft correction |
@@ -173,6 +181,21 @@ Independent reviewers must inspect the hash provenance, effective/dormant stores
 unaffected lock records, precise CI checks and final image results. No independent
 security acceptance is self-awarded. Original PR heads and all historical evidence
 remain untouched; the new branch must never be described as patching old heads.
+
+First Linux runs at `45f885a` failed closed on the stale runner's system roots
+after patched pip/uv/seed installation. The follow-up refreshes the official
+Ubuntu CA security package before bootstrap; the root rejection is unchanged.
+Those failed runs are preserved, not relabeled as passes.
+
+The same run found a **separate pre-existing frontend security blocker** in
+unchanged Next.js 16.4.0: npm audit reports critical findings
+[GHSA-2464-fhr4-w9xw](https://github.com/vercel/next.js/security/advisories/GHSA-2464-fhr4-w9xw),
+[GHSA-p3m5-59mp-jv5r](https://github.com/vercel/next.js/security/advisories/GHSA-p3m5-59mp-jv5r)
+and [GHSA-673q-mjm6-r5xr](https://github.com/vercel/next.js/security/advisories/GHSA-673q-mjm6-r5xr).
+It lists Next.js 16.4.2 as a fix outside the current exact constraint. Frontend
+lint/types/17 tests/build passed; its audit did not. This Python-only correction
+does not change the Node lockfile, suppress the audit or claim overall green CI.
+Separate owner authorization/review is required for that unrelated remediation.
 
 Historical deadlines remain 2026-11-14 17:43:39 UTC and 2026-11-16 16:53:29 UTC.
 No historical custodian or owner key is accessed. Historical 0/84 is unchanged,

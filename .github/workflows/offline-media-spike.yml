@@ -22,6 +22,12 @@ jobs:
         with: {python-version: '3.12'}
       - name: Existing locked Python tooling; no model or media Python package
         run: |
+          test -f /etc/apt/sources.list.d/ubuntu.sources
+          APT_SOURCE=(-o Dir::Etc::sourcelist=sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=-)
+          sudo apt-get "${APT_SOURCE[@]}" update
+          sudo apt-get "${APT_SOURCE[@]}" install --yes --only-upgrade ca-certificates
+          sudo update-ca-certificates --fresh
+          dpkg-query -W ca-certificates
           python tools/security_bootstrap.py --repair-ensurepip
           python tools/security_trust.py --uv --seed
           uv sync --frozen
