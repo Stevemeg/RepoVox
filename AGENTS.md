@@ -12,6 +12,15 @@ RepoVox is solo-maintained by GitHub owner **Stevemeg**. Codex is the implementa
 
 ## No premature phase advancement
 
+On 2026-10-23 the owner authorized isolated botocore certificate hardening from
+exact PR #13 `caf540fb582a0609acb0e62728467e6a58ce9f50`, on
+`security/botocore-trust-hardening`, with a new stacked draft PR. Upstream bundle
+removal, explicit SDK trust enforcement and offline adversarial/regression tests
+are authorized. Keep PRs #9–#13 unchanged, draft and unmerged; preserve frozen
+analysis/SQL/custody/evaluation and host trust. No AWS calls/credentials, cloud,
+real evidence/pilot, owner key, merge/deployment or Phase 3/6. See
+[SDK trust handoff](docs/security/botocore-trust-hardening.md).
+
 On 2026-10-23 the owner authorized isolated Node/Next security remediation from
 exact PR #12 head `119f8bdd62578d8d7fa015ec8ebefe2f8b19bec8`, on
 `security/node-next-remediation`, with a new draft PR stacked on

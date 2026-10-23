@@ -1,14 +1,16 @@
 import hashlib
 from dataclasses import dataclass
-from typing import Literal, Protocol
+from typing import TYPE_CHECKING, Literal, Protocol
 from uuid import UUID
 
-import boto3
 from botocore.client import Config
-from mypy_boto3_s3 import S3Client
 
 from repovox.core.config import Settings
 from repovox.core.errors import DomainError
+from repovox.sdk_trust import create_client
+
+if TYPE_CHECKING:
+    from mypy_boto3_s3 import S3Client
 
 
 @dataclass(frozen=True)
@@ -37,7 +39,7 @@ class ObjectStorage(Protocol):
 class S3Storage:
     def __init__(self, settings: Settings) -> None:
         self.bucket = settings.storage_bucket
-        self.client: S3Client = boto3.client(
+        self.client: S3Client = create_client(
             "s3",
             endpoint_url=settings.storage_endpoint,
             aws_access_key_id=settings.storage_access_key.get_secret_value(),

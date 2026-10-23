@@ -1,9 +1,9 @@
 import os
 
-import boto3
 from botocore.exceptions import ClientError
+from repovox.sdk_trust import create_client
 
-client = boto3.client(
+client = create_client(
     "s3",
     endpoint_url="http://storage:8333",
     aws_access_key_id=os.environ["MINIO_ROOT_USER"],

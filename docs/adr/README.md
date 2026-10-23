@@ -33,3 +33,4 @@ All proposed for Phase 0 review, dated 2026-10-08. Acceptance follows independen
 | [020](0020-post-execution-custody-authority.md) | Separate execution leases and bounded owner-key custody review grants |
 | [021](0021-independent-cloud-retention.md) | External immutable registry, cleanup fencing, reconciliation and honest cloud guarantees |
 | [022](0022-aws-retention-integration.md) | Deployment-disabled AWS adapters, conditional registry and independent service verification |
+| [023](0023-sdk-certificate-trust-boundary.md) | Upstream CA removal and fail-closed, explicitly selected SDK trust |
