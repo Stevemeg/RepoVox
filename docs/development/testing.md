@@ -38,7 +38,12 @@ upstream licenses and source excerpts stay outside Git. [Analysis](analysis.md),
 
 ## Host checks
 
+Run the [hash-anchored bootstrap](../security/python-trust-remediation.md) in the
+selected environment before network installation. Unrelated host Python copies
+are not automatically patched by this branch.
+
 ```powershell
+python tools/security_bootstrap.py
 uv sync --frozen
 uv run ruff check apps/api tests tools/phase1*.py
 uv run ruff format --check apps/api tests tools/phase1*.py

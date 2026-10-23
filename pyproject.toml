@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "RepoVox local SaaS foundation"
 requires-python = ">=3.11,<3.14"
 dependencies = [
+  "certifi>=2026.10.19", # Also secures botocore when development tools are absent.
   "fastapi>=0.115,<1",
   "uvicorn>=0.34,<1",
   "pydantic-settings>=2.8,<3",
@@ -22,6 +23,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "pip>=26.2.2", # pip-api's separately vendored CA bundle also needs remediation.
     "pytest>=8.3,<10",
     "httpx>=0.28,<1",
     "ruff>=0.11,<1",
@@ -49,7 +51,7 @@ addopts = "-ra"
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-include = ["apps/api/**/*.py", "tests/**/*.py", "tools/phase1*.py", "tools/phase2*.py"]
+include = ["apps/api/**/*.py", "tests/**/*.py", "tools/phase1*.py", "tools/phase2*.py", "tools/security_*.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

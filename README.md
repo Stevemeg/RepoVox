@@ -37,7 +37,12 @@ SeaweedFS stores immutable archives/analysis. Database/storage volumes survive
 
 ## Application checks
 
+First use the [hash-anchored security bootstrap](docs/security/python-trust-remediation.md)
+in an owner-selected disposable Python environment. Do not use an old pip/uv for
+network installation; new virtual environments also need the patched bootstrap.
+
 ```powershell
+python tools/security_bootstrap.py
 uv sync --frozen
 uv run ruff check apps/api tests tools/phase1*.py tools/phase2*.py
 uv run ruff format --check apps/api tests tools/phase1*.py tools/phase2*.py
@@ -81,6 +86,7 @@ Self-hosted RepoVox Director and speech are the primary production strategy. Nor
 Python 3.11+ and Node.js LTS are used for planning tooling only:
 
 ```powershell
+python tools/security_bootstrap.py
 python -m pip install -r tools/requirements-docs.txt
 python tools/check_docs.py
 python tools/cost_model.py --check

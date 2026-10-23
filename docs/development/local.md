@@ -40,7 +40,11 @@ Use a separate Compose project (`-p repovox-test`) for disposable integration te
 
 ## Host tooling
 
+Use a dedicated Python environment and the [security bootstrap](../security/python-trust-remediation.md)
+before package installation. This does not update unrelated host installations.
+
 ```powershell
+python tools/security_bootstrap.py
 uv sync --frozen
 npm --prefix apps/web ci
 npm --prefix apps/web run dev
