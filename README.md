@@ -25,6 +25,8 @@ docker compose ps -a
 The [Node/Next security handoff](docs/security/node-next-remediation.md) documents
 the exact runtime pins and effective bundled-root inspection; the global Windows
 trust store and unrelated host installations are outside that correction.
+The separate [SDK trust handoff](docs/security/botocore-trust-hardening.md)
+documents upstream fallback removal and explicit fail-closed certificate selection.
 
 Open `http://localhost:3000` and choose Alex Chen or Sam Rivera. Create/view/delete
 owned GitHub locators, run retained labelled synthetic fixtures, or acknowledge local

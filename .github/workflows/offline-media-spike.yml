@@ -3,7 +3,7 @@ on:
   push:
     branches: [experiment/offline-source-to-video]
   pull_request:
-    branches: [phase2/aws-retention-integration, experiment/offline-source-to-video, security/python-ca-bootstrap]
+    branches: [phase2/aws-retention-integration, experiment/offline-source-to-video, security/python-ca-bootstrap, security/node-next-remediation]
 permissions:
   contents: read
 concurrency:
@@ -30,7 +30,7 @@ jobs:
           dpkg-query -W ca-certificates
           python tools/security_bootstrap.py --repair-ensurepip
           python tools/security_trust.py --uv --seed
-          uv sync --frozen
+          uv sync --frozen --link-mode copy
           uv run python tools/security_trust.py --certifi --seed
       - name: Explicit reviewed FFmpeg provisioning from signed Ubuntu repositories only
         run: |

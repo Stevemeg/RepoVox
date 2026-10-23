@@ -1,7 +1,7 @@
 name: Phase 1 and 2 quality gates
 on:
   pull_request:
-    branches: [main, phase0/foundation, phase1/saas-foundation, phase2/repository-intelligence, phase2/eval-entry, phase2/ai-audited-pilot, phase2/canonical-fact-remediation, phase2/source-fact-v2-evaluation, phase2/pilot-control-plane-safety, phase2/retention-runtime-verification, phase2/aws-retention-integration, experiment/offline-source-to-video, security/python-ca-bootstrap]
+    branches: [main, phase0/foundation, phase1/saas-foundation, phase2/repository-intelligence, phase2/eval-entry, phase2/ai-audited-pilot, phase2/canonical-fact-remediation, phase2/source-fact-v2-evaluation, phase2/pilot-control-plane-safety, phase2/retention-runtime-verification, phase2/aws-retention-integration, experiment/offline-source-to-video, security/python-ca-bootstrap, security/node-next-remediation]
   push:
     branches: [phase1/saas-foundation, phase2/repository-intelligence, phase2/eval-entry, phase2/ai-audited-pilot, phase2/canonical-fact-remediation, phase2/source-fact-v2-evaluation, phase2/pilot-control-plane-safety, phase2/retention-runtime-verification, phase2/aws-retention-integration]
 permissions:
@@ -30,19 +30,22 @@ jobs:
         run: |
           python tools/security_bootstrap.py --repair-ensurepip
           python tools/security_trust.py --uv --seed
-          uv sync --frozen
+          uv sync --frozen --link-mode copy
           uv run python tools/security_trust.py --certifi --seed
+          uv run python tools/security_sdk_check.py
           uv run pip-audit --path "$(python -c 'import sysconfig; print(sysconfig.get_path("purelib"))')"
       - name: Verify locked runtime profile without development dependencies
         run: |
-          UV_PROJECT_ENVIRONMENT=/tmp/repovox-runtime uv sync --frozen --no-dev
+          UV_PROJECT_ENVIRONMENT=/tmp/repovox-runtime uv sync --frozen --link-mode copy --no-dev
           /tmp/repovox-runtime/bin/python tools/security_trust.py --certifi --seed
+          /tmp/repovox-runtime/bin/python tools/security_sdk_check.py --synthetic-storage
           uv run pip-audit --path /tmp/repovox-runtime/lib/python3.12/site-packages
       - name: Security tooling checks
         run: |
           uv run ruff check tools/security_*.py
           uv run ruff format --check tools/security_*.py
           uv run mypy --strict tools/security_bootstrap.py tools/security_trust.py
+          uv run mypy --strict --follow-imports silent --ignore-missing-imports tools/security_sdk_check.py tools/security_sdk_lint.py
       - run: uv run ruff check apps/api tests tools/phase1*.py tools/phase2*.py
       - run: uv run ruff format --check apps/api tests tools/phase1*.py tools/phase2*.py
       - run: uv run mypy
@@ -57,7 +60,8 @@ jobs:
           /tmp/repovox-cfn-lint/bin/python tools/security_bootstrap.py --pip-only
           /tmp/repovox-cfn-lint/bin/python -I -m pip --isolated install --require-hashes --only-binary=:all: --index-url https://pypi.org/simple -r tools/requirements-cfn-lint.txt
           /tmp/repovox-cfn-lint/bin/python tools/security_trust.py --seed
-          /tmp/repovox-cfn-lint/bin/cfn-lint --template infra/aws-retention/*.template.json
+          /tmp/repovox-cfn-lint/bin/python tools/security_sdk_check.py
+          /tmp/repovox-cfn-lint/bin/python tools/security_sdk_lint.py --template infra/aws-retention/*.template.json
           uv run pip-audit --path /tmp/repovox-cfn-lint/lib/python3.12/site-packages
       - name: Accepted Phase 0 documentation and contracts
         run: |
@@ -114,9 +118,10 @@ jobs:
           sudo update-ca-certificates --fresh
           dpkg-query -W ca-certificates
           python tools/security_bootstrap.py --repair-ensurepip
-          uv sync --frozen
+          uv sync --frozen --link-mode copy
           python tools/security_trust.py --uv --seed
           uv run python tools/security_trust.py --certifi --seed
+          uv run python tools/security_sdk_check.py
       - name: Generate ephemeral local credentials
         run: python tools/phase1_env.py
       - name: Fresh migration and real-service integration tests
@@ -126,6 +131,7 @@ jobs:
           docker compose run --rm --no-deps --entrypoint dpkg-query tests -W ca-certificates
           docker compose run --rm --no-deps --entrypoint /usr/local/bin/python tests tools/security_trust.py --uv --seed
           docker compose run --rm --no-deps tests python tools/security_trust.py --certifi --seed
+          docker compose run --rm --no-deps tests python tools/security_sdk_check.py
           docker compose run --rm --no-deps tests pip-audit --cache-dir /tmp/repovox-audit --local
           docker compose run --rm --no-deps tests pip-audit --cache-dir /tmp/repovox-audit --path /usr/local/lib/python3.12/site-packages
           docker compose up -d postgres redis storage storage-init migrate

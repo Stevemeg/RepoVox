@@ -4,7 +4,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 COPY tools/security_bootstrap.py tools/security_trust.py tools/requirements-bootstrap.txt tools/
 RUN python tools/security_bootstrap.py --repair-ensurepip && python tools/security_trust.py --uv --seed
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-install-project --no-cache
+RUN uv sync --frozen --link-mode copy --no-install-project --no-cache
 COPY apps/api apps/api
 COPY tools tools
 COPY docs docs
@@ -12,7 +12,7 @@ COPY tests tests
 COPY infrastructure/retention infrastructure/retention
 COPY infra/aws-retention infra/aws-retention
 COPY README.md AGENTS.md ./
-RUN uv sync --frozen --no-cache && .venv/bin/python tools/security_trust.py --certifi --seed && useradd --create-home --uid 10001 repovox && mkdir /storage-config && chown repovox /storage-config
+RUN uv sync --frozen --link-mode copy --no-cache && .venv/bin/python tools/security_trust.py --certifi --seed && .venv/bin/python tools/security_sdk_check.py && useradd --create-home --uid 10001 repovox && mkdir /storage-config && chown repovox /storage-config
 ENV PATH="/workspace/.venv/bin:$PATH" PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTEST_ADDOPTS="-o cache_dir=/tmp/repovox-pytest-cache"

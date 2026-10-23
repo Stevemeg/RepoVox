@@ -8,6 +8,7 @@ import re
 from dataclasses import asdict, dataclass
 
 from botocore.validate import validate_parameters
+from repovox.sdk_trust import validate_client
 
 from tools.phase2_cloud_retention_model import canonical, digest, require
 
@@ -49,6 +50,7 @@ class SDK:
 
     def call(self, service, method, **kwargs):
         client = self.clients[service]
+        validate_client(client)
         client.meta.events.register_first("before-send.*.*", offline_network_guard)
         require(client.meta.region_name == self.boundary.region, "client_region")
         require(getattr(client, "_repovox_offline", False) is True, "offline_transport_required")

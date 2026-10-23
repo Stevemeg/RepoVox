@@ -5,9 +5,9 @@ import re
 import sqlite3
 import threading
 
-import boto3
 from botocore.config import Config
 from botocore.stub import Stubber
+from repovox.sdk_trust import create_client
 
 from tools.phase2_aws_contract import SDK, Boundary
 from tools.phase2_aws_registry import decode, encode
@@ -50,15 +50,13 @@ def blocked_network(**kwargs):
 
 class Harness:
     def __init__(self, services, boundary=BOUNDARY):
-        session = boto3.Session(
-            aws_access_key_id="offline",
-            aws_secret_access_key="offline",
-            region_name=boundary.region,
-        )
         self.clients, self.stubs = {}, {}
         for service in services:
-            client = session.client(
+            client = create_client(
                 service,
+                aws_access_key_id="offline",
+                aws_secret_access_key="offline",
+                region_name=boundary.region,
                 endpoint_url="https://offline.invalid",
                 config=Config(retries={"max_attempts": 0}),
             )
