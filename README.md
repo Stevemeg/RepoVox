@@ -14,13 +14,17 @@ reviewer is PENDING OWNER APPOINTMENT; the official evaluation corpus is UNFROZE
 
 ## Local development
 
-Requirements: Docker Desktop (Linux containers), Compose v2, Python 3.11+ and Node 24.18.0. Keep at least 15 GB free for builds. Generate distinct ignored local credentials and start the stack:
+Requirements: Docker Desktop (Linux containers), Compose v2, Python 3.11+ and Node 24.22.1. Keep at least 15 GB free for builds. Generate distinct ignored local credentials and start the stack:
 
 ```powershell
 python tools/phase1_env.py
 docker compose up -d --build
 docker compose ps -a
 ```
+
+The [Node/Next security handoff](docs/security/node-next-remediation.md) documents
+the exact runtime pins and effective bundled-root inspection; the global Windows
+trust store and unrelated host installations are outside that correction.
 
 Open `http://localhost:3000` and choose Alex Chen or Sam Rivera. Create/view/delete
 owned GitHub locators, run retained labelled synthetic fixtures, or acknowledge local

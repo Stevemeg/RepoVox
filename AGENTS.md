@@ -12,6 +12,16 @@ RepoVox is solo-maintained by GitHub owner **Stevemeg**. Codex is the implementa
 
 ## No premature phase advancement
 
+On 2026-10-23 the owner authorized isolated Node/Next security remediation from
+exact PR #12 head `119f8bdd62578d8d7fa015ec8ebefe2f8b19bec8`, on
+`security/node-next-remediation`, with a new draft PR stacked on
+`security/python-ca-bootstrap`. Preserve PRs #9–#12 unchanged and unmerged,
+Python security fixes, frozen analysis/control/custody/AWS behavior and history.
+Only targeted Node/Next pins, trust inspection, security regressions and review
+evidence are authorized. No global Windows trust/tool changes, cloud, real data,
+pilot, merge, deployment or Phase 3/6. See
+[Node/Next handoff](docs/security/node-next-remediation.md).
+
 On 2026-10-23 the owner authorized an isolated draft security remediation from
 `0aad19c041f9a854a60ea4636c202c03abd9ee82` on `security/python-ca-bootstrap`.
 Patch certifi and pip/uv bootstrap trust stores, verify disposable images and full

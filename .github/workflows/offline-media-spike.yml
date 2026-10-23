@@ -3,7 +3,7 @@ on:
   push:
     branches: [experiment/offline-source-to-video]
   pull_request:
-    branches: [phase2/aws-retention-integration, experiment/offline-source-to-video]
+    branches: [phase2/aws-retention-integration, experiment/offline-source-to-video, security/python-ca-bootstrap]
 permissions:
   contents: read
 concurrency:
