@@ -187,6 +187,12 @@ after patched pip/uv/seed installation. The follow-up refreshes the official
 Ubuntu CA security package before bootstrap; the root rejection is unchanged.
 Those failed runs are preserved, not relabeled as passes.
 
+At `33f5dca`, the Python job passed all audits and 823 tests (99 explicit skips).
+Rebuilt image base/application/seed inspections passed. Its new container audit
+then failed because its default cache path was under the read-only home directory.
+The follow-up directs only audit cache into the existing bounded `/tmp` tmpfs;
+read-only root, UID, capabilities, network rules and audit assertions are unchanged.
+
 The same run found a **separate pre-existing frontend security blocker** in
 unchanged Next.js 16.4.0: npm audit reports critical findings
 [GHSA-2464-fhr4-w9xw](https://github.com/vercel/next.js/security/advisories/GHSA-2464-fhr4-w9xw),
@@ -196,6 +202,18 @@ It lists Next.js 16.4.2 as a fix outside the current exact constraint. Frontend
 lint/types/17 tests/build passed; its audit did not. This Python-only correction
 does not change the Node lockfile, suppress the audit or claim overall green CI.
 Separate owner authorization/review is required for that unrelated remediation.
+
+The bundled-CA inventory also inspected installed Node 24.18.0 with its `tls` and
+`crypto.X509Certificate` APIs: 120 bundled roots, including the exact removed
+emSign ECC G3 DER fingerprint above. The web Dockerfile and frontend/browser CI
+pin that Node release. [Node's October security release](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases)
+and [Node 24.22.1](https://nodejs.org/en/blog/release/v24.22.1) describe updated
+roots and other security fixes. Node/Next/npm changes are **not** silently folded
+into this isolated Python remediation. Neither a patched system store nor Python
+certifi repairs Node's bundled roots. Thus repository-wide trust remediation and
+all-green security acceptance remain **blocked** pending a separately authorized
+Node/Next follow-up. No Node process/image or unrelated host installation is
+claimed patched, and no production server is started or promoted here.
 
 Historical deadlines remain 2026-11-14 17:43:39 UTC and 2026-11-16 16:53:29 UTC.
 No historical custodian or owner key is accessed. Historical 0/84 is unchanged,

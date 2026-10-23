@@ -105,10 +105,12 @@ jobs:
       - name: Fresh migration and real-service integration tests
         run: |
           docker compose build --pull --no-cache migrate tests
+          docker image inspect repovox-tests --format '{{.Id}}'
+          docker compose run --rm --no-deps --entrypoint dpkg-query tests -W ca-certificates
           docker compose run --rm --no-deps --entrypoint /usr/local/bin/python tests tools/security_trust.py --uv --seed
           docker compose run --rm --no-deps tests python tools/security_trust.py --certifi --seed
-          docker compose run --rm --no-deps tests pip-audit --local
-          docker compose run --rm --no-deps tests pip-audit --path /usr/local/lib/python3.12/site-packages
+          docker compose run --rm --no-deps tests pip-audit --cache-dir /tmp/repovox-audit --local
+          docker compose run --rm --no-deps tests pip-audit --cache-dir /tmp/repovox-audit --path /usr/local/lib/python3.12/site-packages
           docker compose up -d postgres redis storage storage-init migrate
           docker compose run --rm --build tests
           CUSTODIAN_TEST_IMAGE=$(docker image inspect repovox-tests --format '{{.Id}}')
