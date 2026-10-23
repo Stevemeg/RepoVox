@@ -132,6 +132,10 @@ console encoding was fixed without changing the test or its recorded exit status
 The first local lint/type invocations overlapped the initial clean installation
 and failed on missing executable shims. Their original errors are preserved;
 both checks were rerun only after the successful installation completed.
+Initial Linux frontend inspection rejected `sharp/package.json` because sharp's
+exports intentionally hide that subpath. The CI evidence command now reads the
+supported `sharp.versions.sharp` API, preserving the exact version assertion.
+This was a new inspection-command defect, not a package or application failure.
 
 ## Remaining debt, boundaries and reviewer checklist
 
