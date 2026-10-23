@@ -18,7 +18,10 @@ import sysconfig
 import zipfile
 from pathlib import Path
 
-BLOCKED = {"86a1ecba089c4a8d3bbe2734c612ba341d813e043cf9e8a862cd5c57a36bbe6b"}
+BLOCKED = {
+    "86a1ecba089c4a8d3bbe2734c612ba341d813e043cf9e8a862cd5c57a36bbe6b",  # emSign ECC G3
+    "d7a7a0fb5d7e2731d771e9484ebcdef71d5f0c3e0a2948782bc83ee0ea699ef4",  # AAA, DSA-6572-1
+}
 
 
 def inspect_pem(body: bytes) -> dict[str, object]:
@@ -102,6 +105,36 @@ def report(
     if not roots or {hashlib.sha256(x).hexdigest() for x in roots} & BLOCKED:
         raise ValueError("system TLS default roots absent or compromised")
     result["system_roots"] = {"certificates": len(roots), "blocked_anchors": 0}
+    # Offline SDK inspection only: no session/client, credentials, API or request.
+    spec = importlib.util.find_spec("botocore")
+    if spec and spec.origin:
+        from botocore.httpsession import get_cert_path
+
+        fallback = Path(spec.origin).with_name("cacert.pem")
+        chosen = get_cert_path(True)
+        if not chosen:
+            raise ValueError("missing SDK selected CA store")
+        selected = Path(chosen)
+        active = inspect_pem(selected.read_bytes())
+        try:
+            fallback_store = {"status": "NO_LISTED_ANCHOR", **inspect_pem(fallback.read_bytes())}
+        except ValueError:
+            fallback_store = {
+                "status": "UNRESOLVED_DORMANT_CA",
+                "sha256": hashlib.sha256(fallback.read_bytes()).hexdigest(),
+            }
+        result["botocore"] = {
+            "version": importlib.metadata.version("botocore"),
+            "selected_bundle": str(selected),
+            "selected_inspection": active,
+            "fallback_path": str(fallback),
+            "fallback_inspection": fallback_store,
+        }
+        # Exit success here attests active trust checks only, never full bundled
+        # store remediation. The unresolved fallback blocks overall acceptance.
+        result["all_bundled_stores_remediated"] = (
+            fallback_store["status"] != "UNRESOLVED_DORMANT_CA"
+        )
     if uv_required:
         import shutil
 

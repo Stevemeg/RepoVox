@@ -36,6 +36,7 @@ is disabled to accommodate a stale runner image.
 | Disposable cfn-lint environment | pip 26.2.0 | pip 26.2.2; retain cfn-lint 1.52.0 and all 26 prior resolved package versions, now hash-locked |
 | Host integration smoke | unpinned transitive certifi from standalone HTTPX installation | use the existing application's locked HTTPX/environment; same host smoke code |
 | Documented local/docs installs | unspecified host pip/uv | explicit selected-environment bootstrap prerequisite |
+| botocore fallback PEM (app 1.43.111; lint 1.43.116) | AAA Certificate Services remains in the fallback | active standalone certifi is patched; fallback remains explicitly unresolved; SDK unchanged |
 
 There are no Sigstore, conda or pixi distributions in the application lock,
 temporary lint requirements, bootstrap requirements or Dockerfile. No speculative
@@ -115,6 +116,25 @@ anchor check is not a universal revocation/PKI correctness test. uv's compiled
 Rust roots are opaque to this PEM checker: evidence is the verified patched wheel,
 upstream release dependency change, actual executable version and recorded hash,
 not a claim of extracting or independently rebuilding its Rust bundle.
+
+The independent installed-file inventory found three Python PEM stores: standalone
+certifi, pip's vendor and botocore's fallback. The latter's SHA-256 is
+`ed93d6346236d4f0278f617f5245091f37d001806a49ce42ce0ad5bec858d28e`, with 127 roots.
+It retains AAA Certificate Services, DER SHA-256
+`d7a7a0fb5d7e2731d771e9484ebcdef71d5f0c3e0a2948782bc83ee0ea699ef4`, also named in
+DSA-6572-1. The checker now rejects both listed roots in active/system stores and
+records the fallback as `UNRESOLVED_DORMANT_CA` and
+`all_bundled_stores_remediated: false`. Its zero exit status means **active-store
+checks passed**, not complete remediation of dormant bundles. No false overall
+acceptance follows from that exit status.
+
+Offline inspection of the [SDK's local certificate selection](https://github.com/boto/botocore/blob/develop/botocore/httpsession.py)
+and installed `get_cert_path(True)` proves the tested environment selects the
+patched certifi PEM; no AWS client/request or credential is used. If that selected
+store is affected, inspection rejects it. The fallback remains a blocker for
+repository-wide trust acceptance, especially for dependency profiles without
+certifi. A separately reviewed SDK/bundle resolution is needed; no ad hoc editing
+of third-party CA files, unreviewed SDK upgrade or AWS behavior change is made.
 
 The first local inspection intentionally remained failed until the separately
 locked pip 26.2.1 was corrected; original stderr is retained. The owner's shared
@@ -214,6 +234,16 @@ certifi repairs Node's bundled roots. Thus repository-wide trust remediation and
 all-green security acceptance remain **blocked** pending a separately authorized
 Node/Next follow-up. No Node process/image or unrelated host installation is
 claimed patched, and no production server is started or promoted here.
+
+The expanded two-anchor check also rejects the owner's unchanged Windows default
+store because AAA Certificate Services remains present. Earlier G3-only local
+observations are retained, but do not establish complete current system trust.
+No Windows CA/registry/global installation is edited. All new downloads are
+hash-anchored or use the reviewed patched CA bundle explicitly; authenticated
+handoff transport uses that bundle without loading the affected default roots.
+The seed/PATH unit tests use labeled synthetic OS contexts to test their intended
+boundaries; mandatory Linux/CLI system checks still inspect real roots. Existing
+host remediation remains a separate operator obligation, not an automatic fix.
 
 Historical deadlines remain 2026-11-14 17:43:39 UTC and 2026-11-16 16:53:29 UTC.
 No historical custodian or owner key is accessed. Historical 0/84 is unchanged,

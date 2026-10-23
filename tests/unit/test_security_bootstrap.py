@@ -106,6 +106,12 @@ def test_seed_wheel_and_bundle_commitments_remain_distinct(
             else original(name)
         ),
     )
+    # This unit uses a synthetic OS store; real CLI/Linux checks are not mocked.
+    monkeypatch.setattr(
+        trust.ssl,
+        "create_default_context",
+        lambda: SimpleNamespace(get_ca_certs=lambda **kw: [ssl.PEM_cert_to_DER_cert(pem.decode())]),
+    )
     result = trust.report()
     observed = result["ensurepip"][0]
     assert observed["wheel_sha256"] == hashlib.sha256(wheel.read_bytes()).hexdigest()
@@ -127,6 +133,12 @@ def test_wrong_path_uv_cannot_pass_using_new_package_metadata(
     )
     monkeypatch.setattr(shutil, "which", lambda name: "synthetic-old-uv")
     monkeypatch.setattr(trust.subprocess, "check_output", lambda *a, **k: "uv 0.11.29 (old)")
+    pem = trustme.CA().cert_pem.bytes()
+    monkeypatch.setattr(
+        trust.ssl,
+        "create_default_context",
+        lambda: SimpleNamespace(get_ca_certs=lambda **kw: [ssl.PEM_cert_to_DER_cert(pem.decode())]),
+    )
     with pytest.raises(ValueError, match="PATH uv differs"):
         trust.report(uv_required=True)
 
