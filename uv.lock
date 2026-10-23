@@ -1295,6 +1295,7 @@ dependencies = [
     { name = "alembic" },
     { name = "boto3" },
     { name = "celery", extra = ["redis"] },
+    { name = "certifi" },
     { name = "fastapi" },
     { name = "itsdangerous" },
     { name = "jsonschema" },
@@ -1311,7 +1312,6 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "boto3-stubs", extra = ["s3"] },
-    { name = "certifi" },
     { name = "cryptography" },
     { name = "httpx" },
     { name = "jsonschema" },
@@ -1329,6 +1329,7 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.15,<2" },
     { name = "boto3", specifier = ">=1.37,<2" },
     { name = "celery", extras = ["redis"], specifier = ">=5.5,<6" },
+    { name = "certifi", specifier = ">=2026.10.19" },
     { name = "fastapi", specifier = ">=0.115,<1" },
     { name = "itsdangerous", specifier = ">=2.2,<3" },
     { name = "jsonschema", specifier = "==4.26.0" },
@@ -1345,7 +1346,6 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "boto3-stubs", extras = ["s3"], specifier = ">=1.37,<2" },
-    { name = "certifi", specifier = ">=2026.10.19" },
     { name = "cryptography", specifier = "==50.0.2" },
     { name = "httpx", specifier = ">=0.28,<1" },
     { name = "jsonschema", specifier = "==4.26.0" },

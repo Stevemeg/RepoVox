@@ -33,6 +33,11 @@ jobs:
           uv sync --frozen
           uv run python tools/security_trust.py --certifi --seed
           uv run pip-audit --path "$(python -c 'import sysconfig; print(sysconfig.get_path("purelib"))')"
+      - name: Verify locked runtime profile without development dependencies
+        run: |
+          UV_PROJECT_ENVIRONMENT=/tmp/repovox-runtime uv sync --frozen --no-dev
+          /tmp/repovox-runtime/bin/python tools/security_trust.py --certifi --seed
+          uv run pip-audit --path /tmp/repovox-runtime/lib/python3.12/site-packages
       - name: Security tooling checks
         run: |
           uv run ruff check tools/security_*.py

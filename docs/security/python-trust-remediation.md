@@ -29,11 +29,11 @@ is disabled to accommodate a stale runner image.
 
 | Surface at original head | Original affected component | Draft correction |
 |---|---|---|
-| Application/development `uv.lock` | certifi 2026.7.22 | 2026.10.19; direct dev minimum |
+| Application/development `uv.lock` | certifi 2026.7.22 | 2026.10.19; direct runtime minimum, including no-dev installs |
 | `pip-api` transitive dependency in the same lock | pip 26.2.1, independently vendored certifi | pip 26.2.2; direct dev minimum |
 | Python quality and offline media CI | uv 0.11.29, seeded runner pip | verified pip wheel first, then hash-pinned uv 0.13.4 |
 | API/worker/tests/migration/storage-helper image | copied uv 0.11.29; base pip and ensurepip seed; system roots | same bootstrap, replace dormant seed, signed Debian CA refresh, strict inspection |
-| Disposable cfn-lint environment | pip 26.2.0 | pip 26.2.2; retain cfn-lint 1.52.0 and all 26 prior resolved package versions, now hash-locked |
+| Disposable cfn-lint environment | pip 26.2.0; no standalone certifi, activating botocore fallback | pip 26.2.2 and explicit certifi 2026.10.19; all 26 prior package versions retained, now 27 hash-locked packages |
 | Host integration smoke | unpinned transitive certifi from standalone HTTPX installation | use the existing application's locked HTTPX/environment; same host smoke code |
 | Documented local/docs installs | unspecified host pip/uv | explicit selected-environment bootstrap prerequisite |
 | botocore fallback PEM (app 1.43.111; lint 1.43.116) | AAA Certificate Services remains in the fallback | active standalone certifi is patched; fallback remains explicitly unresolved; SDK unchanged |
@@ -146,13 +146,15 @@ condition.** No permissive flag is used to waive their seed gate.
 ## Minimal resolution and compatibility
 
 104 application lock entries remain. Only certifi and pip change package versions;
-all unrelated package records remain byte-equivalent after parsing. The root dev
-metadata gains two explicit security minimums. uv 0.13.4 rewrites lock revision 3
+all unrelated package records remain byte-equivalent after parsing. Root metadata
+gains runtime certifi and development pip security minimums. uv 0.13.4 rewrites lock revision 3
 to revision 5; old uv is therefore unsupported for this remediation branch.
 Parser, analysis/scoring, SQL, migrations, custody and AWS behavior are untouched.
 
 The [lint tooling lock](../../tools/requirements-cfn-lint.txt) preserves the exact
-26 packages observed in original CI 39540415375; pip is bootstrapped separately.
+26 packages observed in original CI 39540415375, plus required certifi 2026.10.19;
+pip is bootstrapped separately. Normal and no-dev application profiles now require
+patched certifi without modifying SDK service behavior.
 No application dependency is upgraded to accommodate lint tooling. The temporary
 lint environment's separate pip/vendored store is inspected and audited.
 
@@ -234,6 +236,14 @@ certifi repairs Node's bundled roots. Thus repository-wide trust remediation and
 all-green security acceptance remain **blocked** pending a separately authorized
 Node/Next follow-up. No Node process/image or unrelated host installation is
 claimed patched, and no production server is started or promoted here.
+
+At `6b6ed35`, the expanded checker correctly rejected cfn-lint's active botocore
+fallback because that isolated environment had no standalone certifi. The final
+follow-up adds pinned certifi to that tooling environment and makes certifi an
+application **runtime** requirement. All 26 existing lint package versions and
+all unrelated application records remain fixed. An additional real locked
+`--no-dev` install/inspection/audit gate prevents a development-only fix from
+concealing an affected runtime profile. SDK code and service models are unchanged.
 
 The expanded two-anchor check also rejects the owner's unchanged Windows default
 store because AAA Certificate Services remains present. Earlier G3-only local
