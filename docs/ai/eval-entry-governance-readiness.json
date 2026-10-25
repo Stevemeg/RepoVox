@@ -1,0 +1,960 @@
+{
+  "schema_version": "eval-entry-governance-readiness-1.0",
+  "as_of": "2026-10-25",
+  "baseline_commit": "02df5d5ae6262ef5e312b159d749a03188242da0",
+  "mode": "METADATA_ONLY_GOVERNANCE_SNAPSHOT",
+  "overall_state": "BLOCKED",
+  "official_evaluation_authorized": false,
+  "freeze_authorized": false,
+  "source_acquisition_authorized": false,
+  "reviewer_appointment_created": false,
+  "protected_evidence_accessed": false,
+  "cr04_status": "PENDING_OWNER_DECISION",
+  "selected_copy_option": null,
+  "official_corpus_status": "UNFROZEN",
+  "official_verified_counts": {
+    "adversarial_families": 0,
+    "adversarial_variants": 0,
+    "development": 0,
+    "gold_claims": 0,
+    "held_out": 0,
+    "hidden_owner_authored": 0,
+    "javascript_typescript": 0,
+    "mixed": 0,
+    "python": 0,
+    "supported_gold_edges": 0
+  },
+  "official_targets": {
+    "adversarial_families": 20,
+    "adversarial_variants": 100,
+    "development": 20,
+    "gold_claims": 600,
+    "held_out": 60,
+    "hidden_owner_authored": 10,
+    "javascript_typescript": 20,
+    "mixed": 20,
+    "python": 20,
+    "supported_gold_edges": 120
+  },
+  "catalog_candidates": 7,
+  "state_definitions": {
+    "VERIFIED": "Only the stated public metadata/engineering fact was checked; never human/rights/operational acceptance.",
+    "PENDING_OWNER": "An authentic owner decision is absent from the permitted evidence.",
+    "PENDING_HUMAN_REVIEWER": "Actual independent human consent/review evidence is required.",
+    "UNVERIFIED": "Required underlying evidence is unavailable or outside this task; no pass inferred.",
+    "BLOCKED": "An operation or numerical gate cannot qualify until listed dependencies are met."
+  },
+  "reviewer_fields": {
+    "identity": "PENDING",
+    "owner_appointment": "PENDING",
+    "consent": "PENDING",
+    "conflicts": "PENDING",
+    "signature": "PENDING",
+    "approval_evidence": "PENDING"
+  },
+  "public_source_artifacts": [
+    {
+      "path": "docs/delivery/roadmap.md",
+      "commit": "02df5d5ae6262ef5e312b159d749a03188242da0",
+      "git_blob_sha256": "4829ce5dbe07a18b81bb9a3812f81a0ded421622a2e5142a80b3e4098d39ce58",
+      "git_object_id": "88261750e0a18fb749d94116f078502dfa6a364d"
+    },
+    {
+      "path": "docs/ai/evaluation-plan.md",
+      "commit": "02df5d5ae6262ef5e312b159d749a03188242da0",
+      "git_blob_sha256": "8aea16a20fa6135f827d69d2c301716cf05f1718684f32d1764097db2dde068f",
+      "git_object_id": "6e28f7f3224e50d52e7492297da05bd71cc5978a"
+    },
+    {
+      "path": "docs/ai/evaluation-rights.md",
+      "commit": "02df5d5ae6262ef5e312b159d749a03188242da0",
+      "git_blob_sha256": "54aed95d27345e5ed1d296af7f9c98e42b5c937213a65caaf25a77328dee8a8e",
+      "git_object_id": "2cb67ce0eb55db0c503dec6fa77b8f498e6a41d6"
+    },
+    {
+      "path": "docs/ai/evaluation-corpus.manifest.json",
+      "commit": "02df5d5ae6262ef5e312b159d749a03188242da0",
+      "git_blob_sha256": "ac2ee090237bc0b864aaeba45091139893c3d8cc0ad82e8489cd4985f1e0b7cd",
+      "git_object_id": "182e536b6597a48fb2f7a1d1d2c48e1d75d3bec7"
+    },
+    {
+      "path": "docs/ai/evaluation-readiness.json",
+      "commit": "02df5d5ae6262ef5e312b159d749a03188242da0",
+      "git_blob_sha256": "b9c054b419294820c8003c45766003e9daf4659d186d015f866169647858dfc7",
+      "git_object_id": "360436900d9181cedd674938b5271179854b8c55"
+    },
+    {
+      "path": "docs/ai/evaluation-candidates.json",
+      "commit": "02df5d5ae6262ef5e312b159d749a03188242da0",
+      "git_blob_sha256": "04990fd7985de17932199ad2aa6a32bf32031092a9a88fa39a63144163adf9e6",
+      "git_object_id": "d2a3cf2bdcb1434d847d82ef75494cc3265a319e"
+    },
+    {
+      "path": "docs/development/evaluation-preparation.md",
+      "commit": "02df5d5ae6262ef5e312b159d749a03188242da0",
+      "git_blob_sha256": "13e7d4b378ce3c492af0cafbd3e5eb807a9b8642a5548d7520a88a1846bd6418",
+      "git_object_id": "41273527039709fb763281f9054f336c7822b337"
+    },
+    {
+      "path": "docs/development/evaluation-reviewer-packet.md",
+      "commit": "02df5d5ae6262ef5e312b159d749a03188242da0",
+      "git_blob_sha256": "fffdaa59afd6e607e24404240c0243351a28037c871518d4c61e13098bb15f55",
+      "git_object_id": "dd6ad6b971008a14c88350e884997d2339089e98"
+    },
+    {
+      "path": "docs/development/evaluation-review-checklist.md",
+      "commit": "02df5d5ae6262ef5e312b159d749a03188242da0",
+      "git_blob_sha256": "05ce4cf29102035eea7851f22bb94bd9a8795555fb44b520b880f929479649b1",
+      "git_object_id": "1f18a9ee956fddcb1e4f27f5ab0908c8a1d91a9e"
+    },
+    {
+      "path": "docs/development/evaluation-storage.md",
+      "commit": "02df5d5ae6262ef5e312b159d749a03188242da0",
+      "git_blob_sha256": "b1cf3064a5422282cef933860403e12a20c7069185cf7c59716a722ff79733a2",
+      "git_object_id": "f2f694a218ba6471bdc8794e04a443b05dac2dd1"
+    },
+    {
+      "path": "docs/development/evaluation-contamination.md",
+      "commit": "02df5d5ae6262ef5e312b159d749a03188242da0",
+      "git_blob_sha256": "c06deacbef663fa475de2706814314b1aa0ecc8597c696527f67dd58d98063e1",
+      "git_object_id": "76cdf420ea8986993594e506c98274c66bec566e"
+    },
+    {
+      "path": "docs/operations/cloud-reviewer-copy-decision.json",
+      "commit": "02df5d5ae6262ef5e312b159d749a03188242da0",
+      "git_blob_sha256": "a37132cf1fe1125bfb265b35361dda7a681b5605ac47b7dff068cbe9489314e7",
+      "git_object_id": "829d02b12c133a844fbc9f32fe6ed297996f29df"
+    },
+    {
+      "path": "docs/operations/cloud-reviewer-copy-decision.md",
+      "commit": "02df5d5ae6262ef5e312b159d749a03188242da0",
+      "git_blob_sha256": "e929760f8df0dd211f99ed2d01b91c17d29d50f19cb877f07c1bceba0a406c77",
+      "git_object_id": "e0f2f6c153f079f8c34f84e4abddbc1ffb04f12f"
+    },
+    {
+      "path": "docs/development/evaluation-v2.md",
+      "commit": "02df5d5ae6262ef5e312b159d749a03188242da0",
+      "git_blob_sha256": "7aff9b0783994b1f4f22010ee9725c90d3f668fe3756299c0fac8cf1ee805816",
+      "git_object_id": "d8ba52e4d71a8545509167aa87e3993282f074d8"
+    },
+    {
+      "path": "docs/delivery/retention-runtime-verification.md",
+      "commit": "02df5d5ae6262ef5e312b159d749a03188242da0",
+      "git_blob_sha256": "c4d3174235bb428d319483594848f84209462d8a0e996c8981a785792983ffdd",
+      "git_object_id": "b8e3928a7a570ac4332fd41696fa1d283f68be2e"
+    },
+    {
+      "path": "docs/delivery/phase2c-c-verification.md",
+      "commit": "02df5d5ae6262ef5e312b159d749a03188242da0",
+      "git_blob_sha256": "d0920364d49b6056a2f24c854fd6ac1b77b5e67bd84de47ecd9bd9743753e1a9",
+      "git_object_id": "e00591a70cc0683e96ec74f2226d489c7ec6fa33"
+    },
+    {
+      "path": "docs/delivery/phase2b-decisions.md",
+      "commit": "02df5d5ae6262ef5e312b159d749a03188242da0",
+      "git_blob_sha256": "1967d9ab3b39a85292cf20b18e1c684d1183787c17683c1a0df769054b93b731",
+      "git_object_id": "935a824eb157df2d8d701a1cbaffb6f873fe2498"
+    }
+  ],
+  "engineering_ci": [
+    {
+      "run_id": 39962413192,
+      "commit": "02df5d5ae6262ef5e312b159d749a03188242da0",
+      "result": "success",
+      "scope": "BASELINE_ENGINEERING_ONLY"
+    },
+    {
+      "run_id": 39962413352,
+      "commit": "02df5d5ae6262ef5e312b159d749a03188242da0",
+      "result": "success",
+      "scope": "BASELINE_SYNTHETIC_MEDIA_ONLY"
+    }
+  ],
+  "candidates": [
+    {
+      "family_id": "jupyterlite-jupyterlite",
+      "repository": "jupyterlite/jupyterlite",
+      "commit_sha": "def6afe53ef5102497bc499dfda28ca21b103d53",
+      "preliminary_language": "mixed",
+      "declared_license": "BSD-3-Clause",
+      "declared_license_sha256": "574f8a9cab1ec418be4a8e00ba19d0629446a5b47d182f821331a6b09f2326dd",
+      "status": "UNVERIFIED",
+      "evidence_scope": "EXISTING_CATALOG_METADATA_ONLY",
+      "official_admission_authorized": false,
+      "unresolved_rights_and_provenance": "Generated/vendor/submodule content, notices, size, ancestry and actual mixed slice require scoped review."
+    },
+    {
+      "family_id": "pallets-click",
+      "repository": "pallets/click",
+      "commit_sha": "2247b35ea1c47c727d7a06e51fa280e12a863ff6",
+      "preliminary_language": "python",
+      "declared_license": "BSD-3-Clause",
+      "declared_license_sha256": "9a8ad106a394e853bfe21f42f4e72d592819a22805d991b5f3275029292b658d",
+      "status": "UNVERIFIED",
+      "evidence_scope": "EXISTING_CATALOG_METADATA_ONLY",
+      "official_admission_authorized": false,
+      "unresolved_rights_and_provenance": "Historical exploratory exposure requires contamination/split review. Public exploratory reports mention additional optparse/PSF notice chain; no official scope is cleared."
+    },
+    {
+      "family_id": "simonw-datasette",
+      "repository": "simonw/datasette",
+      "commit_sha": "cf113a59850862125b86ce1a58c117aa21341e07",
+      "preliminary_language": "mixed",
+      "declared_license": "Apache-2.0",
+      "declared_license_sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1",
+      "status": "UNVERIFIED",
+      "evidence_scope": "EXISTING_CATALOG_METADATA_ONLY",
+      "official_admission_authorized": false,
+      "unresolved_rights_and_provenance": "Apache NOTICE/modification obligations, bundled material, size and actual mixed coverage require scoped review."
+    },
+    {
+      "family_id": "sindresorhus-is",
+      "repository": "sindresorhus/is",
+      "commit_sha": "e9c026c611c1160eaad50da00be4e676b626018f",
+      "preliminary_language": "javascript_typescript",
+      "declared_license": "MIT",
+      "declared_license_sha256": "5c932d88256b4ab958f64a856fa48e8bd1f55bc1d96b8149c65689e0c61789d3",
+      "status": "UNVERIFIED",
+      "evidence_scope": "EXISTING_CATALOG_METADATA_ONLY",
+      "official_admission_authorized": false,
+      "unresolved_rights_and_provenance": "File-level MIT notices, third-party content, scope, ancestry and actual language/size remain unverified."
+    },
+    {
+      "family_id": "sindresorhus-p-limit",
+      "repository": "sindresorhus/p-limit",
+      "commit_sha": "a8a6fbec4e0e866d6d779b10889bb4f5567e70eb",
+      "preliminary_language": "javascript_typescript",
+      "declared_license": "MIT",
+      "declared_license_sha256": "5c932d88256b4ab958f64a856fa48e8bd1f55bc1d96b8149c65689e0c61789d3",
+      "status": "UNVERIFIED",
+      "evidence_scope": "EXISTING_CATALOG_METADATA_ONLY",
+      "official_admission_authorized": false,
+      "unresolved_rights_and_provenance": "Historical exploratory exposure requires contamination/split review; old exploratory approval does not approve official rights or blind eligibility."
+    },
+    {
+      "family_id": "stevemeg-ai-job-agent",
+      "repository": "stevemeg/ai-job-agent",
+      "commit_sha": "e5cb0dfe1c79e7ba75a4a1416f7b25b5ce46ac8f",
+      "preliminary_language": "mixed",
+      "declared_license": "MIT",
+      "declared_license_sha256": "93cc3a570eca0f8493aa63c9965c6cea278456073bbfbdef5715d7976cc7b39f",
+      "status": "UNVERIFIED",
+      "evidence_scope": "EXISTING_CATALOG_METADATA_ONLY",
+      "official_admission_authorized": false,
+      "unresolved_rights_and_provenance": "Prior exploratory authorization excluded this repository for third-party job-description rights. Official catalog membership is unchanged; this unresolved issue blocks admission."
+    },
+    {
+      "family_id": "stevemeg-enterprise-llm-gateway",
+      "repository": "stevemeg/enterprise-llm-gateway",
+      "commit_sha": "bd67a36767c86329b3641d49146d306ea5254c83",
+      "preliminary_language": "python",
+      "declared_license": "MIT",
+      "declared_license_sha256": "3f3bbdfb7cdd88ae2f600c586c7158d2f276ea1cca26519c44be3dd04c58c30f",
+      "status": "UNVERIFIED",
+      "evidence_scope": "EXISTING_CATALOG_METADATA_ONLY",
+      "official_admission_authorized": false,
+      "unresolved_rights_and_provenance": "Owner account does not establish per-file rights or new human authorship; privacy/secrets, external content, size and ancestry need review."
+    }
+  ],
+  "requirements": [
+    {
+      "id": "GOV-META-01",
+      "state": "VERIFIED",
+      "authoritative_references": [
+        "docs/ai/evaluation-corpus.manifest.json",
+        "docs/ai/evaluation-readiness.json"
+      ],
+      "required_evidence": [
+        "Readable committed official manifest and metadata-only report"
+      ],
+      "responsible_parties": [
+        "IMPLEMENTER"
+      ],
+      "current_evidence": "Inspected public records: UNFROZEN, appointment null, families empty, all verified official counts zero; this verifies metadata, not external absence.",
+      "unresolved_dependencies": [],
+      "acceptance_condition": "Only the stated public metadata fact is verified; this row grants no evaluation eligibility.",
+      "required_before": "GOVERNANCE_REPORT"
+    },
+    {
+      "id": "GOV-ENG-01",
+      "state": "VERIFIED",
+      "authoritative_references": [
+        "docs/security/botocore-trust-hardening.md"
+      ],
+      "required_evidence": [
+        "Exact accepted source ancestry and recorded CI run/head/conclusion"
+      ],
+      "responsible_parties": [
+        "IMPLEMENTER",
+        "INDEPENDENT_TECHNICAL_VALIDATOR"
+      ],
+      "current_evidence": "Git HEAD matches accepted 02df5d5; GitHub runs 39962413192 and 39962413352 both completed successfully at that head. Scope is offline engineering.",
+      "unresolved_dependencies": [],
+      "acceptance_condition": "Code/CI metadata only; engineering acceptance is owner-reported separately and does not approve a corpus or custodian.",
+      "required_before": "GOVERNANCE_REPORT"
+    },
+    {
+      "id": "GOV-ENG-02",
+      "state": "UNVERIFIED",
+      "authoritative_references": [
+        "AGENTS.md",
+        "docs/delivery/roadmap.md"
+      ],
+      "required_evidence": [
+        "Retained authentic independent technical-review decision for the exact approved components and limitations"
+      ],
+      "responsible_parties": [
+        "OWNER",
+        "INDEPENDENT_TECHNICAL_VALIDATOR"
+      ],
+      "current_evidence": "Owner identifies 02df5d5 as independently accepted offline engineering. Original private review evidence is not inspected or authenticated in this metadata-only task.",
+      "unresolved_dependencies": [
+        "Private review provenance must be retained by the authorized owner/custodian; no fabricated signatures."
+      ],
+      "acceptance_condition": "Owner/custodian can present authenticated exact-revision acceptance and its scope for the later freeze review.",
+      "required_before": "FREEZE_REVIEW"
+    },
+    {
+      "id": "GOV-HUMAN-01",
+      "state": "PENDING_OWNER",
+      "authoritative_references": [
+        "docs/delivery/phase2b-decisions.md",
+        "docs/development/evaluation-reviewer-packet.md"
+      ],
+      "required_evidence": [
+        "D2B-01 actual-human appointment, named private stable identity, authorized scope and appointment evidence"
+      ],
+      "responsible_parties": [
+        "OWNER"
+      ],
+      "current_evidence": "Manifest appointment is null and reviewer status is PENDING OWNER APPOINTMENT.",
+      "unresolved_dependencies": [
+        "No person may be substituted by Codex, ChatGPT or a synthetic receipt."
+      ],
+      "acceptance_condition": "Owner appoints a qualified independent human through an authenticated private process; no appointment is made here.",
+      "required_before": "SOURCE_REVIEW_ACCESS"
+    },
+    {
+      "id": "GOV-HUMAN-02",
+      "state": "PENDING_HUMAN_REVIEWER",
+      "authoritative_references": [
+        "docs/development/evaluation-reviewer-packet.md",
+        "docs/development/evaluation-review-checklist.md"
+      ],
+      "required_evidence": [
+        "Actual consent, qualifications, COI/recusal declaration, confidentiality, availability and stop-condition acceptance"
+      ],
+      "responsible_parties": [
+        "INDEPENDENT_HUMAN_REVIEWER"
+      ],
+      "current_evidence": "Identity, consent, conflicts and signatures remain PENDING.",
+      "unresolved_dependencies": [
+        "GOV-HUMAN-01"
+      ],
+      "acceptance_condition": "Appointed human and owner/custodian authenticate these records, resolve conflicts and agree review responsibilities.",
+      "required_before": "SOURCE_REVIEW_ACCESS"
+    },
+    {
+      "id": "GOV-ROLES-01",
+      "state": "PENDING_OWNER",
+      "authoritative_references": [
+        "docs/development/evaluation-reviewer-packet.md",
+        "docs/development/evaluation-storage.md"
+      ],
+      "required_evidence": [
+        "Duty assignment and least-privilege access/revocation plan for preparer, human reviewer, evaluator and custodian"
+      ],
+      "responsible_parties": [
+        "OWNER",
+        "CUSTODIAN"
+      ],
+      "current_evidence": "No official review operating identities or access grants are demonstrated.",
+      "unresolved_dependencies": [
+        "GOV-HUMAN-01",
+        "GOV-HUMAN-02"
+      ],
+      "acceptance_condition": "Reviewer is independent of label preparation; custodian identity is isolated from API/worker/parser; overlapping human duties are disclosed and independently reviewed.",
+      "required_before": "SOURCE_REVIEW_ACCESS"
+    },
+    {
+      "id": "GOV-RIGHTS-01",
+      "state": "PENDING_OWNER",
+      "authoritative_references": [
+        "docs/ai/evaluation-rights.md",
+        "docs/delivery/phase2b-decisions.md"
+      ],
+      "required_evidence": [
+        "D2B-02 exact pinned scopes and rights evidence, owner approval, notices, permitted access/retention/withdrawal"
+      ],
+      "responsible_parties": [
+        "OWNER",
+        "RIGHTS_REVIEWER"
+      ],
+      "current_evidence": "All seven catalog entries have pending rights and null permission/rights-review/owner-approval evidence.",
+      "unresolved_dependencies": [
+        "Root license metadata is not file-level permission or official approval."
+      ],
+      "acceptance_condition": "Owner separately approves each precise scope after competent rights review; ambiguous or prohibited content is not admitted.",
+      "required_before": "SOURCE_ADMISSION"
+    },
+    {
+      "id": "GOV-RIGHTS-02",
+      "state": "UNVERIFIED",
+      "authoritative_references": [
+        "docs/ai/evaluation-rights.md",
+        "docs/ai/evaluation-candidate-catalog.md"
+      ],
+      "required_evidence": [
+        "Authenticated original license/NOTICE/file-header/third-party and provenance evidence with hashes and complete permitted inventory"
+      ],
+      "responsible_parties": [
+        "RIGHTS_REVIEWER",
+        "CUSTODIAN"
+      ],
+      "current_evidence": "Catalog contains historical preliminary license claims; underlying original evidence is not accessed or rehashed here.",
+      "unresolved_dependencies": [
+        "GOV-RIGHTS-01",
+        "Source acquisition and protected inspection need separate authorization."
+      ],
+      "acceptance_condition": "Independent rights/provenance review confirms the original bytes and authority for each admitted file and all intended uses.",
+      "required_before": "SOURCE_ADMISSION"
+    },
+    {
+      "id": "GOV-CONTRACT-01",
+      "state": "PENDING_OWNER",
+      "authoritative_references": [
+        "docs/development/evaluation-preparation.md",
+        "docs/development/evaluation-v2.md"
+      ],
+      "required_evidence": [
+        "Explicit official evaluation objective, compatible annotation/prediction/scoring versions, rubric and independent technical validation",
+        "Compatible official preparation custody/access authority; exploratory execution closure/A-B grants cannot substitute for human review access."
+      ],
+      "responsible_parties": [
+        "OWNER",
+        "INDEPENDENT_TECHNICAL_VALIDATOR"
+      ],
+      "current_evidence": "Official corpus-2.0 preparation uses gold-evaluation-1.0/source-fact-1.0; source-fact-2.0 scoring is separately documented exploratory infrastructure.",
+      "unresolved_dependencies": [
+        "No implicit v1-to-v2 gold conversion or official v2 adoption is authorized."
+      ],
+      "acceptance_condition": "Select a compatible existing official path, or separately authorize and independently review a versioned official integration; preserve every current threshold.",
+      "required_before": "SOURCE_REVIEW_ACCESS"
+    },
+    {
+      "id": "GOV-COUNT-01",
+      "state": "BLOCKED",
+      "authoritative_references": [
+        "docs/ai/evaluation-plan.md",
+        "docs/ai/evaluation-readiness.json"
+      ],
+      "required_evidence": [
+        "Qualifying reviewed official evidence for adversarial_families: at least 20"
+      ],
+      "responsible_parties": [
+        "OWNER",
+        "INDEPENDENT_HUMAN_REVIEWER",
+        "CUSTODIAN"
+      ],
+      "current_evidence": "Official verified adversarial_families count is 0; target 20. Catalog entries, AI references and engineering fixtures receive no credit.",
+      "unresolved_dependencies": [
+        "GOV-HUMAN-01",
+        "GOV-RIGHTS-01",
+        "GOV-STORAGE-01",
+        "GOV-REVIEW-01"
+      ],
+      "acceptance_condition": "Existing protected validators and independent review establish at least 20 qualifying adversarial_families without duplicate-family, descendant or partial-review inflation.",
+      "required_before": "FREEZE_REVIEW"
+    },
+    {
+      "id": "GOV-COUNT-02",
+      "state": "BLOCKED",
+      "authoritative_references": [
+        "docs/ai/evaluation-plan.md",
+        "docs/ai/evaluation-readiness.json"
+      ],
+      "required_evidence": [
+        "Qualifying reviewed official evidence for adversarial_variants: at least 100"
+      ],
+      "responsible_parties": [
+        "OWNER",
+        "INDEPENDENT_HUMAN_REVIEWER",
+        "CUSTODIAN"
+      ],
+      "current_evidence": "Official verified adversarial_variants count is 0; target 100. Catalog entries, AI references and engineering fixtures receive no credit.",
+      "unresolved_dependencies": [
+        "GOV-HUMAN-01",
+        "GOV-RIGHTS-01",
+        "GOV-STORAGE-01",
+        "GOV-REVIEW-01"
+      ],
+      "acceptance_condition": "Existing protected validators and independent review establish at least 100 qualifying adversarial_variants without duplicate-family, descendant or partial-review inflation.",
+      "required_before": "FREEZE_REVIEW"
+    },
+    {
+      "id": "GOV-COUNT-03",
+      "state": "BLOCKED",
+      "authoritative_references": [
+        "docs/ai/evaluation-plan.md",
+        "docs/ai/evaluation-readiness.json"
+      ],
+      "required_evidence": [
+        "Qualifying reviewed official evidence for development: at least 20"
+      ],
+      "responsible_parties": [
+        "OWNER",
+        "INDEPENDENT_HUMAN_REVIEWER",
+        "CUSTODIAN"
+      ],
+      "current_evidence": "Official verified development count is 0; target 20. Catalog entries, AI references and engineering fixtures receive no credit.",
+      "unresolved_dependencies": [
+        "GOV-HUMAN-01",
+        "GOV-RIGHTS-01",
+        "GOV-STORAGE-01",
+        "GOV-REVIEW-01"
+      ],
+      "acceptance_condition": "Existing protected validators and independent review establish at least 20 qualifying development without duplicate-family, descendant or partial-review inflation.",
+      "required_before": "FREEZE_REVIEW"
+    },
+    {
+      "id": "GOV-COUNT-04",
+      "state": "BLOCKED",
+      "authoritative_references": [
+        "docs/ai/evaluation-plan.md",
+        "docs/ai/evaluation-readiness.json"
+      ],
+      "required_evidence": [
+        "Qualifying reviewed official evidence for gold_claims: at least 600"
+      ],
+      "responsible_parties": [
+        "OWNER",
+        "INDEPENDENT_HUMAN_REVIEWER",
+        "CUSTODIAN"
+      ],
+      "current_evidence": "Official verified gold_claims count is 0; target 600. Catalog entries, AI references and engineering fixtures receive no credit.",
+      "unresolved_dependencies": [
+        "GOV-HUMAN-01",
+        "GOV-RIGHTS-01",
+        "GOV-STORAGE-01",
+        "GOV-REVIEW-01"
+      ],
+      "acceptance_condition": "Existing protected validators and independent review establish at least 600 qualifying gold_claims without duplicate-family, descendant or partial-review inflation.",
+      "required_before": "FREEZE_REVIEW"
+    },
+    {
+      "id": "GOV-COUNT-05",
+      "state": "BLOCKED",
+      "authoritative_references": [
+        "docs/ai/evaluation-plan.md",
+        "docs/ai/evaluation-readiness.json"
+      ],
+      "required_evidence": [
+        "Qualifying reviewed official evidence for held_out: at least 60"
+      ],
+      "responsible_parties": [
+        "OWNER",
+        "INDEPENDENT_HUMAN_REVIEWER",
+        "CUSTODIAN"
+      ],
+      "current_evidence": "Official verified held_out count is 0; target 60. Catalog entries, AI references and engineering fixtures receive no credit.",
+      "unresolved_dependencies": [
+        "GOV-HUMAN-01",
+        "GOV-RIGHTS-01",
+        "GOV-STORAGE-01",
+        "GOV-REVIEW-01"
+      ],
+      "acceptance_condition": "Existing protected validators and independent review establish at least 60 qualifying held_out without duplicate-family, descendant or partial-review inflation.",
+      "required_before": "FREEZE_REVIEW"
+    },
+    {
+      "id": "GOV-COUNT-06",
+      "state": "BLOCKED",
+      "authoritative_references": [
+        "docs/ai/evaluation-plan.md",
+        "docs/ai/evaluation-readiness.json"
+      ],
+      "required_evidence": [
+        "Qualifying reviewed official evidence for hidden_owner_authored: at least 10"
+      ],
+      "responsible_parties": [
+        "OWNER",
+        "INDEPENDENT_HUMAN_REVIEWER",
+        "CUSTODIAN"
+      ],
+      "current_evidence": "Official verified hidden_owner_authored count is 0; target 10. Catalog entries, AI references and engineering fixtures receive no credit.",
+      "unresolved_dependencies": [
+        "GOV-HUMAN-01",
+        "GOV-RIGHTS-01",
+        "GOV-STORAGE-01",
+        "GOV-REVIEW-01"
+      ],
+      "acceptance_condition": "Existing protected validators and independent review establish at least 10 qualifying hidden_owner_authored without duplicate-family, descendant or partial-review inflation.",
+      "required_before": "FREEZE_REVIEW"
+    },
+    {
+      "id": "GOV-COUNT-07",
+      "state": "BLOCKED",
+      "authoritative_references": [
+        "docs/ai/evaluation-plan.md",
+        "docs/ai/evaluation-readiness.json"
+      ],
+      "required_evidence": [
+        "Qualifying reviewed official evidence for javascript_typescript: at least 20"
+      ],
+      "responsible_parties": [
+        "OWNER",
+        "INDEPENDENT_HUMAN_REVIEWER",
+        "CUSTODIAN"
+      ],
+      "current_evidence": "Official verified javascript_typescript count is 0; target 20. Catalog entries, AI references and engineering fixtures receive no credit.",
+      "unresolved_dependencies": [
+        "GOV-HUMAN-01",
+        "GOV-RIGHTS-01",
+        "GOV-STORAGE-01",
+        "GOV-REVIEW-01"
+      ],
+      "acceptance_condition": "Existing protected validators and independent review establish at least 20 qualifying javascript_typescript without duplicate-family, descendant or partial-review inflation.",
+      "required_before": "FREEZE_REVIEW"
+    },
+    {
+      "id": "GOV-COUNT-08",
+      "state": "BLOCKED",
+      "authoritative_references": [
+        "docs/ai/evaluation-plan.md",
+        "docs/ai/evaluation-readiness.json"
+      ],
+      "required_evidence": [
+        "Qualifying reviewed official evidence for mixed: at least 20"
+      ],
+      "responsible_parties": [
+        "OWNER",
+        "INDEPENDENT_HUMAN_REVIEWER",
+        "CUSTODIAN"
+      ],
+      "current_evidence": "Official verified mixed count is 0; target 20. Catalog entries, AI references and engineering fixtures receive no credit.",
+      "unresolved_dependencies": [
+        "GOV-HUMAN-01",
+        "GOV-RIGHTS-01",
+        "GOV-STORAGE-01",
+        "GOV-REVIEW-01"
+      ],
+      "acceptance_condition": "Existing protected validators and independent review establish at least 20 qualifying mixed without duplicate-family, descendant or partial-review inflation.",
+      "required_before": "FREEZE_REVIEW"
+    },
+    {
+      "id": "GOV-COUNT-09",
+      "state": "BLOCKED",
+      "authoritative_references": [
+        "docs/ai/evaluation-plan.md",
+        "docs/ai/evaluation-readiness.json"
+      ],
+      "required_evidence": [
+        "Qualifying reviewed official evidence for python: at least 20"
+      ],
+      "responsible_parties": [
+        "OWNER",
+        "INDEPENDENT_HUMAN_REVIEWER",
+        "CUSTODIAN"
+      ],
+      "current_evidence": "Official verified python count is 0; target 20. Catalog entries, AI references and engineering fixtures receive no credit.",
+      "unresolved_dependencies": [
+        "GOV-HUMAN-01",
+        "GOV-RIGHTS-01",
+        "GOV-STORAGE-01",
+        "GOV-REVIEW-01"
+      ],
+      "acceptance_condition": "Existing protected validators and independent review establish at least 20 qualifying python without duplicate-family, descendant or partial-review inflation.",
+      "required_before": "FREEZE_REVIEW"
+    },
+    {
+      "id": "GOV-COUNT-10",
+      "state": "BLOCKED",
+      "authoritative_references": [
+        "docs/ai/evaluation-plan.md",
+        "docs/ai/evaluation-readiness.json"
+      ],
+      "required_evidence": [
+        "Qualifying reviewed official evidence for supported_gold_edges: at least 120"
+      ],
+      "responsible_parties": [
+        "OWNER",
+        "INDEPENDENT_HUMAN_REVIEWER",
+        "CUSTODIAN"
+      ],
+      "current_evidence": "Official verified supported_gold_edges count is 0; target 120. Catalog entries, AI references and engineering fixtures receive no credit.",
+      "unresolved_dependencies": [
+        "GOV-HUMAN-01",
+        "GOV-RIGHTS-01",
+        "GOV-STORAGE-01",
+        "GOV-REVIEW-01"
+      ],
+      "acceptance_condition": "Existing protected validators and independent review establish at least 120 qualifying supported_gold_edges without duplicate-family, descendant or partial-review inflation.",
+      "required_before": "FREEZE_REVIEW"
+    },
+    {
+      "id": "GOV-AUDIT-01",
+      "state": "BLOCKED",
+      "authoritative_references": [
+        "docs/ai/evaluation-plan.md",
+        "docs/development/evaluation-review-checklist.md"
+      ],
+      "required_evidence": [
+        "At least 20 independently audited diverse fixtures and complete approved review coverage for all admitted official families"
+      ],
+      "responsible_parties": [
+        "INDEPENDENT_HUMAN_REVIEWER"
+      ],
+      "current_evidence": "No official independently reviewed family is recorded.",
+      "unresolved_dependencies": [
+        "GOV-REVIEW-01"
+      ],
+      "acceptance_condition": "Actual diverse source-based audit evidence meets the plan; this does not replace the 20 DEV/60 TEST or full-row review requirements.",
+      "required_before": "FREEZE_REVIEW"
+    },
+    {
+      "id": "GOV-HIDDEN-01",
+      "state": "PENDING_OWNER",
+      "authoritative_references": [
+        "docs/ai/evaluation-hidden-specifications.md",
+        "docs/delivery/phase2b-decisions.md"
+      ],
+      "required_evidence": [
+        "D2B-03 actual private new owner works, authorship/provenance/AI/template disclosures and independent human confirmation"
+      ],
+      "responsible_parties": [
+        "OWNER",
+        "INDEPENDENT_HUMAN_REVIEWER"
+      ],
+      "current_evidence": "Ten public proposals exist; no qualifying owner-authored hidden family is admitted.",
+      "unresolved_dependencies": [
+        "Actual hidden source must not be created or inspected under this task."
+      ],
+      "acceptance_condition": "At least ten qualifying hidden TEST families are independently confirmed; public existing repos and AI-generated implementations cannot substitute.",
+      "required_before": "FREEZE_REVIEW"
+    },
+    {
+      "id": "GOV-FAMILY-01",
+      "state": "UNVERIFIED",
+      "authoritative_references": [
+        "docs/development/evaluation-contamination.md"
+      ],
+      "required_evidence": [
+        "Reviewed ancestry, family grouping, source fingerprints, immutable split assignments and comparison output"
+      ],
+      "responsible_parties": [
+        "CUSTODIAN",
+        "INDEPENDENT_HUMAN_REVIEWER"
+      ],
+      "current_evidence": "No approved corpus or actual family/contamination comparison is recorded; empty ancestry is unknown.",
+      "unresolved_dependencies": [
+        "GOV-RIGHTS-01",
+        "GOV-STORAGE-01"
+      ],
+      "acceptance_condition": "Actual raw/normalized fingerprint and manual ancestry review clears overlaps, keeps derivatives together and records unknowable pretraining limits.",
+      "required_before": "FREEZE_REVIEW"
+    },
+    {
+      "id": "GOV-REVIEW-01",
+      "state": "BLOCKED",
+      "authoritative_references": [
+        "docs/development/evaluation-reviewer-packet.md",
+        "docs/ai/gold-review-receipt.schema.json"
+      ],
+      "required_evidence": [
+        "Source-authored labels, every claim/edge decision, source checks, adjudication, complete digest-bound human review receipt and immutable revisions"
+      ],
+      "responsible_parties": [
+        "INDEPENDENT_HUMAN_REVIEWER",
+        "CUSTODIAN"
+      ],
+      "current_evidence": "No official gold or human review receipt is recorded; no protected materials are inspected.",
+      "unresolved_dependencies": [
+        "GOV-HUMAN-01",
+        "GOV-HUMAN-02",
+        "GOV-RIGHTS-01",
+        "GOV-CONTRACT-01",
+        "GOV-STORAGE-01"
+      ],
+      "acceptance_condition": "Every final family/variant and claim/edge is reviewed; zero unresolved rows; authenticated human sign-off binds exact source/gold/split/rights/variant digests.",
+      "required_before": "FREEZE_REVIEW"
+    },
+    {
+      "id": "GOV-STORAGE-01",
+      "state": "PENDING_OWNER",
+      "authoritative_references": [
+        "docs/development/evaluation-storage.md",
+        "docs/development/custodian-lifecycle.md"
+      ],
+      "required_evidence": [
+        "D2B-04 and D2B-06 actual custody identity/location, rights-bound expiry, copy inventory, monitoring/cleanup/operator approvals"
+      ],
+      "responsible_parties": [
+        "OWNER",
+        "CUSTODIAN"
+      ],
+      "current_evidence": "No authorized official corpus custodian is demonstrated; offline accepted tooling is not live activation.",
+      "unresolved_dependencies": [
+        "Owner laptop availability is not an independently verified retention arrangement; no cloud deployment or budget authorization exists."
+      ],
+      "acceptance_condition": "Owner approves an independently validated operational boundary and funded/available responsibilities, within existing security and retention requirements.",
+      "required_before": "SOURCE_ADMISSION"
+    },
+    {
+      "id": "GOV-ACCESS-01",
+      "state": "UNVERIFIED",
+      "authoritative_references": [
+        "docs/development/evaluation-storage.md",
+        "docs/development/evaluation-contamination.md"
+      ],
+      "required_evidence": [
+        "Actual read-only reviewer grants, UID/mount/tenant/split denial probes, revocation, backups/restore and independent cleanup evidence"
+      ],
+      "responsible_parties": [
+        "CUSTODIAN",
+        "INDEPENDENT_TECHNICAL_VALIDATOR"
+      ],
+      "current_evidence": "Only historical synthetic/engineering demonstrations are available, not official live-control evidence.",
+      "unresolved_dependencies": [
+        "GOV-STORAGE-01",
+        "GOV-COPY-01"
+      ],
+      "acceptance_condition": "Demonstrate real least-privilege controls and all-copy retention without source/gold in public Git/CI; no proof is fabricated here.",
+      "required_before": "SOURCE_REVIEW_ACCESS"
+    },
+    {
+      "id": "GOV-COPY-01",
+      "state": "PENDING_OWNER",
+      "authoritative_references": [
+        "docs/operations/cloud-reviewer-copy-decision.json",
+        "docs/operations/cloud-reviewer-copy-decision.md"
+      ],
+      "required_evidence": [
+        "Explicit CR-04 option/destination decision, rights, full copy inventory, immutable deadlines, independent enforcement review and authentic separate operation grant"
+      ],
+      "responsible_parties": [
+        "OWNER",
+        "CUSTODIAN",
+        "INDEPENDENT_TECHNICAL_VALIDATOR"
+      ],
+      "current_evidence": "Existing record is PENDING_OWNER_DECISION; selected_option null; real_handoff/provisioning remain unauthorized.",
+      "unresolved_dependencies": [
+        "No option, provider, contract, signature or destination is selected by this package."
+      ],
+      "acceptance_condition": "Eligible owner-selected policy is independently verified and separately authorized; otherwise no export or handoff.",
+      "required_before": "SOURCE_REVIEW_ACCESS"
+    },
+    {
+      "id": "GOV-RETENTION-01",
+      "state": "UNVERIFIED",
+      "authoritative_references": [
+        "docs/delivery/retention-runtime-verification.md",
+        "docs/operations/cloud-reviewer-copy-decision.md"
+      ],
+      "required_evidence": [
+        "Actual authorized historical inventory, responsible human/monitoring assignment, all-copy cleanup and independently verified completion evidence"
+      ],
+      "responsible_parties": [
+        "OWNER",
+        "CUSTODIAN"
+      ],
+      "current_evidence": "Historical deadlines are reported as 2026-11-14 17:43:39 UTC and 2026-11-16 16:53:29 UTC. Current contents/monitoring/deletion are not inspected.",
+      "unresolved_dependencies": [
+        "No retroactive coverage or deadline extension; this task performs no custody action."
+      ],
+      "acceptance_condition": "Authorized operators fulfill original duties by each immutable deadline, record actual failures/absence and retain only permitted opaque audit data; planned actions are not completion.",
+      "required_before": "HISTORICAL_DEADLINES"
+    },
+    {
+      "id": "GOV-BUDGET-01",
+      "state": "PENDING_OWNER",
+      "authoritative_references": [
+        "docs/delivery/phase2b-decisions.md",
+        "docs/development/evaluation-batches.md",
+        "docs/ai/evaluation-effort.json"
+      ],
+      "required_evidence": [
+        "D2B-05 authentic reviewer availability, measured labor plan, access window, retention and any separately approved costs"
+      ],
+      "responsible_parties": [
+        "OWNER",
+        "INDEPENDENT_HUMAN_REVIEWER"
+      ],
+      "current_evidence": "No qualifying review effort/compensation/operational budget is recorded; no spend is authorized.",
+      "unresolved_dependencies": [
+        "No invented throughput or 24/7 responder; cloud $10 planning is not corpus funding or spending approval."
+      ],
+      "acceptance_condition": "Owner and actual reviewer agree a feasible scoped plan and responsibilities; separately approve any later expense.",
+      "required_before": "SOURCE_REVIEW_ACCESS"
+    },
+    {
+      "id": "GOV-FREEZE-01",
+      "state": "BLOCKED",
+      "authoritative_references": [
+        "docs/development/evaluation-batches.md",
+        "docs/development/evaluation-preparation.md",
+        "docs/delivery/roadmap.md"
+      ],
+      "required_evidence": [
+        "Full immutable corpus/preparation/rights/access/contamination/deletion/rubric/human review evidence and independent freeze-review decision"
+      ],
+      "responsible_parties": [
+        "OWNER",
+        "CUSTODIAN",
+        "INDEPENDENT_TECHNICAL_VALIDATOR",
+        "INDEPENDENT_HUMAN_REVIEWER"
+      ],
+      "current_evidence": "freeze_sha256 null; official UNFROZEN; preparation has freeze_eligible false.",
+      "unresolved_dependencies": [
+        "All applicable preceding prerequisites; no partial freeze or automatic approval."
+      ],
+      "acceptance_condition": "A separately authorized protected validation and independent review accept every existing requirement; owner authorization remains distinct. This snapshot cannot freeze anything.",
+      "required_before": "FREEZE_REVIEW"
+    },
+    {
+      "id": "GOV-EXECUTE-01",
+      "state": "BLOCKED",
+      "authoritative_references": [
+        "docs/ai/evaluation-plan.md",
+        "docs/delivery/roadmap.md"
+      ],
+      "required_evidence": [
+        "Approved EVAL-ENTRY plus registered frozen configuration, rights/compute budget, controlled blinded runner and separate next-phase owner instruction"
+      ],
+      "responsible_parties": [
+        "OWNER",
+        "INDEPENDENT_TECHNICAL_VALIDATOR"
+      ],
+      "current_evidence": "No official evaluation/model benchmark is authorized.",
+      "unresolved_dependencies": [
+        "GOV-FREEZE-01",
+        "No acquisition, gold creation, reveal, scoring, model activity, deployment or Phase 3/6 under PR #15."
+      ],
+      "acceptance_condition": "All original EVAL-ENTRY conditions and explicit later authorization exist; no engineering-only or AI exploratory result substitutes.",
+      "required_before": "OFFICIAL_EVALUATION"
+    }
+  ],
+  "historical_custody": [
+    {
+      "label": "ORIGINAL_CUSTODIAN_AND_EXTERNAL_COPIES",
+      "reported_expiry_utc": "2026-11-14T17:43:39Z",
+      "current_live_state": "UNVERIFIED",
+      "monitoring_state": "UNVERIFIED",
+      "cleanup_completion": "UNVERIFIED",
+      "responsible_parties": [
+        "OWNER",
+        "CUSTODIAN"
+      ]
+    },
+    {
+      "label": "FAILED_FRESH_ATTEMPT_AND_EXTERNAL_COPIES",
+      "reported_expiry_utc": "2026-11-16T16:53:29Z",
+      "current_live_state": "UNVERIFIED",
+      "monitoring_state": "UNVERIFIED",
+      "cleanup_completion": "UNVERIFIED",
+      "responsible_parties": [
+        "OWNER",
+        "CUSTODIAN"
+      ]
+    }
+  ]
+}
