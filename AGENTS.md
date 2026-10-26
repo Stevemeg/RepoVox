@@ -12,6 +12,15 @@ RepoVox is solo-maintained by GitHub owner **Stevemeg**. Codex is the implementa
 
 ## No premature phase advancement
 
+On 2026-10-25 the owner authorized documentation-only official EVAL-ENTRY governance
+readiness from exact PR #14 `02df5d5ae6262ef5e312b159d749a03188242da0`, on
+`docs/eval-entry-governance-readiness`, stacked in a new draft PR. Read only public
+repository/PR/CI metadata; prepare pending human appointment, rights/corpus, CR-04
+and historical deadline evidence requirements. Keep PRs #9–#14 unchanged/unmerged,
+official UNFROZEN and CR-04 PENDING. No protected access/actions, source acquisition,
+appointment, gold, freeze, export/reveal/scoring, AWS/spend, deployment or phase
+advancement. See [governance handoff](docs/delivery/eval-entry-governance-readiness.md).
+
 On 2026-10-23 the owner authorized isolated botocore certificate hardening from
 exact PR #13 `caf540fb582a0609acb0e62728467e6a58ce9f50`, on
 `security/botocore-trust-hardening`, with a new stacked draft PR. Upstream bundle

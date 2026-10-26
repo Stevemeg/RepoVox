@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Metadata-only EVAL-ENTRY governance snapshot; never an approval",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "as_of", "baseline_commit", "mode", "overall_state", "official_evaluation_authorized", "freeze_authorized", "source_acquisition_authorized", "reviewer_appointment_created", "protected_evidence_accessed", "cr04_status", "selected_copy_option", "official_corpus_status", "official_verified_counts", "official_targets", "catalog_candidates", "state_definitions", "reviewer_fields", "public_source_artifacts", "engineering_ci", "candidates", "requirements", "historical_custody"],
+  "properties": {
+    "schema_version": {"const": "eval-entry-governance-readiness-1.0"},
+    "as_of": {"type": "string", "format": "date"},
+    "baseline_commit": {"$ref": "#/$defs/git_sha"},
+    "mode": {"const": "METADATA_ONLY_GOVERNANCE_SNAPSHOT"},
+    "overall_state": {"const": "BLOCKED"},
+    "official_evaluation_authorized": {"const": false},
+    "freeze_authorized": {"const": false},
+    "source_acquisition_authorized": {"const": false},
+    "reviewer_appointment_created": {"const": false},
+    "protected_evidence_accessed": {"const": false},
+    "cr04_status": {"const": "PENDING_OWNER_DECISION"},
+    "selected_copy_option": {"type": "null"},
+    "official_corpus_status": {"const": "UNFROZEN"},
+    "official_verified_counts": {"allOf": [{"$ref": "#/$defs/counts"}, {"additionalProperties": {"const": 0}}]},
+    "official_targets": {"allOf": [{"$ref": "#/$defs/counts"}, {"const": {"development": 20, "held_out": 60, "hidden_owner_authored": 10, "adversarial_families": 20, "adversarial_variants": 100, "gold_claims": 600, "supported_gold_edges": 120, "python": 20, "javascript_typescript": 20, "mixed": 20}}]},
+    "catalog_candidates": {"const": 7},
+    "state_definitions": {
+      "type": "object", "additionalProperties": false,
+      "required": ["VERIFIED", "PENDING_OWNER", "PENDING_HUMAN_REVIEWER", "UNVERIFIED", "BLOCKED"],
+      "properties": {
+        "VERIFIED": {"$ref": "#/$defs/text"}, "PENDING_OWNER": {"$ref": "#/$defs/text"},
+        "PENDING_HUMAN_REVIEWER": {"$ref": "#/$defs/text"}, "UNVERIFIED": {"$ref": "#/$defs/text"},
+        "BLOCKED": {"$ref": "#/$defs/text"}
+      }
+    },
+    "reviewer_fields": {
+      "type": "object", "additionalProperties": false,
+      "required": ["identity", "owner_appointment", "consent", "conflicts", "signature", "approval_evidence"],
+      "properties": {
+        "identity": {"const": "PENDING"}, "owner_appointment": {"const": "PENDING"},
+        "consent": {"const": "PENDING"}, "conflicts": {"const": "PENDING"},
+        "signature": {"const": "PENDING"}, "approval_evidence": {"const": "PENDING"}
+      }
+    },
+    "public_source_artifacts": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["path", "commit", "git_blob_sha256", "git_object_id"],
+        "properties": {
+          "path": {"$ref": "#/$defs/text"}, "commit": {"$ref": "#/$defs/git_sha"},
+          "git_blob_sha256": {"$ref": "#/$defs/sha256"}, "git_object_id": {"$ref": "#/$defs/git_sha"}
+        }
+      }
+    },
+    "engineering_ci": {
+      "type": "array", "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["run_id", "commit", "result", "scope"],
+        "properties": {
+          "run_id": {"type": "integer", "minimum": 1}, "commit": {"$ref": "#/$defs/git_sha"},
+          "result": {"const": "success"}, "scope": {"enum": ["BASELINE_ENGINEERING_ONLY", "BASELINE_SYNTHETIC_MEDIA_ONLY"]}
+        }
+      }
+    },
+    "candidates": {
+      "$comment": "Exactly the seven original metadata projections, once each, independent of ordering. This is not source-rights approval. Fixed count 7 equals the separately fixed catalog_candidates declaration.",
+      "type": "array", "minItems": 7, "maxItems": 7,
+      "allOf": [
+        {"contains": {"required": ["family_id", "repository", "commit_sha", "preliminary_language", "declared_license", "declared_license_sha256"], "properties": {
+          "family_id": {"const": "jupyterlite-jupyterlite"}, "repository": {"const": "jupyterlite/jupyterlite"},
+          "commit_sha": {"const": "def6afe53ef5102497bc499dfda28ca21b103d53"}, "preliminary_language": {"const": "mixed"},
+          "declared_license": {"const": "BSD-3-Clause"}, "declared_license_sha256": {"const": "574f8a9cab1ec418be4a8e00ba19d0629446a5b47d182f821331a6b09f2326dd"}
+        }}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["family_id", "repository", "commit_sha", "preliminary_language", "declared_license", "declared_license_sha256"], "properties": {
+          "family_id": {"const": "pallets-click"}, "repository": {"const": "pallets/click"},
+          "commit_sha": {"const": "2247b35ea1c47c727d7a06e51fa280e12a863ff6"}, "preliminary_language": {"const": "python"},
+          "declared_license": {"const": "BSD-3-Clause"}, "declared_license_sha256": {"const": "9a8ad106a394e853bfe21f42f4e72d592819a22805d991b5f3275029292b658d"}
+        }}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["family_id", "repository", "commit_sha", "preliminary_language", "declared_license", "declared_license_sha256"], "properties": {
+          "family_id": {"const": "simonw-datasette"}, "repository": {"const": "simonw/datasette"},
+          "commit_sha": {"const": "cf113a59850862125b86ce1a58c117aa21341e07"}, "preliminary_language": {"const": "mixed"},
+          "declared_license": {"const": "Apache-2.0"}, "declared_license_sha256": {"const": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"}
+        }}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["family_id", "repository", "commit_sha", "preliminary_language", "declared_license", "declared_license_sha256"], "properties": {
+          "family_id": {"const": "sindresorhus-is"}, "repository": {"const": "sindresorhus/is"},
+          "commit_sha": {"const": "e9c026c611c1160eaad50da00be4e676b626018f"}, "preliminary_language": {"const": "javascript_typescript"},
+          "declared_license": {"const": "MIT"}, "declared_license_sha256": {"const": "5c932d88256b4ab958f64a856fa48e8bd1f55bc1d96b8149c65689e0c61789d3"}
+        }}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["family_id", "repository", "commit_sha", "preliminary_language", "declared_license", "declared_license_sha256"], "properties": {
+          "family_id": {"const": "sindresorhus-p-limit"}, "repository": {"const": "sindresorhus/p-limit"},
+          "commit_sha": {"const": "a8a6fbec4e0e866d6d779b10889bb4f5567e70eb"}, "preliminary_language": {"const": "javascript_typescript"},
+          "declared_license": {"const": "MIT"}, "declared_license_sha256": {"const": "5c932d88256b4ab958f64a856fa48e8bd1f55bc1d96b8149c65689e0c61789d3"}
+        }}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["family_id", "repository", "commit_sha", "preliminary_language", "declared_license", "declared_license_sha256"], "properties": {
+          "family_id": {"const": "stevemeg-ai-job-agent"}, "repository": {"const": "stevemeg/ai-job-agent"},
+          "commit_sha": {"const": "e5cb0dfe1c79e7ba75a4a1416f7b25b5ce46ac8f"}, "preliminary_language": {"const": "mixed"},
+          "declared_license": {"const": "MIT"}, "declared_license_sha256": {"const": "93cc3a570eca0f8493aa63c9965c6cea278456073bbfbdef5715d7976cc7b39f"}
+        }}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["family_id", "repository", "commit_sha", "preliminary_language", "declared_license", "declared_license_sha256"], "properties": {
+          "family_id": {"const": "stevemeg-enterprise-llm-gateway"}, "repository": {"const": "stevemeg/enterprise-llm-gateway"},
+          "commit_sha": {"const": "bd67a36767c86329b3641d49146d306ea5254c83"}, "preliminary_language": {"const": "python"},
+          "declared_license": {"const": "MIT"}, "declared_license_sha256": {"const": "3f3bbdfb7cdd88ae2f600c586c7158d2f276ea1cca26519c44be3dd04c58c30f"}
+        }}, "minContains": 1, "maxContains": 1}
+      ],
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["family_id", "repository", "commit_sha", "preliminary_language", "declared_license", "declared_license_sha256", "status", "evidence_scope", "official_admission_authorized", "unresolved_rights_and_provenance"],
+        "properties": {
+          "family_id": {"$ref": "#/$defs/text"}, "repository": {"$ref": "#/$defs/text"},
+          "commit_sha": {"$ref": "#/$defs/git_sha"},
+          "preliminary_language": {"enum": ["python", "javascript_typescript", "mixed"]},
+          "declared_license": {"$ref": "#/$defs/text"}, "declared_license_sha256": {"$ref": "#/$defs/sha256"},
+          "status": {"const": "UNVERIFIED"}, "evidence_scope": {"const": "EXISTING_CATALOG_METADATA_ONLY"},
+          "official_admission_authorized": {"const": false}, "unresolved_rights_and_provenance": {"$ref": "#/$defs/text"}
+        }
+      }
+    },
+    "requirements": {
+      "$comment": "Each expected ID occurs exactly once; uniqueItems would compare entire objects, not their ID fields. Reordering is permitted. Metadata validity never grants human or operational approval.",
+      "type": "array", "minItems": 30, "maxItems": 30,
+      "items": {"$ref": "#/$defs/requirement"},
+      "allOf": [
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-META-01"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-ENG-01"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-ENG-02"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-HUMAN-01"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-HUMAN-02"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-ROLES-01"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-RIGHTS-01"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-RIGHTS-02"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-CONTRACT-01"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-COUNT-01"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-COUNT-02"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-COUNT-03"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-COUNT-04"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-COUNT-05"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-COUNT-06"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-COUNT-07"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-COUNT-08"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-COUNT-09"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-COUNT-10"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-AUDIT-01"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-HIDDEN-01"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-FAMILY-01"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-REVIEW-01"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-STORAGE-01"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-ACCESS-01"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-COPY-01"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-RETENTION-01"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-BUDGET-01"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-FREEZE-01"}}}, "minContains": 1, "maxContains": 1},
+        {"contains": {"required": ["id"], "properties": {"id": {"const": "GOV-EXECUTE-01"}}}, "minContains": 1, "maxContains": 1}
+      ]
+    },
+    "historical_custody": {
+      "type": "array", "minItems": 2, "maxItems": 2,
+      "allOf": [{"prefixItems": [
+        {"properties": {"label": {"const": "ORIGINAL_CUSTODIAN_AND_EXTERNAL_COPIES"}, "reported_expiry_utc": {"const": "2026-11-14T17:43:39Z"}}},
+        {"properties": {"label": {"const": "FAILED_FRESH_ATTEMPT_AND_EXTERNAL_COPIES"}, "reported_expiry_utc": {"const": "2026-11-16T16:53:29Z"}}}
+      ]}],
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["label", "reported_expiry_utc", "current_live_state", "monitoring_state", "cleanup_completion", "responsible_parties"],
+        "properties": {
+          "label": {"enum": ["ORIGINAL_CUSTODIAN_AND_EXTERNAL_COPIES", "FAILED_FRESH_ATTEMPT_AND_EXTERNAL_COPIES"]},
+          "reported_expiry_utc": {"enum": ["2026-11-14T17:43:39Z", "2026-11-16T16:53:29Z"]},
+          "current_live_state": {"const": "UNVERIFIED"}, "monitoring_state": {"const": "UNVERIFIED"},
+          "cleanup_completion": {"const": "UNVERIFIED"}, "responsible_parties": {"$ref": "#/$defs/parties"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "text": {"type": "string", "minLength": 1},
+    "git_sha": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "state": {"enum": ["VERIFIED", "PENDING_OWNER", "PENDING_HUMAN_REVIEWER", "UNVERIFIED", "BLOCKED"]},
+    "parties": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": {"enum": ["OWNER", "INDEPENDENT_HUMAN_REVIEWER", "CUSTODIAN", "INDEPENDENT_TECHNICAL_VALIDATOR", "RIGHTS_REVIEWER", "IMPLEMENTER"]}
+    },
+    "counts": {
+      "type": "object", "additionalProperties": false,
+      "required": ["development", "held_out", "hidden_owner_authored", "adversarial_families", "adversarial_variants", "gold_claims", "supported_gold_edges", "python", "javascript_typescript", "mixed"],
+      "properties": {
+        "development": {"type": "integer", "minimum": 0}, "held_out": {"type": "integer", "minimum": 0},
+        "hidden_owner_authored": {"type": "integer", "minimum": 0}, "adversarial_families": {"type": "integer", "minimum": 0},
+        "adversarial_variants": {"type": "integer", "minimum": 0}, "gold_claims": {"type": "integer", "minimum": 0},
+        "supported_gold_edges": {"type": "integer", "minimum": 0}, "python": {"type": "integer", "minimum": 0},
+        "javascript_typescript": {"type": "integer", "minimum": 0}, "mixed": {"type": "integer", "minimum": 0}
+      }
+    },
+    "requirement": {
+      "type": "object", "additionalProperties": false,
+      "allOf": [{"if": {"properties": {"state": {"const": "VERIFIED"}}}, "then": {"properties": {"id": {"enum": ["GOV-META-01", "GOV-ENG-01"]}, "required_before": {"const": "GOVERNANCE_REPORT"}}}}],
+      "required": ["id", "state", "authoritative_references", "required_evidence", "responsible_parties", "current_evidence", "unresolved_dependencies", "acceptance_condition", "required_before"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^GOV-[A-Z]+-[0-9]{2}$"}, "state": {"$ref": "#/$defs/state"},
+        "authoritative_references": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/text"}},
+        "required_evidence": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/text"}},
+        "responsible_parties": {"$ref": "#/$defs/parties"}, "current_evidence": {"$ref": "#/$defs/text"},
+        "unresolved_dependencies": {"type": "array", "items": {"$ref": "#/$defs/text"}},
+        "acceptance_condition": {"$ref": "#/$defs/text"},
+        "required_before": {"enum": ["GOVERNANCE_REPORT", "SOURCE_ADMISSION", "SOURCE_REVIEW_ACCESS", "FREEZE_REVIEW", "OFFICIAL_EVALUATION", "HISTORICAL_DEADLINES"]}
+      }
+    }
+  }
+}

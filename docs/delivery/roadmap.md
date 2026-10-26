@@ -1,5 +1,9 @@
 # Delivery roadmap and phase gates
 
+2026-10-25 metadata-only [official EVAL-ENTRY governance readiness](eval-entry-governance-readiness.md)
+indexes the unchanged human, rights, corpus, CR-04 and retention prerequisites.
+It grants no appointment, source admission, export, freeze or evaluation authority.
+
 Owner-authorized AWS adapter/IaC work continues accepted offline CR-01..04 from
 `6b412e930dfcfd6b771a457d27633f5f7d5ac8e5`. The
 [integration handoff](aws-integration-verification.md) and
