@@ -61,7 +61,29 @@ States mean:
 
 The schema fixes permission flags to false, appointment fields to PENDING, counts
 to the current public zeros and original deadlines to their exact values. It
-rejects a human/operational row promoted to VERIFIED by merely changing its state.
+requires exactly 30 requirements: each of the expected IDs occurs exactly once,
+using Draft 2020-12 `contains` with `minContains: 1` / `maxContains: 1` inside
+`allOf`, together with `minItems: 30` / `maxItems: 30`. This is uniqueness by ID;
+`uniqueItems` alone would compare complete objects and permit distinct rows with
+the same ID. The exact IDs are GOV-META-01, GOV-ENG-01/02, GOV-HUMAN-01/02,
+GOV-ROLES-01, GOV-RIGHTS-01/02, GOV-CONTRACT-01, GOV-COUNT-01 through 10,
+GOV-AUDIT-01, GOV-HIDDEN-01, GOV-FAMILY-01, GOV-REVIEW-01, GOV-STORAGE-01,
+GOV-ACCESS-01, GOV-COPY-01, GOV-RETENTION-01, GOV-BUDGET-01, GOV-FREEZE-01
+and GOV-EXECUTE-01.
+
+The candidate array must have exactly seven entries, one per original ID with
+the original repository, pin, preliminary language, declared license and declared
+license hash. Per-candidate `contains` constraints bind those values together;
+their exact cardinality excludes substitution, duplication and padding. The
+separately fixed `catalog_candidates: 7` equals the fixed array length without
+unsupported cross-field `$data` syntax. Array order is not identity. These are
+the existing catalog's metadata declarations, not independently confirmed rights;
+the actual snapshot, catalog and official records remain unchanged.
+
+Only GOV-META-01 and GOV-ENG-01 can be VERIFIED, and only for GOVERNANCE_REPORT.
+A human/operational row cannot qualify by changing both its state and its
+`required_before` category. Neither copying a metadata ID nor removing a
+requirement can bypass the exact-ID occurrence checks.
 Schema validity is only snapshot consistency, never authentication or EVAL-ENTRY
 acceptance. There is no executable self-approval or freeze path in this package.
 
@@ -303,6 +325,76 @@ workflow base filters do not trigger runtime CI for this documentation-only targ
 no new-head runtime/security CI success is claimed or required as a substitute for
 human approval. Exact command evidence is retained outside Git/OneDrive and indexed
 in the draft PR handoff.
+
+### Documentation consistency correction, 2026-10-26
+
+The reviewed starting head is `2dac8b10430decf38f417bfd153bcc6e16702c83`,
+stacked directly on `02df5d5ae6262ef5e312b159d749a03188242da0`. Before editing,
+the working tree and GitHub head/base were checked for conflicting owner changes.
+The original schema accepted 80 of the 111 prohibited metadata mutations below;
+that gap reproduction is retained rather than described as a successful guard.
+The correction changes this documentation schema and handoff only. It does not
+change the snapshot JSON, existing catalog/manifests, executable validation tools,
+production behavior, workflows or accepted contracts.
+
+The existing documentation checker parses JSON and validates its established
+contracts; it does not automatically run this separate snapshot schema. Explicit
+Draft 2020-12 validation and separate one-off public-record comparisons were run
+using the existing reviewed Python tooling, with commands and outputs retained
+outside Git. They are tests performed by the implementer, not independent human
+approval or a new operational validator. No tooling scope expansion was required.
+
+| Negative mutation group | Cases | Schema-only result | Separate semantic comparison |
+| --- | ---: | --- | --- |
+| Missing/extra requirement, duplicate ID in distinct rows, unknown replacement ID | 4 | All rejected | All rejected |
+| Missing/extra candidate, duplicated candidate/ID at fixed length, declared count mismatch, jointly reduced array/count | 6 | All rejected | All rejected |
+| Each of seven candidates: changed ID, repository, source pin, preliminary language, declared license or declared license hash | 42 | All rejected | All rejected against original catalog metadata |
+| Changed original or failed-attempt historical deadline | 2 | All rejected | All rejected |
+| Each of ten lowered targets and ten nonzero official counts | 20 | All rejected | All rejected against original readiness metadata |
+| Each of five authorization/access/appointment flags set true | 5 | All rejected | All rejected |
+| Each of 28 non-metadata rows promoted to VERIFIED and reclassified as GOVERNANCE_REPORT | 28 | All rejected | All rejected |
+| Human VERIFIED, CR-04 selection, invented reviewer identity, fabricated cleanup completion | 4 | All rejected | All rejected |
+| Structurally valid wrong public blob hash, unknown dependency or missing authoritative reference | 3 | Accepted structurally, as expected | All rejected by public Git/reference comparison |
+
+The first eight groups total **111** schema-negative mutations, each independently
+rejected by both checks. The last group demonstrates the three separate semantic
+obligations that structural validity does not establish. Both the unchanged
+snapshot and a positive control reversing both arrays passed. No mutated snapshot,
+human appointment, consent, source, gold, cleanup/absence receipt or other protected
+evidence was created. Semantic checks compare exact ID sets, catalog projections,
+declared count/actual length, original targets/zero counts, flags, deadlines,
+dependencies/references and baseline public Git commitments without invoking the
+schema as their authority. They do not authenticate permission or semantic truth.
+
+For an explicit schema-only check with the already installed reviewed dependencies:
+
+```powershell
+@'
+import json
+from pathlib import Path
+from jsonschema import Draft202012Validator, FormatChecker
+load = lambda p: json.loads(Path(p).read_text(encoding="utf-8-sig"))
+schema = load("docs/ai/eval-entry-governance-readiness.schema.json")
+Draft202012Validator.check_schema(schema)
+Draft202012Validator(schema, format_checker=FormatChecker()).validate(
+    load("docs/ai/eval-entry-governance-readiness.json"))
+print("METADATA VALID ONLY; NO APPROVAL")
+'@ | python -
+```
+
+This command checks only the schema; compare the public catalog, targets,
+references and Git commitments separately. It neither changes operational gate
+state nor supplies the missing rights/human/custody evidence. The complete one-off
+mutation commands, before/after results, exact exits, stderr and file hashes are
+retained in the external hardening evidence directory indexed in PR #15.
+
+The 2026-10-26 rerun passed all 32 existing documentation/tool tests (zero failures
+or skips), documentation/link/JSON checks (106 Markdown files, 659 links, 40 JSON
+files), cost consistency, all three public contract checks, inspect-only corpus
+status and metadata-readiness `--check`. The manifest still reports UNFROZEN and
+zero qualifying counts. These are current local results, not prior CI promoted to
+new-head CI. Existing workflow base filters are unchanged; no runtime/security
+suite or protected evaluation is invoked for this documentation-only correction.
 
 **EVAL-ENTRY GOVERNANCE READINESS PACKAGE PREPARED — HUMAN APPOINTMENT AND OWNER
 CUSTODY DECISIONS PENDING; OFFICIAL EVALUATION NOT AUTHORIZED.**
