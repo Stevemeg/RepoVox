@@ -5,6 +5,7 @@ export type Account = {
   environment: string;
   fixtures_enabled: boolean;
   analysis_enabled?: boolean;
+  video_enabled?: boolean;
 };
 export type Project = {
   id: string;

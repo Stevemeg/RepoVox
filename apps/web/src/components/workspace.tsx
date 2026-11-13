@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Account, api, ApiError, errorMessage, Job, Project } from "@/lib/api";
 import { AnalysisPanel } from "@/components/analysis-panel";
+import { VideoPanel } from "@/components/video-panel";
 
 export function Badge({ state }: { state: string }) {
   return (
@@ -589,6 +590,26 @@ export function Workspace() {
                         </button>
                       </div>
                     )}
+                    {account.video_enabled && (
+                      <button
+                        disabled={busy || !processingAcknowledged}
+                        onClick={() =>
+                          void act(() =>
+                            api(`/projects/${project.id}/video-jobs`, {
+                              method: "POST",
+                              headers: {
+                                "Idempotency-Key": crypto.randomUUID(),
+                              },
+                              body: JSON.stringify({
+                                processing_acknowledged: true,
+                              }),
+                            }),
+                          )
+                        }
+                      >
+                        Generate narrated video
+                      </button>
+                    )}
                     {account.fixtures_enabled && (
                       <button
                         disabled={busy}
@@ -727,6 +748,10 @@ export function Workspace() {
                   )}
                 </div>
               </section>
+              {selectedJob.fixture === "video" &&
+                selectedJob.state === "succeeded" && (
+                  <VideoPanel jobId={selectedJob.id} />
+                )}
               {!selectedJob.synthetic &&
                 selectedJob.error_code === "phase2_pipeline_boundary" && (
                   <AnalysisPanel jobId={selectedJob.id} />

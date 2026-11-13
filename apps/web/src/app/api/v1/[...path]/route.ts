@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const allowed =
-  /^(auth\/(session|sign-out|development\/sign-in)|projects(\/[a-f0-9-]+(\/jobs)?)?|jobs(\/[a-f0-9-]+(\/cancel)?)?|development\/(projects\/[a-f0-9-]+\/(fixture-jobs|analysis-jobs)|jobs\/[a-f0-9-]+\/(retry|analysis)))$/;
+  /^(auth\/(session|sign-out|development\/sign-in)|projects(\/[a-f0-9-]+(\/(jobs|video-jobs))?)?|jobs(\/[a-f0-9-]+(\/(cancel|video(\/(captions|download))?))?)?|development\/(projects\/[a-f0-9-]+\/(fixture-jobs|analysis-jobs)|jobs\/[a-f0-9-]+\/(retry|analysis)))$/;
 async function forward(
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> },
@@ -18,10 +18,12 @@ async function forward(
     "x-csrf-token",
     "idempotency-key",
     "x-request-id",
+    "range",
   ]) {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
   }
+  const media = /\/video(\/(captions|download))?$/.test(route);
   const mutating = !["GET", "HEAD"].includes(request.method);
   let body: string | undefined;
   if (mutating && request.body) {
@@ -54,14 +56,30 @@ async function forward(
         redirect: "error",
         // Resolution has a 10-second aggregate limit; leave bounded DB publication time.
         signal: AbortSignal.timeout(
-          route.endsWith("/analysis-jobs") ? 15000 : 10000,
+          media
+            ? 60000
+            : /\/(analysis|video)-jobs$/.test(route)
+              ? 15000
+              : 10000,
         ),
       },
     );
     const response = new NextResponse(upstream.body, {
       status: upstream.status,
     });
-    for (const name of ["content-type", "x-request-id"]) {
+    for (const name of [
+      "content-type",
+      "x-request-id",
+      // Byte-range playback and download of an owner-authorized video only.
+      ...(media
+        ? [
+            "content-range",
+            "accept-ranges",
+            "content-length",
+            "content-disposition",
+          ]
+        : []),
+    ]) {
       const value = upstream.headers.get(name);
       if (value) response.headers.set(name, value);
     }
