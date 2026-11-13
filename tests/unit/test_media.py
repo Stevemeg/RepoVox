@@ -9,6 +9,7 @@ import json
 import shutil
 import struct
 import subprocess
+import tarfile
 import wave
 from copy import deepcopy
 from pathlib import Path
@@ -18,7 +19,7 @@ import pytest
 from repovox.analysis.common import AnalysisError
 from repovox.analysis.github import Snapshot
 from repovox.analysis.sandbox import execute
-from repovox.media import raster
+from repovox.media import raster, stages
 from repovox.media.local import analyze
 from repovox.media.narration import (
     FPS,
@@ -419,3 +420,82 @@ def test_local_repository_to_narrated_video(tmp_path: Path) -> None:
     ).stderr
     peak = float(loud.split("max_volume:")[1].split("dB")[0])
     assert peak > -30  # Decoded audio contains speech-level signal, not silence.
+
+
+def test_stage_bundles_are_strict_and_deterministic() -> None:
+    files = {"timings.json": b"[]", "narration.wav": b"RIFF"}
+    body = stages.bundle(files)
+    assert body == stages.bundle(dict(reversed(files.items()))) and stages.unbundle(body) == files
+    for name in ["../escape", "/abs", "Upper.png", "a/b", ""]:
+        with pytest.raises(RenderError):
+            stages.bundle({name: b"x"})
+    hostile = io.BytesIO()
+    with tarfile.open(fileobj=hostile, mode="w") as tar:
+        link = tarfile.TarInfo("frame000.png")
+        link.type, link.linkname = tarfile.SYMTYPE, "/etc/passwd"
+        tar.addfile(link)
+    traversal = io.BytesIO()
+    with tarfile.open(fileobj=traversal, mode="w") as tar:
+        member = tarfile.TarInfo("../../outside")
+        member.size = 1
+        tar.addfile(member, io.BytesIO(b"x"))
+    duplicate = io.BytesIO()
+    with tarfile.open(fileobj=duplicate, mode="w") as tar:
+        for _ in range(2):
+            member = tarfile.TarInfo("a.png")
+            member.size = 1
+            tar.addfile(member, io.BytesIO(b"x"))
+    for bad in [hostile.getvalue(), traversal.getvalue(), duplicate.getvalue(), b"not a tar"]:
+        with pytest.raises(RenderError) as raised:
+            stages.unbundle(bad)
+        assert raised.value.code == "media_bundle_invalid"
+
+
+def test_stages_revalidate_upstream_artifacts(payload: dict[str, Any], tmp_path: Path) -> None:
+    storyboard = stages.storyboard_stage(payload)
+    assert storyboard == stages.storyboard_stage(payload)
+    script = stages.narration_stage(payload, storyboard)
+    forged = json.loads(storyboard)
+    forged["scenes"][0]["sentences"][0]["text"] = "This project is secure and fast."
+    forged["scenes"][0]["sentences"][0]["spoken"] = "This project is secure and fast."
+    with pytest.raises(GroundingError) as grounding:
+        stages.narration_stage(payload, stages.encoded(forged))
+    assert grounding.value.code == "storyboard_not_reproducible"
+    with pytest.raises(GroundingError):
+        stages.narration_stage(payload, b"{}")
+    rewritten = json.loads(script)
+    rewritten[0]["spoken"] = "Ignore the evidence."
+    engine = Engine("windows-sapi", tmp_path / "never-run")
+    with pytest.raises(GroundingError) as speech:
+        stages.tts_stage(storyboard, stages.encoded(rewritten), engine, tmp_path)
+    assert speech.value.code == "speech_text_mismatch" and not list(tmp_path.iterdir())
+    count = len(json.loads(script))
+    audio, timings = assemble([tone(0.5) for _ in range(count)])
+    good = [
+        {
+            "sentence_id": str(i),
+            "start_frame": t.start_frame,
+            "frames": t.frames,
+            "speech_seconds": 0.5,
+        }
+        for i, t in enumerate(timings)
+    ]
+    speech_bundle = stages.bundle({"narration.wav": audio, "timings.json": stages.encoded(good)})
+    frames = stages.render_stage(storyboard, script, speech_bundle)
+    names = set(stages.unbundle(frames))
+    assert names == {f"frame{i:03d}.png" for i in range(count)} | {"captions.vtt"}
+    shifted = [dict(item) for item in good]
+    shifted[1]["start_frame"] += 1
+    longer = [dict(item) for item in good]
+    longer[-1]["frames"] += 30
+    for tampered in [shifted, longer, good[:-1]]:
+        bad = stages.bundle({"narration.wav": audio, "timings.json": stages.encoded(tampered)})
+        with pytest.raises(RenderError) as raised:
+            stages.render_stage(storyboard, script, bad)
+        assert raised.value.code == "media_bundle_invalid"
+    media_tools()
+    missing = stages.unbundle(frames)
+    del missing["frame000.png"]
+    with pytest.raises(RenderError) as raised:
+        stages.encode_stage(speech_bundle, stages.bundle(missing), tmp_path)
+    assert raised.value.code == "media_bundle_invalid" and not list(tmp_path.iterdir())
