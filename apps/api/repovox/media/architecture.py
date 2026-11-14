@@ -26,7 +26,11 @@ from repovox.media.pyflow import (
 
 VERSION: Literal["architecture-ir-1.0"] = "architecture-ir-1.0"
 Status = Literal["VERIFIED", "INFERRED", "UNRESOLVED"]
-MENTION = re.compile(r"(?i)\b(gan|generative adversarial|generator|discriminator)\b")
+Basis = Literal["static_structure", "static_data_flow", "declared_route", "literal_match"]
+MENTION = re.compile(r"(?i)\b(gan|generative adversarial|discriminator)\b")
+TECHNOLOGY = re.compile(
+    r"(?i)\b(transformer|self-attention|rag|retrieval-augmented|multi-agent|microservices?)\b"
+)
 DECLARATIONS = {"class", "function", "method"}
 
 
@@ -60,22 +64,27 @@ class LayerIR(Closed):
 class Component(Closed):
     id: str
     role: str
-    kind: Literal["module", "tensor", "loss", "optimizer", "service", "handler"]
+    kind: str = Field(pattern=r"^[a-z][a-z_]{0,23}$")
     label: str = Field(min_length=1, max_length=28)
     lines: tuple[str, ...] = Field(default=(), max_length=7)
     layers: tuple[LayerIR, ...] = ()
     status: Status
     anchors: tuple[str, ...] = Field(min_length=1)
     citations: tuple[Citation, ...] = Field(min_length=1)
+    parent: str | None = None  # Hierarchy: the component this one is drawn inside.
+    group: str = Field(default="", max_length=60)  # Boundary, e.g. the declaring file.
 
 
 class Connection(Closed):
     id: str
     source: str
     target: str
-    kind: Literal["data", "condition", "score", "gradient", "update", "registers"]
+    kind: str = Field(pattern=r"^[a-z][a-z_]{0,23}$")
     label: str = Field(max_length=40)
     phase: Literal["training", "inference", "structure"]
+    # What kind of source evidence this is. There is deliberately no runtime value:
+    # nothing in this IR asserts that something happened during execution.
+    basis: Basis = "static_structure"
     status: Status
     anchors: tuple[str, ...] = Field(min_length=1)
     citations: tuple[Citation, ...] = Field(min_length=1)
@@ -91,7 +100,7 @@ class Step(Closed):
 
 
 class Flow(Closed):
-    name: Literal["training", "inference", "request"]
+    name: str = Field(pattern=r"^[a-z][a-z_ ]{0,23}$")
     steps: tuple[Step, ...] = Field(min_length=1)
 
 
@@ -114,9 +123,19 @@ class Unresolved(Closed):
     reason: str
 
 
+class View(Closed):
+    """One diagram: the overview, or a zoom into the parts of a single component."""
+
+    id: str
+    title: str = Field(max_length=50)
+    parent: str | None = None
+    component_ids: tuple[str, ...] = Field(min_length=2)
+    connection_ids: tuple[str, ...]
+
+
 class Architecture(Closed):
     id: str
-    type: Literal["gan", "supervised_network", "http_service"]
+    type: str = Field(pattern=r"^[a-z][a-z_]{0,23}$")
     level: Literal["model", "system"]
     title: str
     scope: tuple[str, ...] = Field(min_length=1)
@@ -129,6 +148,7 @@ class Architecture(Closed):
     outputs: tuple[str, ...] = ()
     decisions: tuple[Fact, ...] = ()
     unresolved: tuple[Unresolved, ...] = ()
+    views: tuple[View, ...] = ()  # Empty: one overview of every component.
 
 
 class Mention(Closed):
@@ -140,7 +160,10 @@ class Mention(Closed):
 class Rejected(Closed):
     candidate: str
     reason: Literal[
-        "mention_without_implementation", "unbound_models", "incomplete_adversarial_path"
+        "mention_without_implementation",
+        "unbound_models",
+        "incomplete_adversarial_path",
+        "insufficient_structure",
     ]
     detail: str
     mentions: tuple[Mention, ...]
@@ -194,6 +217,10 @@ class Context:
             claim: symbol for symbol, claim in self.verified.items()
         }  # claim id -> symbol id
         self.symbol_index = {s["id"]: s for group in self.symbols.values() for s in group}
+        self.all_symbols = {s["id"]: s for s in knowledge["symbols"]}
+        self.lines = {
+            path: body.decode("utf-8", "replace").split("\n") for path, body in sources.items()
+        }
         found: dict[str, list[ModuleClass]] = {}
         for file in self.files.values():
             for item in file.module_classes():
@@ -220,9 +247,9 @@ class Context:
         return tuple(sorted(self.verified[s["id"]] for s in chosen))[:8]
 
     def cite(self, path: str, number: int) -> Citation | None:
-        file = self.files.get(path)
+        lines = self.lines.get(path, [])
         claims = self.claims_at(path, number)
-        text = file.quote(number) if file else ""
+        text = lines[number - 1].strip() if 1 <= number <= len(lines) else ""
         if not text or not claims:
             return None
         return Citation(
@@ -969,110 +996,11 @@ def supervised(
     return None
 
 
-def http_service(ctx: Context) -> Architecture | None:
-    """System level: a framework application object and the route handlers bound to it."""
-    candidates = ctx.payload["knowledge"]["entrypoints"]["candidates"]
-    apps = [
-        c
-        for c in candidates
-        if c["rule"] == "framework-construction-v1" and c["symbol_id"] in ctx.symbol_index
-    ]
-    if not apps:
-        return None
-    app = ctx.symbol_index[apps[0]["symbol_id"]]
-    routes = [
-        ctx.symbol_index[c["symbol_id"]]
-        for c in candidates
-        if c["rule"] == "framework-route-v1"
-        and c["path"] == app["path"]
-        and c["symbol_id"] in ctx.symbol_index
-    ][:5]
-    citation = ctx.cite(app["path"], app["start_line"])
-    if not routes or citation is None:
-        return None
-    b = Builder(ctx, app["path"])
-    name = app["name"].split(".")[-1][:28] or "application"
-    b.components["application"] = Component(
-        id="application",
-        role="application",
-        kind="service",
-        label=name,
-        lines=("framework application object",),
-        status="VERIFIED",
-        anchors=(name,),
-        citations=(citation,),
-    )
-    events: list[Event] = []
-    for i, route in enumerate(routes):
-        role = f"handler_{i + 1}"
-        label = route["name"][:28]
-        found = ctx.cite(route["path"], route["start_line"])
-        if found is None:
-            continue
-        b.components[role] = Component(
-            id=role,
-            role="handler",
-            kind="handler",
-            label=label,
-            status="INFERRED",
-            anchors=(label.split(".")[-1],),
-            citations=(found,),
-        )
-        link = b.link(
-            "application",
-            role,
-            "registers",
-            "route",
-            [route["start_line"]],
-            (label.split(".")[-1],),
-            "INFERRED",
-            "structure",
-        )
-        events.append(
-            (
-                route["start_line"],
-                f"{label} is registered on the application object.",
-                ("application", role),
-                (link,),
-                "INFERRED",
-                found,
-            )
-        )
-    if len(b.components) < 2:
-        return None
-    return Architecture(
-        id="http-service-1",
-        type="http_service",
-        level="system",
-        title="HTTP service"[:60],
-        scope=(app["path"],),
-        status="INFERRED",
-        components=tuple(b.components.values()),
-        connections=tuple(b.connections),
-        flows=(Flow(name="request", steps=steps(events)),),
-        unresolved=(
-            Unresolved(
-                topic="request handling",
-                reason=(
-                    "Route registration is a candidate binding; which handler runs for "
-                    "a request is not executed or verified."
-                ),
-            ),
-            Unresolved(
-                topic="dependencies",
-                reason=(
-                    "Databases, queues and external services are not established by this detector."
-                ),
-            ),
-        ),
-    )
-
-
-def mentions(ctx: Context) -> tuple[Mention, ...]:
+def mentions(ctx: Context, pattern: re.Pattern[str] = MENTION) -> tuple[Mention, ...]:
     found: list[Mention] = []
     for path, body in sorted(ctx.sources.items()):
         for number, text in enumerate(body.decode("utf-8", "replace").split("\n"), 1):
-            if MENTION.search(text) and len(found) < 6:
+            if pattern.search(text) and len(found) < 6:
                 found.append(Mention(path=path, line=number, quote=text.strip()[:200]))
     return tuple(found)
 
@@ -1082,6 +1010,7 @@ def discover(payload: dict[str, Any], sources: dict[str, bytes]) -> Report:
     architectures: list[Architecture] = []
     rejected: list[Rejected] = []
     paired: set[str] = set()
+    claimed: set[tuple[str, str]] = set()
     partial = False
     for file, scope in ctx.scopes:
         generators = {
@@ -1105,6 +1034,7 @@ def discover(payload: dict[str, Any], sources: dict[str, bytes]) -> Report:
                         gan(ctx, file, scope, g_cls, d_cls, len(architectures) + 1)
                     )
                     paired |= {g_cls, d_cls}
+                    claimed.add((scope.path, scope.name))
                 else:
                     partial = True
     for file, scope in ctx.scopes:
@@ -1116,9 +1046,15 @@ def discover(payload: dict[str, Any], sources: dict[str, bytes]) -> Report:
             if found is not None:
                 architectures.append(found)
                 paired.add(call.cls)
-    service = http_service(ctx)
-    if service is not None:
-        architectures.append(service)
+                claimed.add((scope.path, scope.name))
+    # Named patterns above enrich; the generic graph below does not depend on any of them.
+    from repovox.media.archgraph import build
+
+    generic = build(ctx, claimed, paired, len(architectures))
+    if generic and generic[0].type == "system_overview":
+        architectures = [generic[0], *architectures, *generic[1:]]
+    else:
+        architectures += generic
     if not any(a.type == "gan" for a in architectures):
         noted = mentions(ctx)
         unbound = [
@@ -1166,6 +1102,22 @@ def discover(payload: dict[str, Any], sources: dict[str, bytes]) -> Report:
                     mentions=noted,
                 )
             )
+    if not architectures and not rejected:
+        named = mentions(ctx, TECHNOLOGY)
+        rejected.append(
+            Rejected(
+                candidate="architecture",
+                reason="mention_without_implementation" if named else "insufficient_structure",
+                detail=(
+                    "Technology names appear in the text, but no scope connects three or more "
+                    "locally defined components through at least two static relationships."
+                    if named
+                    else "No scope connects three or more locally defined components through "
+                    "at least two static relationships, so no architecture is drawn."
+                ),
+                mentions=named,
+            )
+        )
     report = Report(
         version=VERSION,
         repository=ctx.snapshot["repository"],
@@ -1265,6 +1217,35 @@ def check(report: Report, payload: dict[str, Any], sources: dict[str, bytes]) ->
             cited(fact.citations)
         for variant in architecture.variants:
             cited(variant.citations)
+        parents = {c.id: c.parent for c in architecture.components}
+        for component in architecture.components:
+            if component.parent is not None and parents.get(component.parent, "") is not None:
+                raise ArchitectureError("unsupported_hierarchy")
+        links = {c.id: c for c in architecture.connections}
+        for connection in architecture.connections:
+            if parents[connection.source] != parents[connection.target]:
+                raise ArchitectureError("unsupported_connection")
+            # A declared route or a matching literal is never a verified interaction.
+            if connection.basis in {"declared_route", "literal_match"} and (
+                connection.status == "VERIFIED"
+            ):
+                raise ArchitectureError("unsupported_runtime_claim")
+        seen: set[str] = set()
+        for position, view in enumerate(architecture.views):
+            members = set(view.component_ids)
+            if (
+                view.id in seen
+                or (position == 0) != (view.id == "overview" and view.parent is None)
+                or not members <= set(ids)
+                or any(parents[m] != view.parent for m in members)
+                or (view.parent is not None and view.parent not in ids)
+                or any(
+                    c not in links or not {links[c].source, links[c].target} <= members
+                    for c in view.connection_ids
+                )
+            ):
+                raise ArchitectureError("unsupported_view")
+            seen.add(view.id)
         if not set(architecture.inputs) | set(architecture.outputs) <= set(ids):
             raise ArchitectureError("unsupported_flow")
         if not set(architecture.scope) <= set(sources):
