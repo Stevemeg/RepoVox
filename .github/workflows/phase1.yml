@@ -3,7 +3,7 @@ on:
   pull_request:
     branches: [main, phase0/foundation, phase1/saas-foundation, phase2/repository-intelligence, phase2/eval-entry, phase2/ai-audited-pilot, phase2/canonical-fact-remediation, phase2/source-fact-v2-evaluation, phase2/pilot-control-plane-safety, phase2/retention-runtime-verification, phase2/aws-retention-integration, experiment/offline-source-to-video, security/python-ca-bootstrap, security/node-next-remediation]
   push:
-    branches: [phase1/saas-foundation, phase2/repository-intelligence, phase2/eval-entry, phase2/ai-audited-pilot, phase2/canonical-fact-remediation, phase2/source-fact-v2-evaluation, phase2/pilot-control-plane-safety, phase2/retention-runtime-verification, phase2/aws-retention-integration]
+    branches: [phase1/saas-foundation, phase2/repository-intelligence, phase2/eval-entry, phase2/ai-audited-pilot, phase2/canonical-fact-remediation, phase2/source-fact-v2-evaluation, phase2/pilot-control-plane-safety, phase2/retention-runtime-verification, phase2/aws-retention-integration, feature/repository-to-video]
 permissions:
   contents: read
 concurrency:
@@ -103,7 +103,7 @@ jobs:
       - run: npm audit --audit-level=high
   integration:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
         with: {ref: '${{ github.event.pull_request.head.sha || github.sha }}'}
@@ -134,7 +134,7 @@ jobs:
           docker compose run --rm --no-deps tests python tools/security_sdk_check.py
           docker compose run --rm --no-deps tests pip-audit --cache-dir /tmp/repovox-audit --local
           docker compose run --rm --no-deps tests pip-audit --cache-dir /tmp/repovox-audit --path /usr/local/lib/python3.12/site-packages
-          docker compose up -d postgres redis storage storage-init migrate
+          docker compose up -d postgres redis storage storage-init migrate media-migrate
           docker compose run --rm --build tests
           CUSTODIAN_TEST_IMAGE=$(docker image inspect repovox-tests --format '{{.Id}}')
           docker run --rm --user 10002:10002 --cap-drop ALL --security-opt no-new-privileges:true \
@@ -150,7 +150,7 @@ jobs:
       - name: Boot complete local stack
         run: |
           docker pull node:24.22.1-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
-          docker compose up -d --build --wait api web worker dispatcher
+          docker compose up -d --build --wait api web worker dispatcher media-worker
           uv run python tools/phase1_runtime.py
       - uses: actions/setup-node@v4
         with: {node-version: '24.22.1'}
@@ -177,6 +177,17 @@ jobs:
       - name: Service status
         if: always()
         run: docker compose ps -a
+      - name: Preserve service logs
+        if: always()
+        run: docker compose logs --no-color --tail 400 migrate media-migrate api worker dispatcher media-worker > compose-logs.txt 2>&1 || true
+      - name: Upload service logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compose-logs
+          path: compose-logs.txt
+          retention-days: 7
+          if-no-files-found: warn
       - name: Remove ephemeral services and volumes
         if: always()
         run: docker compose down --volumes

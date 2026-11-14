@@ -15,6 +15,8 @@ x-api: &api
     REPOVOX_DEV_AUTH: 'true'
     REPOVOX_FIXTURES: 'true'
     REPOVOX_ANALYSIS: 'true'
+    REPOVOX_VIDEO: 'true'
+    REPOVOX_MEDIA_DATABASE_URL: postgresql+psycopg://rvm_app:${MEDIA_APP_PASSWORD:?Generate .env}@postgres:5432/repovox_media
     REPOVOX_DATABASE_URL: postgresql+psycopg://rv_app:${APP_DATABASE_PASSWORD:?Generate .env}@postgres:5432/repovox
     REPOVOX_SESSION_SECRET: ${SESSION_SECRET:?Generate .env}
     REPOVOX_ORIGIN: http://localhost:3000
@@ -26,6 +28,7 @@ x-api: &api
   stop_grace_period: 20s
   depends_on:
     migrate: {condition: service_completed_successfully}
+    media-migrate: {condition: service_completed_successfully}
     storage-init: {condition: service_completed_successfully}
     redis: {condition: service_healthy}
 
@@ -37,6 +40,9 @@ services:
       MIGRATION_PASSWORD: ${MIGRATION_PASSWORD:?Generate .env}
       APP_DATABASE_PASSWORD: ${APP_DATABASE_PASSWORD:?Generate .env}
       WORKER_DATABASE_PASSWORD: ${WORKER_DATABASE_PASSWORD:?Generate .env}
+      MEDIA_MIGRATION_PASSWORD: ${MEDIA_MIGRATION_PASSWORD:?Generate .env}
+      MEDIA_APP_PASSWORD: ${MEDIA_APP_PASSWORD:?Generate .env}
+      MEDIA_WORKER_PASSWORD: ${MEDIA_WORKER_PASSWORD:?Generate .env}
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./infrastructure/local/init-db.sh:/docker-entrypoint-initdb.d/10-roles.sh:ro
@@ -93,6 +99,14 @@ services:
       REPOVOX_MIGRATION_DATABASE_URL: postgresql+psycopg://rv_migrator:${MIGRATION_PASSWORD:?Generate .env}@postgres:5432/repovox
     command: ['alembic', '-c', 'apps/api/alembic.ini', 'upgrade', 'head']
     depends_on: {postgres: {condition: service_healthy}}
+  media-migrate:
+    build:
+      context: .
+      dockerfile: infrastructure/local/api.Dockerfile
+    environment:
+      REPOVOX_MEDIA_MIGRATION_DATABASE_URL: postgresql+psycopg://rvm_migrator:${MEDIA_MIGRATION_PASSWORD:?Generate .env}@postgres:5432/repovox_media
+    command: ['alembic', '-c', 'apps/api/alembic_media.ini', 'upgrade', 'head']
+    depends_on: {postgres: {condition: service_healthy}}
   api:
     <<: *api
     ports: ['127.0.0.1:8000:8000']
@@ -115,6 +129,13 @@ services:
       REPOVOX_DATABASE_URL: postgresql+psycopg://rv_worker:${WORKER_DATABASE_PASSWORD:?Generate .env}@postgres:5432/repovox
       REPOVOX_WORKER_DATABASE_URL: postgresql+psycopg://rv_worker:${WORKER_DATABASE_PASSWORD:?Generate .env}@postgres:5432/repovox
     command: ['python', '-m', 'repovox.workers.dispatcher']
+  media-worker:
+    <<: *api
+    environment:
+      <<: *environment
+      REPOVOX_DATABASE_URL: postgresql+psycopg://rvm_worker:${MEDIA_WORKER_PASSWORD:?Generate .env}@postgres:5432/repovox_media
+      REPOVOX_MEDIA_WORKER_DATABASE_URL: postgresql+psycopg://rvm_worker:${MEDIA_WORKER_PASSWORD:?Generate .env}@postgres:5432/repovox_media
+    command: ['python', '-m', 'repovox.media.worker']
   web:
     build:
       context: .
@@ -138,6 +159,9 @@ services:
       REPOVOX_WORKER_DATABASE_URL: postgresql+psycopg://rv_worker:${WORKER_DATABASE_PASSWORD:?Generate .env}@postgres:5432/repovox
       REPOVOX_TEST_ADMIN_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:?Generate .env}@postgres:5432/repovox
       REPOVOX_TEST_MIGRATION_URL: postgresql+psycopg://rv_migrator:${MIGRATION_PASSWORD:?Generate .env}@postgres:5432/repovox
+      REPOVOX_MEDIA_WORKER_DATABASE_URL: postgresql+psycopg://rvm_worker:${MEDIA_WORKER_PASSWORD:?Generate .env}@postgres:5432/repovox_media
+      REPOVOX_TEST_MEDIA_ADMIN_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:?Generate .env}@postgres:5432/repovox_media
+      REPOVOX_TEST_MEDIA_MIGRATION_URL: postgresql+psycopg://rvm_migrator:${MEDIA_MIGRATION_PASSWORD:?Generate .env}@postgres:5432/repovox_media
     command: ['pytest', '-q', '--tb=short']
 volumes:
   postgres-data:

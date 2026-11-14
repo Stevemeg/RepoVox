@@ -1,6 +1,8 @@
 FROM python:3.12.12-slim
 WORKDIR /workspace
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libseccomp2 && update-ca-certificates --fresh && rm -rf /var/lib/apt/lists/*
+# ffmpeg and espeak-ng come from the image's signed Debian repositories: local encoding and
+# local speech only, no hosted media or speech service.
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libseccomp2 ffmpeg espeak-ng && update-ca-certificates --fresh && rm -rf /var/lib/apt/lists/*
 COPY tools/security_bootstrap.py tools/security_trust.py tools/requirements-bootstrap.txt tools/
 RUN python tools/security_bootstrap.py --repair-ensurepip && python tools/security_trust.py --uv --seed
 COPY pyproject.toml uv.lock ./
