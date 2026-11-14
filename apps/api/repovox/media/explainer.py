@@ -13,10 +13,12 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from repovox.analysis.common import digest
+from repovox.media.archgraph import sentence
 from repovox.media.architecture import (
     Architecture,
     ArchitectureError,
     Citation,
+    Component,
     Report,
     validate,
 )
@@ -49,6 +51,7 @@ class Line(BaseModel):
     component_ids: tuple[str, ...]
     connection_ids: tuple[str, ...]
     citations: tuple[Citation, ...]
+    view: str = "overview"  # Which diagram this line is narrated over.
 
 
 class Script:
@@ -65,6 +68,7 @@ class Script:
         components: tuple[str, ...] = (),
         connections: tuple[str, ...] = (),
         citations: tuple[Citation, ...] = (),
+        view: str = "overview",
     ) -> None:
         text = display(text, 290)
         self.lines.append(
@@ -77,6 +81,7 @@ class Script:
                 component_ids=components,
                 connection_ids=tuple(c for c in connections if c in self.links),
                 citations=tuple(dict.fromkeys(citations))[:6],
+                view=view,
             )
         )
 
@@ -87,6 +92,8 @@ def listing(items: list[str]) -> str:
 
 def narrate(architecture: Architecture) -> tuple[Line, ...]:
     """Educational order: purpose, components, inputs and outputs, flow, decisions, unknowns."""
+    if architecture.views:
+        return narrate_graph(architecture)
     script = Script(architecture)
     parts = {c.id: c for c in architecture.components}
     links = {c.id: c for c in architecture.connections}
@@ -229,6 +236,135 @@ def narrate(architecture: Architecture) -> tuple[Line, ...]:
     return tuple(script.lines)
 
 
+KIND_WORDS = {
+    "function": "function",
+    "class": "class",
+    "part": "constructed part",
+    "endpoint": "declared route",
+    "source_file": "source file",
+    "input": "parameter",
+    "output": "returned value",
+}
+
+
+def describe(component: Component) -> str:
+    """One sentence about a component, using only what the IR records about it."""
+    detail = component.lines[0] if component.lines else ""
+    weak = "" if component.status == "VERIFIED" else " Its binding is inferred, not confirmed."
+    if component.kind in {"function", "class"}:
+        extra = f", which {detail}" if detail.startswith("takes") else ""
+        extra = f", with {detail}" if detail.startswith("methods") else extra
+        return (
+            f"{component.label} is a {component.kind} declared in {component.group}{extra}.{weak}"
+        )
+    if component.kind == "part":
+        return f"{component.label} is a part the class constructs as {detail}.{weak}"
+    if component.kind == "endpoint":
+        return f"{component.label} is a route declared in {component.group}."
+    if component.kind == "source_file":
+        return f"{component.label} is a {detail} file under {component.group}."
+    if component.group == "external":
+        kind = component.kind.replace("_", " ")
+        return (
+            f"{component.label} is a client library for a {kind}. It stands for something "
+            f"outside this repository.{weak}"
+        )
+    return f"{component.label} is a {KIND_WORDS.get(component.kind, component.kind)}.{weak}"
+
+
+def narrate_graph(architecture: Architecture) -> tuple[Line, ...]:
+    """Narration for any component graph: no wording depends on a named architecture."""
+    script = Script(architecture)
+    parts = {c.id: c for c in architecture.components}
+    links = {c.id: c for c in architecture.connections}
+    overview = architecture.views[0]
+    top = [parts[i] for i in overview.component_ids]
+    shown = [c for c in top if c.kind not in {"input", "output"}]
+    files = sorted({c.group for c in shown if c.group and c.group != "external"})
+    script.say(
+        "purpose",
+        f"{architecture.title}. This view connects {len(shown)} components through "
+        f"{len(overview.connection_ids)} static source relationships across {len(files)} "
+        f"{'area' if len(files) == 1 else 'areas'} of the repository. What the code is for is "
+        "not inferred.",
+        architecture.status,
+        tuple(c.id for c in top),
+        (),
+        tuple(c.citations[0] for c in shown[:6]),
+    )
+    for component in shown[:9]:
+        script.say(
+            "components",
+            describe(component),
+            component.status,
+            (component.id,),
+            (),
+            component.citations,
+        )
+    if len(files) > 1:
+        for group in files[:4]:
+            members = [c for c in shown if c.group == group]
+            script.say(
+                "boundaries",
+                f"Boundary {group} holds {listing([c.label for c in members])}.",
+                "VERIFIED" if all(c.status == "VERIFIED" for c in members) else "INFERRED",
+                tuple(c.id for c in members),
+                (),
+                tuple(c.citations[0] for c in members[:6]),
+            )
+    for role, word in ((architecture.inputs, "Input"), (architecture.outputs, "Output")):
+        for identity in role:
+            component = parts[identity]
+            near = tuple(
+                c.id
+                for c in architecture.connections
+                if identity in (c.source, c.target) and c.id in overview.connection_ids
+            )
+            script.say(
+                "inputs and outputs",
+                f"{word}: {component.label}, the {KIND_WORDS.get(component.kind, component.kind)} "
+                f"of the scope shown.",
+                component.status,
+                (identity,),
+                near,
+                component.citations,
+            )
+    script.say("flow", "Now the relationships of this view, in source order.")
+    for flow in architecture.flows:
+        for step in flow.steps:
+            script.say(
+                "flow",
+                step.text,
+                step.status,
+                step.component_ids,
+                step.connection_ids,
+                step.citations,
+            )
+    for view in architecture.views[1:]:
+        parent = parts[view.parent] if view.parent else None
+        script.say(
+            "zoom",
+            f"Zooming into {parent.label if parent else view.title}: {view.title}.",
+            view=view.id,
+        )
+        for identity in view.connection_ids:
+            connection = links[identity]
+            script.say(
+                "zoom",
+                sentence(connection, parts),
+                connection.status,
+                (connection.source, connection.target),
+                (identity,),
+                connection.citations[:1],
+                view.id,
+            )
+    if architecture.unresolved:
+        script.say("unknowns", "Static analysis did not establish the following.")
+        for item in architecture.unresolved[:5]:
+            script.say("unknowns", f"{item.topic.capitalize()}: {item.reason}", "UNRESOLVED")
+    return tuple(script.lines)
+
+
 def check_narration(lines: tuple[Line, ...], architecture: Architecture) -> None:
     """Independent of narrate(): each line must be backed by the validated IR it animates."""
     components = {c.id for c in architecture.components}
@@ -243,9 +379,17 @@ def check_narration(lines: tuple[Line, ...], architecture: Architecture) -> None
     for flow in architecture.flows:
         for step in flow.steps:
             known.update(step.citations)
+    views = {view.id: view for view in architecture.views}
     if len({line.id for line in lines}) != len(lines) or not lines:
         raise ArchitectureError("narration_invalid")
     for line in lines:
+        view = views.get(line.view)
+        if architecture.views and (
+            view is None
+            or not set(line.component_ids) <= set(view.component_ids)
+            or not set(line.connection_ids) <= set(view.connection_ids)
+        ):
+            raise ArchitectureError("narration_unsupported_element")
         if not set(line.component_ids) <= components or not set(line.connection_ids) <= connections:
             raise ArchitectureError("narration_unsupported_element")
         if not set(line.citations) <= known:
@@ -274,7 +418,10 @@ def render_architecture(
     """Write one architecture's validated video bundle into an empty directory."""
     lines = narrate(architecture)
     check_narration(lines, architecture)
-    diagram = Diagram(architecture, report.repository, report.commit_sha)
+    diagrams = {
+        view.id: Diagram(architecture, report.repository, report.commit_sha, view)
+        for view in architecture.views
+    } or {"overview": Diagram(architecture, report.repository, report.commit_sha)}
     scratch = work / "scratch"
     scratch.mkdir(mode=0o700)
     speech = []
@@ -288,6 +435,7 @@ def render_architecture(
     narration = []
     for i, (line, timing) in enumerate(zip(lines, timings, strict=True)):
         checkpoint()
+        diagram = diagrams[line.view]
         base = diagram.base(
             line.component_ids,
             line.connection_ids,
