@@ -318,29 +318,27 @@ def probe(
     }
 
 
-def encode_stage(
-    speech: bytes, frames: bytes, scratch: Path, checkpoint: Checkpoint = noop
+def encode_sequence(
+    scratch: Path, entries: list[tuple[str, int]], wav: bytes, checkpoint: Checkpoint = noop
 ) -> tuple[bytes, dict[str, Any]]:
-    """Encode from re-validated bundles; return the MP4 only after it probes and fully decodes."""
+    """Encode image files already in scratch, each shown for a whole number of video frames.
+
+    The concat list is generated here from fixed names and integer durations, never stored input.
+    """
     ffmpeg, ffprobe = tool("ffmpeg"), tool("ffprobe")
-    audio, images = unbundle(speech), unbundle(frames)
-    captions = images.pop("captions.vtt", None)
-    timings = timings_of(audio, len(images))
-    if captions is None or set(images) != {f"frame{i:03d}.png" for i in range(len(timings))}:
+    total = sum(frames for _, frames in entries)
+    if (
+        not entries
+        or not 0 < total <= MAX_FRAMES
+        or any(frames <= 0 or not MEMBER.fullmatch(name) for name, frames in entries)
+    ):
         raise RenderError("media_bundle_invalid")
-    if any(not image.startswith(b"\x89PNG\r\n\x1a\n") for image in images.values()):
-        raise RenderError("media_bundle_invalid")
-    if any(scratch.iterdir()):
-        raise RenderError("media_bundle_invalid")
-    total = timings[-1].start_frame + timings[-1].frames
-    # The concat list is regenerated from validated timings and fixed names, never stored input.
     concat = ["ffconcat version 1.0"]
-    for i, timing in enumerate(timings):
-        (scratch / f"frame{i:03d}.png").write_bytes(images[f"frame{i:03d}.png"])
-        concat += [f"file frame{i:03d}.png", f"duration {timing.frames / FPS:.6f}"]
-    concat.append(f"file frame{len(timings) - 1:03d}.png")
+    for name, frames in entries:
+        concat += [f"file {name}", f"duration {frames / FPS:.6f}"]
+    concat.append(f"file {entries[-1][0]}")
     (scratch / "frames.ffconcat").write_bytes(("\n".join(concat) + "\n").encode())
-    (scratch / "narration.wav").write_bytes(audio["narration.wav"])
+    (scratch / "narration.wav").write_bytes(wav)
     command(
         [
             str(ffmpeg),
@@ -395,7 +393,29 @@ def encode_stage(
         checkpoint,
     )
     summary = probe(scratch, ffmpeg, ffprobe, total, checkpoint)
-    summary["sentences"] = len(timings)
-    summary["captions"] = captions.decode("utf-8")
     summary["ffmpeg_version"] = command([str(ffmpeg), "-version"], scratch).splitlines()[0]
     return (scratch / "video.mp4").read_bytes(), summary
+
+
+def encode_stage(
+    speech: bytes, frames: bytes, scratch: Path, checkpoint: Checkpoint = noop
+) -> tuple[bytes, dict[str, Any]]:
+    """Encode from re-validated bundles; return the MP4 only after it probes and fully decodes."""
+    tool("ffmpeg"), tool("ffprobe")
+    audio, images = unbundle(speech), unbundle(frames)
+    captions = images.pop("captions.vtt", None)
+    timings = timings_of(audio, len(images))
+    if captions is None or set(images) != {f"frame{i:03d}.png" for i in range(len(timings))}:
+        raise RenderError("media_bundle_invalid")
+    if any(not image.startswith(b"\x89PNG\r\n\x1a\n") for image in images.values()):
+        raise RenderError("media_bundle_invalid")
+    if any(scratch.iterdir()):
+        raise RenderError("media_bundle_invalid")
+    entries = []
+    for i, timing in enumerate(timings):
+        (scratch / f"frame{i:03d}.png").write_bytes(images[f"frame{i:03d}.png"])
+        entries.append((f"frame{i:03d}.png", timing.frames))
+    video, summary = encode_sequence(scratch, entries, audio["narration.wav"], checkpoint)
+    summary["sentences"] = len(timings)
+    summary["captions"] = captions.decode("utf-8")
+    return video, summary

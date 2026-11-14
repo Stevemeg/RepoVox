@@ -200,7 +200,7 @@ class Canvas:
             self.rect(x + w - n - 1, y - n, 2, 2, ACCENT)
             self.rect(x + w - n - 1, y + n, 2, 2, ACCENT)
 
-    def png(self) -> bytes:
+    def png(self, level: int = 6) -> bytes:
         def chunk(kind: bytes, body: bytes) -> bytes:
             return (
                 struct.pack(">I", len(body))
@@ -214,7 +214,7 @@ class Canvas:
         return (
             b"\x89PNG\r\n\x1a\n"
             + chunk(b"IHDR", struct.pack(">IIBBBBB", WIDTH, HEIGHT, 8, 2, 0, 0, 0))
-            + chunk(b"IDAT", zlib.compress(raw, 6))
+            + chunk(b"IDAT", zlib.compress(raw, level))
             + chunk(b"IEND", b"")
         )
 
