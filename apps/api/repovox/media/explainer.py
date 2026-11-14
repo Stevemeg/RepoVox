@@ -24,8 +24,9 @@ from repovox.media.architecture import (
 )
 from repovox.media.diagram import Diagram
 from repovox.media.narration import FPS, Engine, assemble, detect, synthesize
+from repovox.media.speech import natural, vocabulary
 from repovox.media.stages import Checkpoint, RenderError, encode_sequence, encoded, noop, timestamp
-from repovox.media.storyboard import display, speakable
+from repovox.media.storyboard import display
 
 VERSION = "architecture-explainer-1.0"
 ANIMATION_STEP = 6  # Video frames per animation frame: five diagram updates per second.
@@ -59,6 +60,7 @@ class Script:
         self.architecture = architecture
         self.lines: list[Line] = []
         self.links = {c.id for c in architecture.connections}
+        self.names = vocabulary(architecture)
 
     def say(
         self,
@@ -76,7 +78,7 @@ class Script:
                 id=f"{self.architecture.id}-n{len(self.lines) + 1}",
                 section=section,
                 text=text,
-                spoken=speakable(text)[:600],
+                spoken=natural(text, self.names),
                 status=status,
                 component_ids=components,
                 connection_ids=tuple(c for c in connections if c in self.links),
@@ -380,6 +382,7 @@ def check_narration(lines: tuple[Line, ...], architecture: Architecture) -> None
         for step in flow.steps:
             known.update(step.citations)
     views = {view.id: view for view in architecture.views}
+    names = vocabulary(architecture)
     if len({line.id for line in lines}) != len(lines) or not lines:
         raise ArchitectureError("narration_invalid")
     for line in lines:
@@ -396,7 +399,7 @@ def check_narration(lines: tuple[Line, ...], architecture: Architecture) -> None
             raise ArchitectureError("narration_false_citation")
         if line.status in {"VERIFIED", "INFERRED"} and not line.citations:
             raise ArchitectureError("narration_uncited")
-        if line.spoken != speakable(line.text)[:600]:
+        if line.spoken != natural(line.text, names):
             raise ArchitectureError("narration_speech_mismatch")
     if narrate(architecture) != lines:
         raise ArchitectureError("narration_not_reproducible")

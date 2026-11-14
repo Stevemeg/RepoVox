@@ -30,6 +30,7 @@ from repovox.media.diagram import Diagram
 from repovox.media.local import analyze_with_sources
 from repovox.media.narration import FPS, Engine, NarrationError, detect
 from repovox.media.raster import HEIGHT, WIDTH
+from repovox.media.speech import natural, vocabulary
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "architectures"
 Loaded = tuple[dict[str, Any], dict[str, bytes], Report]
@@ -657,3 +658,28 @@ def test_gan_architecture_explainer_video(loaded: dict[str, Loaded], tmp_path: P
     assert len(one) == WIDTH * HEIGHT
     assert sum(a != b for a, b in zip(one, two, strict=True)) < WIDTH * HEIGHT // 500
     assert sum(a != b for a, b in zip(one, gray_frame(video, start + 0.4), strict=True)) > 2000
+
+
+def test_narration_is_spoken_naturally_and_captions_keep_the_code(
+    loaded: dict[str, Loaded],
+) -> None:
+    gan = only(loaded["gan_standard"][2])
+    lines = {line.text: line.spoken for line in explainer.narrate(gan)}
+    update = "loss_d.backward() then opt_d.step() update Discriminator."
+    assert lines[update] == (
+        "The discriminator loss is backpropagated, followed by an optimizer step that "
+        "updates the discriminator."
+    )
+    assert lines["Its first layer is Linear 100 -> 256 and its last layer is Tanh."] == (
+        "Its first layer is Linear from 100 to 256 and its last layer is Tanh."
+    )
+    assert "gradient tracking disabled" in next(v for k, v in lines.items() if "no_grad" in k)
+    assert lines["Generator maps z to fake."] == "The generator maps z to fake."
+    for spoken in lines.values():
+        assert "_" not in spoken and "()" not in spoken and "->" not in spoken
+    # Speech is a fixed function of the caption and the IR: nothing can be added by hand.
+    names = vocabulary(gan)
+    assert all(natural(text, names) == spoken for text, spoken in lines.items())
+    assert (
+        natural("build_prompt passes to LocalModel.", {}) == "Build prompt passes to Local Model."
+    )

@@ -30,6 +30,7 @@ from repovox.media.diagram import Diagram
 from repovox.media.local import analyze_with_sources
 from repovox.media.narration import FPS
 from repovox.media.raster import HEIGHT, WIDTH
+from repovox.media.speech import natural
 from test_architecture import (
     FIXTURES,
     analyzed,
@@ -470,7 +471,7 @@ def test_forged_graph_elements_and_runtime_claims_are_rejected(
     claim = "At runtime Sluice sends every surge to Basin."
     altered = (
         *lines[:moving],
-        lines[moving].model_copy(update={"text": claim, "spoken": explainer.speakable(claim)}),
+        lines[moving].model_copy(update={"text": claim, "spoken": natural(claim, {})}),
         *lines[moving + 1 :],
     )
     with pytest.raises(ArchitectureError) as raised:
