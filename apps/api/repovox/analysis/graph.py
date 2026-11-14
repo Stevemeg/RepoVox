@@ -188,6 +188,59 @@ def resolve_import(path: str, target: str, lang: str, modules: dict[str, str]) -
     return found[0] if len(found) == 1 else None
 
 
+ANCHOR = ("path", "file_sha256", "start_line", "end_line")
+
+
+def merge_indistinguishable(
+    indexed: dict[str, dict[str, Any]], edges: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """One edge per relationship that canonical facts can tell apart.
+
+    A canonical relationship fact is identified by its endpoints, relationship, classification
+    and line-level support anchors. Several supporting symbols on the same lines (two members
+    of one `from m import A, B`, two calls to one function on a line) therefore describe one
+    relationship, not several. They become a single edge that lists every supporting symbol;
+    each symbol keeps its own syntax fact and byte range. Edges that were already distinct are
+    returned unchanged, including their identifiers.
+    """
+
+    def key(edge: dict[str, Any]) -> tuple[Any, ...]:
+        anchors = {
+            tuple(indexed[i][field] for field in ANCHOR)
+            for i in [edge["source"], edge["target"], *edge["support_ids"]]
+        }
+        return (
+            edge["source"],
+            edge["target"],
+            edge["relationship"],
+            edge["classification"],
+            edge["rule"],
+            edge["qualification"],
+            tuple(sorted(anchors)),
+        )
+
+    groups: dict[tuple[Any, ...], list[dict[str, Any]]] = {}
+    for edge in edges:
+        groups.setdefault(key(edge), []).append(edge)
+    merged: list[dict[str, Any]] = []
+    for group in groups.values():
+        if len(group) == 1:
+            merged.append(group[0])
+            continue
+        support = sorted({i for edge in group for i in edge["support_ids"]})
+        first = group[0]
+        merged.append(
+            {
+                **first,
+                "id": stable(
+                    "edge", first["source"], first["target"], first["relationship"], support
+                ),
+                "support_ids": support,
+            }
+        )
+    return merged
+
+
 def infer(structural: dict[str, Any], entries: dict[str, Any]) -> dict[str, Any]:
     symbols = sorted(structural["symbols"], key=lambda s: s["id"])
     modules = {s["path"]: s["id"] for s in symbols if s["kind"] == "module"}
@@ -229,6 +282,7 @@ def infer(structural: dict[str, Any], entries: dict[str, Any]) -> dict[str, Any]
             }
         )
     edges.extend(qualified_edges(symbols, modules))
+    edges = merge_indistinguishable({s["id"]: s for s in symbols}, edges)
     return {
         "nodes": nodes,
         "edges": sorted(edges, key=lambda e: e["id"]),

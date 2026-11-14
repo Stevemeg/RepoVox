@@ -54,8 +54,7 @@ implemented.
 
 ## Analyzer defect found while testing
 
-A single statement `from local_module import A, B` makes the accepted Stage 7 analysis emit
-two identical import-relationship facts, and the accepted contract then rejects the whole
-payload with `duplicate_canonical_fact`. The accepted analyzer was not changed. The GAN
-fixture uses `import models` instead. Repositories using that common import form currently
-fail analysis before any video stage.
+A single statement `from local_module import A, B` used to make the analysis fail with
+`duplicate_canonical_fact`. See the
+[relationship edge correction](relationship-edge-correction.md). The GAN fixture now uses
+that import form.

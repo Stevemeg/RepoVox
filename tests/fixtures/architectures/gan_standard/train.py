@@ -1,13 +1,13 @@
-import models
 import torch
 import torch.nn as nn
+from models import Discriminator, Generator
 
 LATENT_DIM = 100
 
 
 def train(loader, epochs, device):
-    generator = models.Generator().to(device)
-    discriminator = models.Discriminator().to(device)
+    generator = Generator().to(device)
+    discriminator = Discriminator().to(device)
     criterion = nn.BCELoss()
     opt_g = torch.optim.Adam(generator.parameters(), lr=0.0002, betas=(0.5, 0.999))
     opt_d = torch.optim.Adam(discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
