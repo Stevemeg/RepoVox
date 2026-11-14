@@ -182,7 +182,9 @@ class Report(Closed):
 class Context:
     """Verified payload plus hash-checked source; the only inputs discovery may use."""
 
-    def __init__(self, payload: dict[str, Any], sources: dict[str, bytes]) -> None:
+    def __init__(
+        self, payload: dict[str, Any], sources: dict[str, bytes], parse: bool = True
+    ) -> None:
         try:
             TypeAdapter(PAYLOADS["verify"]).validate_python(payload)
         except ValueError:
@@ -197,7 +199,7 @@ class Context:
         self.sources = sources
         self.files = {
             path: SourceFile(path, body)
-            for path, body in sorted(sources.items())
+            for path, body in (sorted(sources.items()) if parse else [])
             if self.manifest[path]["status"] == "parsed"
             and self.manifest[path]["language"] == "python"
         }
@@ -1140,8 +1142,12 @@ GAN_CORE = [
 
 
 def check(report: Report, payload: dict[str, Any], sources: dict[str, bytes]) -> None:
-    """Independent of the detectors: every element must be backed by exact, verified source."""
-    ctx = Context(payload, sources)
+    """Independent of the detectors: every element must be backed by exact, verified source.
+
+    Text and claim comparison only; the source is not parsed here, so this is safe to run
+    outside the parser sandbox on a report produced inside it.
+    """
+    ctx = Context(payload, sources, parse=False)
     if (
         report.analysis_sha256 != digest(canonical(payload))
         or report.commit_sha != ctx.snapshot["commit_sha"]
