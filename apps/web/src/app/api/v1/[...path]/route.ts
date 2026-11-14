@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const allowed =
-  /^(auth\/(session|sign-out|development\/sign-in)|projects(\/[a-f0-9-]+(\/(jobs|video-jobs))?)?|jobs(\/[a-f0-9-]+(\/(cancel|video(\/(captions|download))?))?)?|development\/(projects\/[a-f0-9-]+\/(fixture-jobs|analysis-jobs)|jobs\/[a-f0-9-]+\/(retry|analysis)))$/;
+  /^(auth\/(session|sign-out|development\/sign-in)|projects(\/[a-f0-9-]+(\/(jobs|video-jobs))?)?|jobs(\/[a-f0-9-]+(\/cancel)?)?|video-jobs\/[a-f0-9-]+(\/cancel|\/videos\/[a-f0-9-]+(\/(captions|download))?)?|development\/(projects\/[a-f0-9-]+\/(fixture-jobs|analysis-jobs)|jobs\/[a-f0-9-]+\/(retry|analysis)))$/;
 async function forward(
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> },
@@ -23,7 +23,7 @@ async function forward(
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
   }
-  const media = /\/video(\/(captions|download))?$/.test(route);
+  const media = /\/videos\/[a-f0-9-]+(\/(captions|download))?$/.test(route);
   const mutating = !["GET", "HEAD"].includes(request.method);
   let body: string | undefined;
   if (mutating && request.body) {
