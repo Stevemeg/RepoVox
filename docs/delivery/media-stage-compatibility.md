@@ -28,46 +28,23 @@ immutable. Three accepted rules currently make video impossible:
 2. `rv.job_guard` raises `video_generation_disabled` on any transition to `succeeded`.
 3. Trigger `no_video` rejects every insert into `video_artifacts`.
 
-## Compatible design (drafted, not applied)
+## Resolution: a separate media database
 
-Stages 10–14 are reserved for exactly this work and are not renumbered or repurposed.
-Analysis jobs must keep ending at Stage 9, so the draft adds a separate job mode,
-`fixture='video'`, rather than changing analysis behavior:
+The owner approved a separately versioned media track on 2026-11-14. Video jobs now live in
+a second database with its own roles and revision `m001`; see
+[media database](../operations/media-database.md). The core database stays at `0004` and
+none of the three rules above is changed there. The earlier shared-database draft
+(`apps/api/migrations/media_generation.sql`), which would have replaced `rv.job_guard` and
+`rv.video_disabled`, has been removed.
 
-- `rv.admit_video`: same locks, quotas, deadline and stage rows as analysis admission.
-- `rv.media_scope`, `rv.finish_media`, `rv.fail_media`: fenced stage completion for video
-  jobs only; Stage 9 advances to Stage 10; Stage 14 inserts the publication row and ends
-  the job as `succeeded` in the same transaction.
-- `rv.job_guard` and `rv.video_disabled` keep rejecting success and publication for every
-  job except a video job with fourteen succeeded stages and a committed encode artifact.
+The five version pins that motivated this are unchanged:
+`apps/api/repovox/pilot/control.py:33`, `tests/integration/test_execution_review.py:288`,
+`tests/integration/test_pilot_migration.py:32,66`,
+`tests/integration/test_additive_migration.py:48`,
+`tests/integration/test_api_isolation.py:175`.
 
-The draft is `apps/api/migrations/media_generation.sql`. **It has never been executed
-against PostgreSQL.** No Alembic revision references it, so it cannot be applied by
-`alembic upgrade head`.
+## Media stages
 
-## Conflict that stopped the migration
-
-A new Alembic revision changes `alembic_version` from `0004`. That value is pinned by
-accepted code and tests that this work is not authorized to change:
-
-| Location | Pin |
-| --- | --- |
-| `apps/api/repovox/pilot/control.py:33` | pilot controller/executor refuse unless version is exactly `0004` |
-| `tests/integration/test_execution_review.py:288` | custodian review script asserts `0004` |
-| `tests/integration/test_pilot_migration.py:32,66` | asserts head is `0004` |
-| `tests/integration/test_additive_migration.py:48` | asserts head is `0004` |
-| `tests/integration/test_api_isolation.py:175` | asserts version is `0004` |
-
-`apps/api/repovox/db/database.py` also allows only `0003` and `0004` at startup.
-Applying any revision `0005` would therefore disable the accepted pilot control plane and
-fail five accepted integration tests. Resolving it means editing pilot control code and
-those tests, which needs an explicit owner decision. Until then the worker wiring, the
-video API and the migration tests are not implemented.
-
-## What is implemented without the migration
-
-- `repovox.media.stages`: the Stage 10–14 transforms as pure functions over artifact
-  bytes, each re-validating its upstream input. The local command runs this same path.
-- Web: an owner-scoped video player and download link, and proxy support for the planned
-  video routes including byte ranges. The generate button is hidden unless the API reports
-  `video_enabled`, which it does not yet.
+Stages 10-14 keep their reserved keys in the media database. Architecture explainers use a
+media-only Stage 15. The stage transforms are in `repovox.media.stages`; the worker is
+`repovox.media.worker`.
