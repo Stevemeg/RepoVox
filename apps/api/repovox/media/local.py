@@ -40,6 +40,13 @@ def git(repository: Path, *args: str) -> bytes:
 def analyze(
     repository: Path, url: str, revision: str = "HEAD", paths: tuple[str, ...] = ()
 ) -> dict[str, Any]:
+    return analyze_with_sources(repository, url, revision, paths)[0]
+
+
+def analyze_with_sources(
+    repository: Path, url: str, revision: str = "HEAD", paths: tuple[str, ...] = ()
+) -> tuple[dict[str, Any], dict[str, bytes]]:
+    """Verified payload plus the exact parsed and context file bytes it was derived from."""
     identity = repository_url(url)
     if not repository.is_dir() or not re.fullmatch(r"[A-Za-z0-9._/~^-]{1,200}", revision):
         raise AnalysisError("invalid_local_repository")
@@ -79,4 +86,11 @@ def analyze(
         for stage in (3, 4, 5, 6, 7, 8, 9):
             payload = execute(stage, root, request)
             request["inputs"][str(stage)] = payload
-    return payload
+        sources: dict[str, bytes] = {}
+        for entry in payload["knowledge"]["coverage"]["files"]:
+            if entry["status"] in {"parsed", "context"}:
+                body = (root / entry["path"]).read_bytes()
+                if digest(body) != entry["file_sha256"]:
+                    raise AnalysisError("source_changed")
+                sources[entry["path"]] = body
+    return payload, sources
