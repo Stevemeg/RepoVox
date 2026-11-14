@@ -63,6 +63,43 @@ class JobSummary(BaseModel):
     pipeline_version: str | None = None
 
 
+class MediaStageView(BaseModel):
+    ordinal: int
+    stage_key: str
+    state: str
+    attempt_count: int
+    error_code: str | None
+
+
+class VideoView(BaseModel):
+    id: UUID
+    category: str
+    position: int
+    title: str
+    checksum: str
+    byte_count: int
+    metadata: dict[str, Any]
+    published_at: datetime
+    expires_at: datetime
+
+
+class MediaJobView(BaseModel):
+    id: UUID
+    project_id: UUID
+    analysis_job_id: UUID
+    state: str
+    version: int
+    repository: str | None
+    commit_sha: str | None
+    architecture: str | None
+    error_code: str | None
+    created_at: datetime
+    deadline: datetime
+    finished_at: datetime | None
+    stages: list[MediaStageView]
+    videos: list[VideoView]
+
+
 class JobView(JobSummary):
     prior_job_id: UUID | None
     stages: list[StageView]

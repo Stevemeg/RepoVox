@@ -24,6 +24,7 @@ from repovox.core.errors import DomainError
 from repovox.core.services import Services
 from repovox.db.database import make_engine, verify_role
 from repovox.services.jobs import Jobs
+from repovox.services.media_jobs import MediaJobs
 from repovox.services.projects import Projects
 
 logger = logging.getLogger("repovox")
@@ -43,6 +44,8 @@ SAFE_DB_CODES = {
     "authentication_rate": 429,
     "terminal_conflict": 409,
     "invalid_retry": 409,
+    "invalid_request": 422,
+    "analysis_reference_conflict": 409,
 }
 
 
@@ -55,6 +58,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         verify_role(engine, "rv_app")
         yield
         engine.dispose()
+        if media_engine is not None:
+            media_engine.dispose()
 
     app = FastAPI(title="RepoVox API", version="0.1.0", lifespan=lifespan)
     app.state.settings = config
@@ -63,7 +68,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.projects = Projects(engine)
     token = config.github_token.get_secret_value() if config.github_token else None
     app.state.jobs = Jobs(engine, config.fixtures, config.analysis, GitHubHTTP(token))
-    app.state.services = Services(config, app.state.sessions, app.state.projects, app.state.jobs)
+    # Video generation uses a separate media database; without it the feature is off.
+    media_engine = (
+        make_engine(config.media_database_url.get_secret_value())
+        if config.video and config.media_database_url
+        else None
+    )
+    app.state.media_engine = media_engine
+    app.state.media = (
+        MediaJobs(media_engine, engine, app.state.jobs, config) if media_engine else None
+    )
+    app.state.services = Services(
+        config, app.state.sessions, app.state.projects, app.state.jobs, app.state.media
+    )
 
     def error(request: Request, code: str, status: int) -> JSONResponse:
         return JSONResponse(

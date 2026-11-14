@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     github_token: SecretStr | None = None
     database_url: SecretStr
     worker_database_url: SecretStr | None = None
+    # Product video generation lives in a separate media database with its own roles.
+    video: bool = False
+    media_database_url: SecretStr | None = None
+    media_worker_database_url: SecretStr | None = None
     session_secret: SecretStr = Field(min_length=32)
     session_seconds: int = Field(default=3600, ge=60, le=86400)
     origin: str = "http://localhost:3000"

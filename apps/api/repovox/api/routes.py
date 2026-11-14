@@ -15,7 +15,8 @@ from repovox.schemas.requests import (
     ProjectUpdate,
     SignIn,
 )
-from repovox.schemas.responses import JobSummary, JobView, ProjectView
+from repovox.schemas.responses import JobSummary, JobView, MediaJobView, ProjectView
+from repovox.services.media_jobs import MediaJobs
 
 router = APIRouter(prefix="/v1")
 session_cookie = APIKeyCookie(name="rv_session", auto_error=False)
@@ -81,6 +82,7 @@ def session(request: Request, identity: ReadIdentity) -> dict[str, Any]:
         "environment": services(request).settings.environment,
         "fixtures_enabled": services(request).settings.fixtures,
         "analysis_enabled": services(request).settings.analysis,
+        "video_enabled": services(request).media is not None,
     }
 
 
@@ -198,3 +200,86 @@ def retry(
     return services(request).jobs.admit(
         identity.owner_id, old["project_id"], idempotency_key, old["fixture"], job_id
     )
+
+
+def media(request: Request) -> MediaJobs:
+    found = services(request).media
+    if found is None or not services(request).settings.analysis:
+        raise DomainError("video_generation_unavailable", 503)
+    return found
+
+
+@router.post("/projects/{project_id}/video-jobs", status_code=202, response_model=MediaJobView)
+def video_job(
+    project_id: UUID,
+    body: AnalysisInput,
+    request: Request,
+    identity: WriteIdentity,
+    idempotency_key: Annotated[str, Header()],
+) -> dict[str, Any]:
+    service = media(request)
+    services(request).projects.get(identity.owner_id, project_id)
+    return service.admit(identity.owner_id, project_id, idempotency_key)
+
+
+@router.get("/projects/{project_id}/video-jobs", response_model=list[MediaJobView])
+def project_video_jobs(
+    project_id: UUID, request: Request, identity: ReadIdentity
+) -> list[dict[str, Any]]:
+    service = media(request)
+    services(request).projects.get(identity.owner_id, project_id)
+    return service.list(identity.owner_id, project_id)
+
+
+@router.get("/video-jobs/{job_id}", response_model=MediaJobView)
+def video_job_status(job_id: UUID, request: Request, identity: ReadIdentity) -> dict[str, Any]:
+    return media(request).get(identity.owner_id, job_id)
+
+
+@router.post("/video-jobs/{job_id}/cancel", response_model=MediaJobView)
+def cancel_video_job(job_id: UUID, request: Request, identity: WriteIdentity) -> dict[str, Any]:
+    return media(request).cancel(identity.owner_id, job_id)
+
+
+def byte_range(header: str | None, size: int) -> tuple[int, int] | None:
+    """One satisfiable `bytes=a-b` range, or None to send the whole body."""
+    if not header or not header.startswith("bytes=") or "," in header:
+        return None
+    first, _, last = header[6:].partition("-")
+    if not first.isdigit() or (last and not last.isdigit()):
+        return None
+    start, end = int(first), min(int(last) if last else size - 1, size - 1)
+    return (start, end) if start <= end < size else None
+
+
+@router.get("/video-jobs/{job_id}/videos/{video_id}")
+def video(job_id: UUID, video_id: UUID, request: Request, identity: ReadIdentity) -> Response:
+    body, _ = media(request).video(identity.owner_id, job_id, video_id)
+    headers = {"accept-ranges": "bytes"}
+    wanted = byte_range(request.headers.get("range"), len(body))
+    if wanted is None:
+        return Response(body, media_type="video/mp4", headers=headers)
+    start, end = wanted
+    headers["content-range"] = f"bytes {start}-{end}/{len(body)}"
+    return Response(body[start : end + 1], 206, headers, "video/mp4")
+
+
+@router.get("/video-jobs/{job_id}/videos/{video_id}/download")
+def download_video(
+    job_id: UUID, video_id: UUID, request: Request, identity: ReadIdentity
+) -> Response:
+    body, row = media(request).video(identity.owner_id, job_id, video_id)
+    name = f"repovox-{row['category']}-{video_id}.mp4"
+    return Response(
+        body,
+        media_type="video/mp4",
+        headers={"content-disposition": f'attachment; filename="{name}"'},
+    )
+
+
+@router.get("/video-jobs/{job_id}/videos/{video_id}/captions")
+def video_captions(
+    job_id: UUID, video_id: UUID, request: Request, identity: ReadIdentity
+) -> Response:
+    _, row = media(request).video(identity.owner_id, job_id, video_id)
+    return Response(row["captions"], media_type="text/vtt; charset=utf-8")
