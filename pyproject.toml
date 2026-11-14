@@ -37,6 +37,14 @@ dev = [
     "cryptography==50.0.2", # Offline custody grant verification; never a worker authority.
 ]
 
+[tool.uv]
+# Security floors for transitive dependencies (pip-audit, 2026-11-14): CVE-2026-126360 in
+# opentelemetry-api < 1.45.2 and the advisories fixed in filelock 4.2.1.
+constraint-dependencies = [
+  "opentelemetry-api>=1.45.2",
+  "filelock>=4.2.1",
+]
+
 [build-system]
 requires = ["hatchling==1.27.0"]
 build-backend = "hatchling.build"
