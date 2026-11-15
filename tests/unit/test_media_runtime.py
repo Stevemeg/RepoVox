@@ -4,16 +4,22 @@ import hashlib
 import io
 import tarfile
 import tracemalloc
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 import pytest
 from botocore.exceptions import ClientError
+from fastapi.testclient import TestClient
 from repovox.analysis.common import AnalysisError
 from repovox.analysis.github import archive_path, repository_url, resolve
+from repovox.api.routes import authenticated
+from repovox.auth.session import Identity
 from repovox.core.config import Settings
 from repovox.core.errors import DomainError
+from repovox.main import create_app
 from repovox.media.architecture import ArchitectureError
 from repovox.media.store import CHUNK, MediaStorage, media_key
 from repovox.media.worker import ArchitecturePhase
@@ -38,25 +44,49 @@ class Body:
 
 
 class Bucket:
-    """The three S3 calls retrieval uses, over in-memory objects."""
+    """The S3 calls retrieval uses, over in-memory objects, with S3 `If-Match` semantics.
 
-    def __init__(self) -> None:
+    Every stored version has its own quoted ETag. `precondition` is the error code returned
+    when `If-Match` names another version; `short` drops that many bytes from each response
+    body, as a truncated transfer would; `after_head` runs once a head request has answered.
+    """
+
+    def __init__(self, precondition: str = "PreconditionFailed") -> None:
         self.objects: dict[str, bytes] = {}
         self.gets = 0
         self.bodies: list[Body] = []
+        self.conditions: list[str | None] = []
+        self.precondition, self.short, self.etags = precondition, 0, True
+        self.after_head: Any = None
+
+    def etag(self, key: str) -> str:
+        return '"' + hashlib.md5(self.objects[key]).hexdigest() + '"'  # noqa: S324
 
     def head_object(self, Bucket: str, Key: str) -> dict[str, Any]:  # noqa: N803
         if Key not in self.objects:
             raise ClientError({"Error": {"Code": "404"}}, "HeadObject")
-        data = self.objects[Key]
-        return {"ContentLength": len(data), "ETag": hashlib.md5(data).hexdigest()}  # noqa: S324
+        head: dict[str, Any] = {"ContentLength": len(self.objects[Key])}
+        if self.etags:
+            head["ETag"] = self.etag(Key)
+        if self.after_head is not None:
+            self.after_head()
+        return head
 
-    def get_object(self, Bucket: str, Key: str, Range: str) -> dict[str, Any]:  # noqa: N803
+    def get_object(
+        self,
+        Bucket: str,  # noqa: N803
+        Key: str,  # noqa: N803
+        Range: str,  # noqa: N803
+        IfMatch: str | None = None,  # noqa: N803
+    ) -> dict[str, Any]:
         if Key not in self.objects:
             raise ClientError({"Error": {"Code": "NoSuchKey"}}, "GetObject")
+        self.conditions.append(IfMatch)
+        if IfMatch is not None and IfMatch != self.etag(Key):
+            raise ClientError({"Error": {"Code": self.precondition}}, "GetObject")
         self.gets += 1
         start, end = (int(part) for part in Range.removeprefix("bytes=").split("-"))
-        body = Body(self.objects[Key][start : end + 1])
+        body = Body(self.objects[Key][start : end + 1 - self.short])
         self.bodies.append(body)
         return {"Body": body}
 
@@ -123,6 +153,162 @@ def test_stream_yields_only_the_requested_range_without_holding_the_object() -> 
         list(store.stream("media/../x", 0, 1))
     with pytest.raises(DomainError, match="not_found"):
         list(store.stream(key, 5, 4))
+
+
+def test_retrieval_is_pinned_to_the_verified_version() -> None:
+    bucket = Bucket()
+    data = bytes(range(256)) * 1024  # 256 KiB: several chunks.
+    owner, key = stored(bucket, data)
+    store = storage(bucket)
+    etag = store.verify(owner, key, len(data))
+    assert etag == bucket.etag(key) and store.verified[key] == etag
+    assert bucket.conditions == [etag]  # The hashing pass read exactly the version it records.
+    assert store.verify(owner, key, len(data)) == etag and bucket.gets == 1  # Remembered.
+    assert b"".join(store.stream(key, 0, len(data) - 1, etag=etag)) == data
+    assert b"".join(store.stream(key, 70000, 200000, etag=etag)) == data[70000:200001]
+    assert bucket.conditions == [etag, etag, etag]  # Every send names the verified version.
+    assert store.verified[key] == etag and all(body.closed for body in bucket.bodies)
+    assert b"".join(store.stream(key, 0, 9)) == data[:10] and bucket.conditions[-1] is None
+
+
+@pytest.mark.parametrize("precondition", ["PreconditionFailed", "412"])
+def test_a_version_replaced_after_verification_is_refused_and_forgotten(precondition: str) -> None:
+    bucket = Bucket(precondition)
+    data = bytes(range(256)) * 1024
+    owner, key = stored(bucket, data)
+    store = storage(bucket)
+    etag = store.verify(owner, key, len(data))
+    # Same length, different bytes, between the check and the send: a new stored version.
+    bucket.objects[key] = bytes(len(data))
+    with pytest.raises(DomainError, match="object_corrupt") as refused:
+        store.stream(key, 0, len(data) - 1, etag=etag)
+    assert refused.value.status == 503 and key not in store.verified
+    assert bucket.conditions[-1] == etag and bucket.gets == 1  # Storage sent no new bytes.
+    # The next retrieval re-checks the stored object from scratch and refuses it.
+    with pytest.raises(DomainError, match="object_corrupt"):
+        store.verify(owner, key, len(data))
+    assert key not in store.verified and all(body.closed for body in bucket.bodies)
+    # Any version other than the named one is refused; a missing object is only unavailable.
+    bucket.objects[key] = data
+    with pytest.raises(DomainError, match="object_corrupt"):
+        store.stream(key, 0, 9, etag=etag + "x")
+    del bucket.objects[key]
+    with pytest.raises(DomainError, match="object_unavailable"):
+        store.stream(key, 0, 9, etag=etag)
+
+
+def test_truncated_corrupted_or_unversioned_objects_fail_closed() -> None:
+    bucket = Bucket()
+    data = bytes(range(256)) * 1024
+    owner, key = stored(bucket, data)
+    store = storage(bucket)
+    bucket.etags = False  # Nothing to pin retrieval to.
+    with pytest.raises(DomainError, match="object_corrupt"):
+        store.verify(owner, key, len(data))
+    bucket.etags = True
+    bucket.objects[key] = data[:-1]  # Truncated at rest.
+    with pytest.raises(DomainError, match="object_corrupt"):
+        store.verify(owner, key, len(data))
+    bucket.objects[key] = data[:-1] + b"\x00"  # Corrupted at rest, same length.
+    with pytest.raises(DomainError, match="object_corrupt"):
+        store.verify(owner, key, len(data))
+    assert bucket.gets == 1 and key not in store.verified
+    bucket.objects[key] = data
+    bucket.short = 100  # Truncated in transfer, under the right version.
+    with pytest.raises(DomainError, match="object_corrupt"):
+        store.verify(owner, key, len(data))
+    assert key not in store.verified
+    bucket.short = 0
+    etag = store.verify(owner, key, len(data))
+    bucket.short = 100
+    with pytest.raises(DomainError, match="object_corrupt"):
+        list(store.stream(key, 0, len(data) - 1, etag=etag))
+    assert key not in store.verified and all(body.closed for body in bucket.bodies)
+
+
+class Connection:
+    def __init__(self, database: "Database") -> None:
+        self.database = database
+
+    def execute(self, clause: Any, params: dict[str, Any] | None = None) -> "Connection":
+        self.found = self.scalar(clause, params)
+        return self
+
+    def mappings(self) -> list[dict[str, Any]]:
+        return list(self.found or [])
+
+    def scalar(self, clause: Any, params: dict[str, Any] | None = None) -> Any:
+        sql, values = " ".join(str(clause).split()), dict(params or {})
+        self.database.calls.append((sql, values))
+        return self.database.answer(sql, values)
+
+
+class Database:
+    """Records every statement; `answer(sql, params)` supplies what a test's reads return."""
+
+    def __init__(self, answer: Any = None) -> None:
+        self.answer = answer or (lambda sql, params: None)
+        self.calls: list[tuple[str, dict[str, Any]]] = []
+
+    @contextmanager
+    def begin(self) -> Iterator[Connection]:
+        yield Connection(self)
+
+    def called(self, function: str) -> list[dict[str, Any]]:
+        return [params for sql, params in self.calls if f"{function}(" in sql]
+
+
+def video_app(bucket: Bucket, owner: Any, key: str, size: int) -> tuple[TestClient, MediaJobs]:
+    """The real retrieval routes and `MediaJobs.video`, over a recorded database and bucket."""
+    settings = Settings(
+        environment="test",
+        dev_auth=True,
+        analysis=True,
+        video=True,
+        database_url="postgresql+psycopg://u:p@localhost/core",
+        media_database_url="postgresql+psycopg://u:p@localhost/media",
+        session_secret="s" * 32,
+        storage_access_key="a",
+        storage_secret_key="s",
+    )
+    app = create_app(settings)  # Not entered, so nothing connects.
+    service = app.state.media
+    record = {
+        "id": uuid4(),
+        "category": "walkthrough",
+        "title": "Walkthrough",
+        "object_key": key,
+        "checksum": key.rsplit("/", 1)[1],
+        "byte_count": size,
+        "captions": "WEBVTT\n",
+    }
+    service.engine = Database(lambda sql, params: [dict(record)] if "media_videos" in sql else None)
+    service._storage = storage(bucket)
+    app.dependency_overrides[authenticated] = lambda: Identity(owner, uuid4(), "", "n", "e")
+    return TestClient(app), service
+
+
+@pytest.mark.parametrize("route", ["", "/download"])
+def test_retrieval_routes_send_only_the_verified_version(route: str) -> None:
+    bucket = Bucket()
+    data = bytes(range(256)) * 1024
+    owner, key = stored(bucket, data)
+    client, service = video_app(bucket, owner, key, len(data))
+    path = f"/v1/video-jobs/{uuid4()}/videos/{uuid4()}{route}"
+    sent = client.get(path)
+    assert sent.status_code == 200 and sent.content == data
+    etag = bucket.etag(key)
+    assert bucket.conditions == [etag, etag]  # The hashing pass, then the send.
+    if not route:
+        ranged = client.get(path, headers={"range": "bytes=70000-200000"})
+        assert ranged.status_code == 206 and ranged.content == data[70000:200001]
+        assert bucket.conditions == [etag, etag, etag]
+    # The object is replaced after this request's check and before its send.
+    bucket.after_head = lambda: bucket.objects.__setitem__(key, bytes(len(data)))
+    refused = client.get(path)
+    assert refused.status_code == 503 and refused.json()["error"]["code"] == "object_corrupt"
+    assert bucket.conditions[-1] == etag and key not in service.storage.verified
+    assert bucket.gets == len(bucket.conditions) - 1  # The replacement was never sent.
 
 
 def test_concurrent_verification_is_limited() -> None:

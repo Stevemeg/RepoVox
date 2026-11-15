@@ -209,7 +209,8 @@ class MediaJobs:
     def video(self, owner: UUID, job: UUID, video: UUID) -> dict[str, Any]:
         """One published video's record, after confirming its stored bytes are intact.
 
-        Only committed, validated, unexpired, owned videos of a succeeded job.
+        Only committed, validated, unexpired, owned videos of a succeeded job. `etag` names
+        the stored version that was confirmed; retrieval must pin to it.
         """
         with tenant(self.engine, owner) as c:
             found = rows(
@@ -227,5 +228,5 @@ class MediaJobs:
         row = found[0]
         if not row["object_key"].endswith("/" + row["checksum"]):
             raise DomainError("object_corrupt", 503)
-        self.storage.verify(owner, row["object_key"], row["byte_count"])
+        row["etag"] = self.storage.verify(owner, row["object_key"], row["byte_count"])
         return row

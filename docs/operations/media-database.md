@@ -109,7 +109,11 @@ bytes by text and claim comparison without parsing.
 - Retrieval streams. Before the first send of a stored object version, the API hashes it in
   64 KiB chunks (at most two objects at once; a third request waits up to 20 seconds, then
   gets `retrieval_busy`) and remembers the result by ETag. Responses, including ranges, are
-  sent in 64 KiB chunks. A changed or missing object is refused with `object_corrupt` or
+  sent in 64 KiB chunks. Every send, and the hashing pass itself, names the verified ETag
+  with `If-Match`, so storage serves only the version that was checked: an object replaced
+  after the check is refused with `object_corrupt` before the response starts, and its
+  remembered result is dropped. A body shorter than its record is also `object_corrupt`; an
+  object without an ETag is refused, since there is no version to pin. A missing object is
   `object_unavailable`. Objects are limited to 100 MB.
 - Remaining gap: a whole-object hash confirms the version that was checked. A storage
   backend that served different bytes under an unchanged ETag after that check would not be

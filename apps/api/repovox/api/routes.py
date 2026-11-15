@@ -264,7 +264,7 @@ def video(job_id: UUID, video_id: UUID, request: Request, identity: ReadIdentity
     if wanted is not None:
         headers["content-range"] = f"bytes {start}-{end}/{size}"
     return StreamingResponse(
-        service.storage.stream(row["object_key"], start, end),
+        service.storage.stream(row["object_key"], start, end, etag=row["etag"]),
         status_code=206 if wanted is not None else 200,
         media_type="video/mp4",
         headers=headers,
@@ -280,7 +280,7 @@ def download_video(
     size = int(row["byte_count"])
     name = f"repovox-{row['category']}-{video_id}.mp4"
     return StreamingResponse(
-        service.storage.stream(row["object_key"], 0, size - 1),
+        service.storage.stream(row["object_key"], 0, size - 1, etag=row["etag"]),
         media_type="video/mp4",
         headers={
             "content-disposition": f'attachment; filename="{name}"',

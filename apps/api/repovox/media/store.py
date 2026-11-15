@@ -5,6 +5,7 @@ database row can only ever name bytes that are exactly what was published.
 """
 
 import hashlib
+import itertools
 import re
 import threading
 from collections.abc import Iterator
@@ -20,6 +21,7 @@ from repovox.storage import ObjectRef, S3Storage
 LIMIT = 100 * 1024**2
 CHUNK = 64 * 1024
 KEY = re.compile(r"media/[a-f0-9-]{36}/[a-f0-9-]{36}/1[0-5]/[a-f0-9-]{36}/[a-f0-9]{64}")
+CHANGED = {"PreconditionFailed", "412"}  # Storage no longer holds the pinned version.
 
 
 def media_key(
@@ -73,12 +75,14 @@ class MediaStorage:
             raise DomainError("object_corrupt", 503)
         return body
 
-    def verify(self, owner: UUID | str, key: str, size: int) -> None:
+    def verify(self, owner: UUID | str, key: str, size: int) -> str:
         """Confirm the stored bytes still hash to their key, using bounded memory.
 
-        Runs once per stored version of an object (remembered by ETag). Hashing streams
-        64 KiB at a time and is limited to two objects at once, so concurrent requests
-        cannot make the API hold videos in memory.
+        Returns the ETag of the exact stored version that was confirmed. Retrieval passes it
+        to `stream`, which then refuses any other version, so the bytes sent are the bytes
+        that were checked. Runs once per stored version of an object (remembered by ETag).
+        Hashing streams 64 KiB at a time and is limited to two objects at once, so concurrent
+        requests cannot make the API hold videos in memory.
         """
         if not KEY.fullmatch(key) or not key.startswith(f"media/{owner}/"):
             raise DomainError("not_found", 404)
@@ -86,18 +90,21 @@ class MediaStorage:
             head = self.client.head_object(Bucket=self.bucket, Key=key)
         except ClientError:
             raise DomainError("object_unavailable", 503) from None
-        etag = str(head.get("ETag", ""))
+        etag = head.get("ETag")
+        if not isinstance(etag, str) or not etag.strip('"'):
+            raise DomainError("object_corrupt", 503)  # No version to pin retrieval to.
         if int(head.get("ContentLength", -1)) != size or size > LIMIT:
             raise DomainError("object_corrupt", 503)
         with self.lock:
-            if etag and self.verified.get(key) == etag:
-                return
+            if self.verified.get(key) == etag:
+                return etag
         if not self.verifying.acquire(timeout=self.WAIT):
             raise DomainError("retrieval_busy", 503)
         try:
             checksum = hashlib.sha256()
             count = 0
-            for chunk in self.stream(key, 0, size - 1):
+            # Pinned too, so the version remembered below is the version that was hashed.
+            for chunk in self.stream(key, 0, size - 1, etag):
                 checksum.update(chunk)
                 count += len(chunk)
             if count != size or checksum.hexdigest() != key.rsplit("/", 1)[1]:
@@ -108,16 +115,34 @@ class MediaStorage:
             if len(self.verified) >= 512:
                 self.verified.clear()
             self.verified[key] = etag
+        return etag
 
-    def stream(self, key: str, start: int, end: int) -> Iterator[bytes]:
-        """Yield an inclusive byte range in fixed-size chunks."""
+    def stream(self, key: str, start: int, end: int, etag: str | None = None) -> Iterator[bytes]:
+        """An inclusive byte range in fixed-size chunks.
+
+        With `etag`, storage serves only that stored version (`If-Match`): any other version
+        is refused as `object_corrupt` and forgotten as verified. The request is made and the
+        first chunk read before this returns, so a refusal reaches the caller before any
+        response has started.
+        """
         if not KEY.fullmatch(key) or not 0 <= start <= end < LIMIT:
             raise DomainError("not_found", 404)
+        chunks = self._chunks(key, start, end, etag)
+        return itertools.chain((next(chunks),), chunks)
+
+    def _chunks(self, key: str, start: int, end: int, etag: str | None) -> Iterator[bytes]:
+        span = f"bytes={start}-{end}"
         try:
-            response = self.client.get_object(
-                Bucket=self.bucket, Key=key, Range=f"bytes={start}-{end}"
-            )
-        except ClientError:
+            if etag is None:
+                response = self.client.get_object(Bucket=self.bucket, Key=key, Range=span)
+            else:
+                response = self.client.get_object(
+                    Bucket=self.bucket, Key=key, Range=span, IfMatch=etag
+                )
+        except ClientError as error:
+            if etag is not None and error.response.get("Error", {}).get("Code") in CHANGED:
+                self.forget(key)
+                raise DomainError("object_corrupt", 503) from None
             raise DomainError("object_unavailable", 503) from None
         body = response["Body"]
         try:
@@ -125,11 +150,17 @@ class MediaStorage:
             while remaining > 0:
                 chunk = body.read(min(CHUNK, remaining))
                 if not chunk:
-                    break
+                    self.forget(key)
+                    raise DomainError("object_corrupt", 503)  # Shorter than its record.
                 remaining -= len(chunk)
                 yield chunk
         finally:
             body.close()
+
+    def forget(self, key: str) -> None:
+        """Drop a remembered verification, so the next retrieval hashes the object again."""
+        with self.lock:
+            self.verified.pop(key, None)
 
     def delete(self, key: str) -> None:
         if KEY.fullmatch(key):
