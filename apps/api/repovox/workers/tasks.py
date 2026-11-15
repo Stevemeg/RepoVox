@@ -10,6 +10,8 @@ from repovox.analysis.runner import AnalysisRunner
 from repovox.analysis.transport import GitHubHTTP
 from repovox.core.config import Settings
 from repovox.db.database import make_engine, verify_role
+from repovox.services.jobs import Jobs
+from repovox.services.media_jobs import MediaJobs
 from repovox.storage import S3Storage
 from repovox.synthetic_source import SyntheticSource
 from repovox.workers.runtime import Orchestrator
@@ -49,6 +51,45 @@ def runtime() -> Orchestrator:
     )
     analysis = AnalysisRunner(engine, storage, source) if settings.analysis else None
     return Orchestrator(engine, storage, analysis)
+
+
+@lru_cache
+def media_handoff_service() -> MediaJobs | None:
+    """The analysis-to-media handoff for worker maintenance, or None where video is not set up.
+
+    It is the API's own idempotent pass, so waiting video jobs advance with no API process
+    running. It uses only existing interfaces: `mv.awaiting`, `mv.attach` and
+    `mv.analysis_failed` as `rvm_app`, and owner-scoped tenant reads of the core database as
+    `rv_app`, because `rv_worker` reads no tables. Both roles are checked before any use.
+    """
+    settings = Settings()  # type: ignore[call-arg]
+    if not settings.video or settings.media_database_url is None:
+        return None
+    from repovox.media.worker import make_media_engine  # Media code loads only when used.
+
+    core = make_engine(settings.database_url.get_secret_value())
+    try:
+        verify_role(core, "rv_app")
+        media = make_media_engine(settings.media_database_url.get_secret_value(), "rvm_app")
+    except BaseException:
+        core.dispose()
+        raise
+    return MediaJobs(media, core, Jobs(core, settings.fixtures), settings)
+
+
+def media_handoff() -> int:
+    """One handoff pass; without video settings it connects to nothing and returns 0."""
+    service = media_handoff_service()
+    return 0 if service is None else service.handoff()
+
+
+def close_media_handoff() -> None:
+    if media_handoff_service.cache_info().currsize:
+        service = media_handoff_service()
+        if service is not None:
+            service.engine.dispose()
+            service.core.dispose()
+    media_handoff_service.cache_clear()
 
 
 @celery.task(name="repovox.stage")

@@ -7,7 +7,7 @@ from celery import Celery
 from sqlalchemy import Engine, text
 
 from repovox.db.database import rows
-from repovox.workers.tasks import celery, runtime
+from repovox.workers.tasks import celery, close_media_handoff, media_handoff, runtime
 
 logger = logging.getLogger("repovox.dispatcher")
 
@@ -46,9 +46,15 @@ def main() -> None:
                 dispatch(orchestrator.engine, celery)
             except Exception:
                 logger.warning('{"event":"reconciliation_dependency_unavailable"}')
+            try:
+                # Waiting video jobs advance even when no API process is running.
+                media_handoff()
+            except Exception:
+                logger.warning('{"event":"media_handoff_dependency_unavailable"}')
             stop.wait(5)
     finally:
         orchestrator.engine.dispose()
+        close_media_handoff()
 
 
 if __name__ == "__main__":

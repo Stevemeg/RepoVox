@@ -609,6 +609,33 @@ def test_handoff_runs_in_the_background_of_the_api_process(
     assert media_state(media_admin, job)[0] == "queued"
 
 
+def test_dispatcher_handoff_advances_jobs_without_any_api_pass(
+    clients: tuple[TestClient, TestClient],
+    orchestrator: Orchestrator,
+    media_admin: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from repovox.workers import tasks
+
+    a, b = clients
+    # This API process stops advancing jobs; only the dispatcher's pass can move them now.
+    monkeypatch.setattr(a.app.state.media, "handoff", lambda: 0)
+    ready = submit(a, orchestrator, "dispatcher-ready")
+    doomed = submit(b, orchestrator, "dispatcher-doomed")
+    analyse(a, orchestrator, ready)
+    assert b.post(f"/v1/jobs/{doomed['analysis_job_id']}/cancel").status_code == 200
+    assert media_state(media_admin, ready)[0] == "awaiting_analysis"
+    tasks.media_handoff_service.cache_clear()
+    try:
+        # Built from this process's settings: rv_app on the core, rvm_app on the media database.
+        assert tasks.media_handoff() == 2
+        assert tasks.media_handoff() == 0  # Idempotent.
+    finally:
+        tasks.close_media_handoff()
+    assert media_state(media_admin, ready)[0] == "queued"
+    assert media_state(media_admin, doomed) == ("failed", None, "analysis_failed")
+
+
 def direct_job(engine: Engine, owner: UUID, key: str) -> UUID:
     """A media job with a well-formed reference, created through the tenant functions only."""
     analysis = uuid4()

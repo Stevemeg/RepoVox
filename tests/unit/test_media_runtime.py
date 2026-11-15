@@ -2,6 +2,7 @@
 
 import hashlib
 import io
+import json
 import tarfile
 import tracemalloc
 from collections.abc import Iterator
@@ -24,7 +25,9 @@ from repovox.media.architecture import ArchitectureError
 from repovox.media.store import CHUNK, MediaStorage, media_key
 from repovox.media.worker import ArchitecturePhase
 from repovox.services.media_jobs import MediaJobs
+from repovox.storage import ObjectRef
 from repovox.synthetic_source import SyntheticSource
+from repovox.workers import tasks
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "architectures"
 
@@ -249,13 +252,194 @@ class Database:
     def __init__(self, answer: Any = None) -> None:
         self.answer = answer or (lambda sql, params: None)
         self.calls: list[tuple[str, dict[str, Any]]] = []
+        self.disposed = False
 
     @contextmanager
     def begin(self) -> Iterator[Connection]:
         yield Connection(self)
 
+    def dispose(self) -> None:
+        self.disposed = True
+
     def called(self, function: str) -> list[dict[str, Any]]:
         return [params for sql, params in self.calls if f"{function}(" in sql]
+
+    def scopes(self) -> list[str]:
+        """Owner of each tenant scope opened, in order."""
+        return [params["owner"] for sql, params in self.calls if "set_config" in sql]
+
+
+Analysis = tuple[dict[str, Any], list[dict[str, Any]]]
+
+
+def analysis(
+    owner: Any,
+    job: Any,
+    state: str = "failed",
+    error: str | None = "phase2_pipeline_boundary",
+    ordinals: tuple[int, ...] = (2, 9),
+) -> Analysis:
+    """One core analysis job and its unexpired artifacts, as its owner's tenant scope reads them."""
+    snapshot = uuid4()
+    artifacts = []
+    for ordinal in ordinals:
+        artifact, checksum = uuid4(), hashlib.sha256(f"{job}-{ordinal}".encode()).hexdigest()
+        artifacts.append(
+            {
+                "ordinal": ordinal,
+                "id": artifact,
+                "checksum": checksum,
+                "object_key": ObjectRef(owner, snapshot, job, artifact, checksum, "analysis").key,
+                "byte_count": 1000 + ordinal,
+            }
+        )
+    row = {
+        "state": state,
+        "error_code": error,
+        "snapshot_id": snapshot,
+        "commit_sha": "a" * 40,
+        "metadata": {"repository": "https://github.com/synthetic/sample"},
+    }
+    return row, artifacts
+
+
+def core(analyses: dict[Any, Analysis]) -> Database:
+    def answer(sql: str, params: dict[str, Any]) -> Any:
+        if "FROM generation_jobs" in sql:
+            found = analyses.get(params["id"])
+            return [found[0]] if found else []
+        if "FROM knowledge_artifacts" in sql:
+            return analyses[params["id"]][1]
+        return None
+
+    return Database(answer)
+
+
+def reference(owner: Any, job: Any, found: Analysis) -> dict[str, Any]:
+    row, (archive, verify) = found[0], found[1]
+    return {
+        "owner_id": str(owner),
+        "analysis_job_id": str(job),
+        "snapshot_id": str(row["snapshot_id"]),
+        "commit_sha": "a" * 40,
+        "repository": "https://github.com/synthetic/sample",
+        "archive": {"artifact": str(archive["id"]), "checksum": archive["checksum"], "bytes": 1002},
+        "verify": {"artifact": str(verify["id"]), "checksum": verify["checksum"], "bytes": 1009},
+    }
+
+
+CORE_URL = "postgresql+psycopg://rv_app:p@localhost/repovox"
+MEDIA_URL = "postgresql+psycopg://rvm_app:p@localhost/repovox_media"
+
+
+@pytest.fixture
+def worker_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[pytest.MonkeyPatch]:
+    """A worker-process environment, with video off until a test turns it on."""
+    for name in ("VIDEO", "MEDIA_DATABASE_URL", "SYNTHETIC_SOURCE_DIR", "FIXTURES", "ORIGIN"):
+        monkeypatch.delenv(f"REPOVOX_{name}", raising=False)
+    for name, value in {
+        "ENVIRONMENT": "test",
+        "DEV_AUTH": "true",
+        "DATABASE_URL": CORE_URL,
+        "SESSION_SECRET": "s" * 32,
+        "STORAGE_ACCESS_KEY": "a",
+        "STORAGE_SECRET_KEY": "s",
+    }.items():
+        monkeypatch.setenv(f"REPOVOX_{name}", value)
+    tasks.media_handoff_service.cache_clear()
+    yield monkeypatch
+    tasks.media_handoff_service.cache_clear()
+
+
+@pytest.mark.parametrize(("video", "media"), [("true", None), ("false", MEDIA_URL)])
+def test_worker_handoff_is_a_no_op_without_video_settings(
+    worker_settings: pytest.MonkeyPatch, video: str, media: str | None
+) -> None:
+    def refuse(*args: Any) -> None:
+        raise AssertionError("nothing may connect")
+
+    worker_settings.setattr(tasks, "make_engine", refuse)
+    worker_settings.setattr("repovox.media.worker.make_media_engine", refuse)
+    worker_settings.setenv("REPOVOX_VIDEO", video)
+    if media is not None:
+        worker_settings.setenv("REPOVOX_MEDIA_DATABASE_URL", media)
+    assert tasks.media_handoff() == 0 and tasks.media_handoff_service() is None
+    tasks.close_media_handoff()  # Nothing was opened, so nothing is closed.
+
+
+def test_worker_handoff_advances_waiting_jobs_without_an_api_process(
+    worker_settings: pytest.MonkeyPatch,
+) -> None:
+    alex, sam = uuid4(), uuid4()
+    ready, doomed, pending = (uuid4(), uuid4()), (uuid4(), uuid4()), (uuid4(), uuid4())
+    analyses = {
+        ready[1]: analysis(alex, ready[1]),
+        doomed[1]: analysis(sam, doomed[1], error="archive_download_limit"),
+        pending[1]: analysis(sam, pending[1], state="running", error=None),
+    }
+    analysis_db = core(analyses)
+    waiting = [
+        {"o_job": job, "o_owner": owner, "o_analysis": source}
+        for owner, (job, source) in ((alex, ready), (sam, doomed), (sam, pending))
+    ]
+    media_db = Database(lambda sql, params: waiting if "mv.awaiting()" in sql else None)
+    built: list[str] = []
+    checked: list[tuple[Any, str]] = []
+
+    def make_engine(url: str) -> Database:
+        built.append(url)
+        return analysis_db
+
+    def make_media_engine(url: str, role: str) -> Database:
+        checked.append((url, role))
+        return media_db
+
+    worker_settings.setattr(tasks, "make_engine", make_engine)
+    worker_settings.setattr(tasks, "verify_role", lambda e, role: checked.append((e, role)))
+    worker_settings.setattr("repovox.media.worker.make_media_engine", make_media_engine)
+    worker_settings.setenv("REPOVOX_VIDEO", "true")
+    worker_settings.setenv("REPOVOX_MEDIA_DATABASE_URL", MEDIA_URL)
+
+    assert tasks.media_handoff() == 2
+    # Both existing roles were confirmed before anything was read or written.
+    assert built == [CORE_URL] and checked == [(analysis_db, "rv_app"), (MEDIA_URL, "rvm_app")]
+    attached = media_db.called("mv.attach")
+    assert [item["id"] for item in attached] == [ready[0]]
+    assert json.loads(attached[0]["reference"]) == reference(alex, ready[1], analyses[ready[1]])
+    assert media_db.called("mv.analysis_failed") == [{"id": doomed[0]}]
+    # Each job's analysis was read only inside its own owner's tenant scope.
+    assert analysis_db.scopes() == [str(alex), str(sam), str(sam)]
+    assert media_db.scopes() == [str(alex), str(sam)]
+    # The next pass reuses the checked connections; the still-running analysis keeps waiting.
+    waiting[:] = waiting[2:]
+    assert tasks.media_handoff() == 0 and len(built) == 1
+    assert [len(media_db.called(name)) for name in ("mv.attach", "mv.analysis_failed")] == [1, 1]
+    tasks.close_media_handoff()
+    assert analysis_db.disposed and media_db.disposed
+    assert tasks.media_handoff_service.cache_info().currsize == 0
+
+
+def test_worker_handoff_refuses_a_core_role_other_than_the_api_role(
+    worker_settings: pytest.MonkeyPatch,
+) -> None:
+    analysis_db = Database()
+
+    def verify_role(engine: Any, expected: str) -> None:
+        raise RuntimeError("Unsafe database role")  # e.g. the rv_worker URL
+
+    def make_media_engine(url: str, role: str) -> Database:
+        raise AssertionError("the media database is not opened after a refused core role")
+
+    worker_settings.setattr(tasks, "make_engine", lambda url: analysis_db)
+    worker_settings.setattr(tasks, "verify_role", verify_role)
+    worker_settings.setattr("repovox.media.worker.make_media_engine", make_media_engine)
+    worker_settings.setenv("REPOVOX_VIDEO", "true")
+    worker_settings.setenv("REPOVOX_MEDIA_DATABASE_URL", MEDIA_URL)
+    with pytest.raises(RuntimeError, match="Unsafe database role"):
+        tasks.media_handoff()
+    # Released, not remembered: the dispatcher logs it and the next loop tries afresh.
+    assert analysis_db.disposed and analysis_db.calls == []
+    assert tasks.media_handoff_service.cache_info().currsize == 0
 
 
 def video_app(bucket: Bucket, owner: Any, key: str, size: int) -> tuple[TestClient, MediaJobs]:

@@ -131,7 +131,9 @@ services:
     <<: *api
     environment:
       <<: *environment
-      REPOVOX_DATABASE_URL: postgresql+psycopg://rv_worker:${WORKER_DATABASE_PASSWORD:?Generate .env}@postgres:5432/repovox
+      # The API's existing core role, used only by the media handoff pass for the
+      # owner-scoped reads rv_worker cannot make. Dispatch and reconciliation use rv_worker.
+      REPOVOX_DATABASE_URL: postgresql+psycopg://rv_app:${APP_DATABASE_PASSWORD:?Generate .env}@postgres:5432/repovox
       REPOVOX_WORKER_DATABASE_URL: postgresql+psycopg://rv_worker:${WORKER_DATABASE_PASSWORD:?Generate .env}@postgres:5432/repovox
     command: ['python', '-m', 'repovox.workers.dispatcher']
   media-worker:

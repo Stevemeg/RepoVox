@@ -20,7 +20,8 @@ class Settings(BaseSettings):
     video: bool = False
     media_database_url: SecretStr | None = None
     media_worker_database_url: SecretStr | None = None
-    # Seconds between analysis-to-media handoff passes in the API process; 0 turns it off.
+    # Seconds between analysis-to-media handoff passes in the API process; 0 turns that pass
+    # off. The dispatcher runs the same pass every five seconds regardless.
     media_handoff_seconds: float = Field(default=3, ge=0, le=300)
     # Development and test only: serve locally authored synthetic repositories from this
     # directory instead of acquiring anything from GitHub.

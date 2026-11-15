@@ -318,16 +318,22 @@ def main() -> None:
 def make_media_engine(url: str, expected: str) -> Engine:
     """Connect to the media database and refuse anything that is not it."""
     engine = make_engine(url)
-    with engine.connect() as c:
-        role = c.execute(
-            text("SELECT rolname,rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user")
-        ).one()
-        if role.rolname != expected or role.rolsuper or role.rolbypassrls:
-            raise RuntimeError("Unsafe media database role")
-        if c.scalar(text("SELECT to_regclass('public.generation_jobs')")) is not None:
-            raise RuntimeError("Media role connected to the core database")
-        if c.scalar(text("SELECT version_num FROM alembic_version")) != "m001":
-            raise RuntimeError("Media database migration required")
+    try:
+        with engine.connect() as c:
+            role = c.execute(
+                text(
+                    "SELECT rolname,rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user"
+                )
+            ).one()
+            if role.rolname != expected or role.rolsuper or role.rolbypassrls:
+                raise RuntimeError("Unsafe media database role")
+            if c.scalar(text("SELECT to_regclass('public.generation_jobs')")) is not None:
+                raise RuntimeError("Media role connected to the core database")
+            if c.scalar(text("SELECT version_num FROM alembic_version")) != "m001":
+                raise RuntimeError("Media database migration required")
+    except BaseException:
+        engine.dispose()  # A refused engine keeps no pooled connection; callers may retry.
+        raise
     return engine
 
 

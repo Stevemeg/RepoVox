@@ -37,11 +37,12 @@ idempotent.
 1. `POST /v1/projects/{id}/video-jobs` admits the core analysis job through the existing
    function (idempotent on its key), then admits a media job that records only the
    analysis job id. State `awaiting_analysis`.
-2. A handoff pass in each API process (every `REPOVOX_MEDIA_HANDOFF_SECONDS`, default 3)
-   lists waiting jobs with `mv.awaiting()` and, for each job whose analysis has reached its
-   verified Stage 9 boundary, reads the identity of the Stage 2 archive and Stage 9 result
-   through that job owner's own tenant scope in the core database and calls `mv.attach`.
-   An owner reading the job runs the same idempotent step. The reference is the object
+2. A handoff pass lists waiting jobs with `mv.awaiting()` and, for each job whose analysis
+   has reached its verified Stage 9 boundary, reads the identity of the Stage 2 archive and
+   Stage 9 result through that job owner's own tenant scope in the core database and calls
+   `mv.attach`. It runs in each API process (every `REPOVOX_MEDIA_HANDOFF_SECONDS`, default
+   3) and in the dispatcher's maintenance loop (every five seconds, after reconciliation and
+   dispatch). An owner reading the job runs the same idempotent step. The reference is the object
    identity (owner, snapshot, job, artifact, SHA-256, size). It can be attached once; an
    identical repeat is a no-op and a different reference is refused.
 3. The media worker reads those objects through the accepted hash-verifying reader.
@@ -61,8 +62,19 @@ row lock, accepts one reference, and treats an identical repeat as a no-op. A cr
 the core read and the media write leaves the job waiting for the next pass. One job's
 failure does not stop the pass for others.
 
-Limitation: the pass runs inside the API process. If no API process is running, waiting jobs
-do not advance, and the reconciler ends them `analysis_wait_timeout` at their deadline.
+Progress does not depend on an API process. Analysis stages are only delivered to workers
+through the dispatcher, so in the Compose stack a pass runs wherever analysis can finish. The
+dispatcher's pass
+(`repovox.workers.tasks.media_handoff`) is the API's own `MediaJobs.handoff`; it is active
+only when `REPOVOX_VIDEO` and `REPOVOX_MEDIA_DATABASE_URL` are set, and otherwise connects to
+nothing. It needs the same two existing roles as the API pass: `rvm_app` for the media
+functions, and `rv_app` for the owner-scoped core reads, because `rv_worker` has no table
+reads. Both roles are verified before first use. The dispatcher's `REPOVOX_DATABASE_URL` is
+therefore the `rv_app` URL; stage dispatch and reconciliation still use
+`REPOVOX_WORKER_DATABASE_URL` (`rv_worker`). The analysis worker that handles submitted
+archives holds no `rv_app` credential. If neither an API process nor the dispatcher runs,
+waiting jobs do not advance, and the reconciler ends them `analysis_wait_timeout` at their
+deadline.
 
 ## Lifecycle
 
