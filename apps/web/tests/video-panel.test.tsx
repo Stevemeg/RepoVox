@@ -21,7 +21,7 @@ const succeeded: VideoJob = {
   state: "succeeded",
   repository: "example/demo",
   commit_sha: "a".repeat(40),
-  architecture: "supported",
+  architecture: "published",
   error_code: null,
   created_at: "2026-11-14T00:00:00Z",
   stages: [],
@@ -117,6 +117,27 @@ it("offers no player before a job has succeeded and reports unsupported architec
   expect(await screen.findByText(/evidence was not sufficient/)).toBeVisible();
   expect(screen.getAllByText("Download MP4")).toHaveLength(1);
 });
+
+it.each([
+  ["extraction_failed", /architecture extraction failed/],
+  ["rendering_failed", /rendering it failed/],
+  ["not_completed", /did not complete/],
+])(
+  "reports architecture outcome %s without implying an explainer was published",
+  async (architecture, message) => {
+    const job = {
+      ...succeeded,
+      architecture,
+      videos: succeeded.videos.slice(0, 1),
+    };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(respond([job])));
+    render(<VideoJobs projectId={project} />);
+    const note = await screen.findByText(message);
+    expect(note).toHaveAttribute("data-architecture", architecture);
+    expect(screen.queryByText(/explainers were generated/)).toBeNull();
+    expect(screen.getAllByText("Download MP4")).toHaveLength(1);
+  },
+);
 
 it("submits a video job only after acknowledgement, with an idempotency key", async () => {
   const fetch = vi

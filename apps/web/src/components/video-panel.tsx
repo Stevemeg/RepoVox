@@ -40,15 +40,24 @@ export function videoRoutes(jobId: string, videoId: string) {
   };
 }
 
-const architectureNote = (job: VideoJob): string => {
-  if (job.architecture === "supported")
-    return "Architecture explainers were generated from verified source relationships.";
-  if (job.architecture === "unsupported")
-    return "No architecture explainer: the source evidence was not sufficient to establish one.";
-  if (job.architecture === "failed")
-    return "The architecture explainer could not be completed. The walkthrough is unaffected.";
-  return "";
+// The architecture outcome is reported separately from the walkthrough. A published
+// walkthrough never implies that an architecture explainer was produced.
+const architectureNotes: Record<string, string> = {
+  published:
+    "Architecture explainers were generated from verified source relationships.",
+  unsupported:
+    "No architecture explainer: the source evidence was not sufficient to establish one.",
+  extraction_failed:
+    "No architecture explainer: architecture extraction failed. The walkthrough is unaffected.",
+  rendering_failed:
+    "No architecture explainer: an architecture was found but rendering it failed. The walkthrough is unaffected.",
+  not_completed:
+    "No architecture explainer: the architecture stage did not complete. The walkthrough is unaffected.",
 };
+
+const architectureNote = (job: VideoJob): string =>
+  (job.architecture && architectureNotes[job.architecture]) ||
+  "Architecture outcome was not recorded.";
 
 export function VideoPlayer({ jobId, video }: { jobId: string; video: Video }) {
   const [failed, setFailed] = useState(false);
@@ -117,7 +126,7 @@ export function VideoJobs({ projectId }: { projectId: string }) {
   }, [load]);
   useEffect(() => {
     if (!active) return;
-    // Reading a job is also what lets a waiting job pick up its finished analysis.
+    // Display refresh only. Jobs advance on the server whether or not this page is open.
     const timer = setInterval(() => void load(), 3000);
     return () => clearInterval(timer);
   }, [active, load]);
@@ -208,7 +217,11 @@ export function VideoJobs({ projectId }: { projectId: string }) {
           {job.error_code && (
             <p className="notice">Status code: {job.error_code}</p>
           )}
-          {job.state === "succeeded" && <p>{architectureNote(job)}</p>}
+          {job.state === "succeeded" && (
+            <p data-architecture={job.architecture ?? "unknown"}>
+              {architectureNote(job)}
+            </p>
+          )}
           {job.videos.map((video) => (
             <VideoPlayer key={video.id} jobId={job.id} video={video} />
           ))}
