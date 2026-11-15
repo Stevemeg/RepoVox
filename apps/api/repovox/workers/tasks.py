@@ -1,5 +1,7 @@
 import os
 from functools import lru_cache
+from pathlib import Path
+from typing import cast
 from uuid import UUID
 
 from celery import Celery
@@ -9,6 +11,7 @@ from repovox.analysis.transport import GitHubHTTP
 from repovox.core.config import Settings
 from repovox.db.database import make_engine, verify_role
 from repovox.storage import S3Storage
+from repovox.synthetic_source import SyntheticSource
 from repovox.workers.runtime import Orchestrator
 
 celery = Celery("repovox", broker=os.environ.get("REPOVOX_REDIS_URL", "redis://redis:6379/0"))
@@ -38,7 +41,13 @@ def runtime() -> Orchestrator:
     verify_role(engine, "rv_worker")
     storage = S3Storage(settings)
     token = settings.github_token.get_secret_value() if settings.github_token else None
-    analysis = AnalysisRunner(engine, storage, GitHubHTTP(token)) if settings.analysis else None
+    # Development and test only: a locally authored synthetic source instead of GitHub.
+    source = (
+        cast(GitHubHTTP, SyntheticSource(Path(settings.synthetic_source_dir)))
+        if settings.synthetic_source_dir
+        else GitHubHTTP(token)
+    )
+    analysis = AnalysisRunner(engine, storage, source) if settings.analysis else None
     return Orchestrator(engine, storage, analysis)
 
 

@@ -26,7 +26,7 @@ from repovox.core.config import Settings
 from repovox.core.errors import DomainError
 from repovox.db.database import make_engine, rows
 from repovox.media import stages
-from repovox.media.architecture import check
+from repovox.media.architecture import Report, check
 from repovox.media.explainer import render_architecture
 from repovox.media.narration import Engine as SpeechEngine
 from repovox.media.narration import detect
@@ -39,6 +39,17 @@ TRANSIENT = {"object_unavailable", "dependency_unavailable"}
 
 class Lost(Exception):
     """The lease is gone: stop without committing or reporting anything."""
+
+
+class ArchitecturePhase(Exception):
+    """Which part of the architecture stage failed, so the outcome can say so honestly."""
+
+    def __init__(self, phase: str, cause: BaseException) -> None:
+        found = getattr(cause, "code", None)
+        detail = found if isinstance(found, str) else "failure"
+        self.code = f"{phase}__{detail}"[:64]
+        self.transient = not isinstance(found, str) or found in TRANSIENT
+        super().__init__(self.code)
 
 
 class MediaWorker:
@@ -133,7 +144,7 @@ class MediaWorker:
         except Exception as error:
             self.discard(uploaded)
             code = getattr(error, "code", None)
-            transient = not isinstance(code, str) or code in TRANSIENT
+            transient = getattr(error, "transient", not isinstance(code, str) or code in TRANSIENT)
             logger.warning(
                 json.dumps({"event": "media_stage_failed", "code": code or "media_failure"})
             )
@@ -213,14 +224,38 @@ class MediaWorker:
         speech: SpeechEngine,
     ) -> tuple[bytes, dict[str, Any]]:
         reference = scope["analysis"]
-        payload = self.payload(reference)
-        archive = scratch / "source.tar.gz"
-        archive.write_bytes(self.storage.analysis(reference, "archive"))
-        root = scratch / "source"
-        extract(archive, root, checkpoint=checkpoint)
-        report = discover_isolated(root, payload, checkpoint)
-        # The subprocess result is untrusted: re-check every citation against the source bytes.
-        check(report, payload, sources_from(root, payload))
+        try:
+            payload = self.payload(reference)
+            archive = scratch / "source.tar.gz"
+            archive.write_bytes(self.storage.analysis(reference, "archive"))
+            root = scratch / "source"
+            extract(archive, root, checkpoint=checkpoint)
+            report = discover_isolated(root, payload, checkpoint)
+            # The subprocess result is untrusted: re-check every citation against the
+            # source bytes.
+            check(report, payload, sources_from(root, payload))
+        except Lost:
+            raise
+        except Exception as error:
+            raise ArchitecturePhase("extraction", error) from None
+        try:
+            videos = self.explainers(scope, report, scratch, checkpoint, uploaded, speech)
+        except Lost:
+            raise
+        except Exception as error:
+            raise ArchitecturePhase("rendering", error) from None
+        summary = {"architecture": report.explanation, "videos": videos}
+        return stages.encoded(report.model_dump(mode="json")), summary
+
+    def explainers(
+        self,
+        scope: dict[str, Any],
+        report: Report,
+        scratch: Path,
+        checkpoint: stages.Checkpoint,
+        uploaded: list[str],
+        speech: SpeechEngine,
+    ) -> list[dict[str, Any]]:
         videos: list[dict[str, Any]] = []
         for architecture in report.architectures[:3]:
             checkpoint()
@@ -255,8 +290,7 @@ class MediaWorker:
                     },
                 }
             )
-        summary = {"architecture": report.explanation, "videos": videos}
-        return stages.encoded(report.model_dump(mode="json")), summary
+        return videos
 
 
 def main() -> None:

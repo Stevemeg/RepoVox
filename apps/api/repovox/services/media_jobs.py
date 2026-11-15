@@ -38,6 +38,10 @@ class MediaJobs:
             self._storage = MediaStorage(self.settings)
         return self._storage
 
+    def _waiting(self) -> list[dict[str, Any]]:
+        with self.engine.begin() as c:
+            return rows(c, "SELECT * FROM mv.awaiting()")
+
     def admit(self, owner: UUID, project: UUID, key: str) -> dict[str, Any]:
         if not key or len(key) > 120 or not key.isascii() or not key.isprintable() or " " in key:
             raise DomainError("invalid_idempotency_key", 422)
@@ -180,8 +184,33 @@ class MediaJobs:
             c.execute(text("SELECT mv.cancel(:id)"), {"id": job})
         return self.get(owner, job)
 
-    def video(self, owner: UUID, job: UUID, video: UUID) -> tuple[bytes, dict[str, Any]]:
-        """Bytes of one published video. Only committed, validated, unexpired, owned videos."""
+    def handoff(self) -> int:
+        """Advance every waiting job whose analysis has settled, without any user request.
+
+        Lists waiting jobs from the media database, then for each one reads the analysis
+        outputs through that job's own owner scope in the core database and attaches the
+        reference. Every step is idempotent, so several API processes may run this, and a
+        crash between steps is repaired by the next pass. One job's failure does not stop
+        the others.
+        """
+        advanced = 0
+        for item in self._waiting():
+            job = {
+                "id": item["o_job"],
+                "state": "awaiting_analysis",
+                "analysis_job_id": item["o_analysis"],
+            }
+            try:
+                advanced += self.sync(item["o_owner"], job)
+            except Exception:
+                continue  # Left waiting; retried on the next pass or ended at its deadline.
+        return advanced
+
+    def video(self, owner: UUID, job: UUID, video: UUID) -> dict[str, Any]:
+        """One published video's record, after confirming its stored bytes are intact.
+
+        Only committed, validated, unexpired, owned videos of a succeeded job.
+        """
         with tenant(self.engine, owner) as c:
             found = rows(
                 c,
@@ -196,7 +225,7 @@ class MediaJobs:
         if not found:
             raise DomainError("not_found", 404)
         row = found[0]
-        body = self.storage.read(owner, row["object_key"])
-        if len(body) != row["byte_count"] or not row["object_key"].endswith(row["checksum"]):
+        if not row["object_key"].endswith("/" + row["checksum"]):
             raise DomainError("object_corrupt", 503)
-        return body, row
+        self.storage.verify(owner, row["object_key"], row["byte_count"])
+        return row

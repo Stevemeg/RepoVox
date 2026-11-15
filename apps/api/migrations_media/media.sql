@@ -19,7 +19,11 @@ CREATE TABLE media_jobs (
  'cancelled','failed','succeeded')),
  version integer NOT NULL DEFAULT 1, analysis jsonb, repository text,
  commit_sha text CHECK(commit_sha ~ '^[a-f0-9]{40}$'),
- architecture text CHECK(architecture IN ('supported','unsupported','failed')),
+ -- Outcome of the architecture stage, kept separate from the walkthrough's success:
+ -- published | unsupported (evidence insufficient) | extraction_failed | rendering_failed |
+ -- not_completed (the stage ended for any other reason, such as its attempts being used up).
+ architecture text CHECK(architecture IN ('published','unsupported','extraction_failed',
+ 'rendering_failed','not_completed')),
  error_code text, created_at timestamptz NOT NULL DEFAULT now(), deadline timestamptz NOT NULL,
  finished_at timestamptz, UNIQUE(owner_id,idempotency_key), UNIQUE(owner_id,id)
 );
@@ -343,7 +347,8 @@ BEGIN
     (v->>'bytes')::bigint,v->>'captions',v->'metadata',j.created_at+interval '24 hours');
   END LOOP;
   IF (arch='supported')<>(n>0) THEN RAISE EXCEPTION 'invalid_summary'; END IF;
-  UPDATE media_jobs SET architecture=arch WHERE id=j.id;
+  UPDATE media_jobs SET architecture=CASE WHEN arch='supported' THEN 'published' ELSE 'unsupported' END
+   WHERE id=j.id;
   PERFORM mv.end_job(j.id,'succeeded',NULL);
  ELSE
   UPDATE media_stages SET state='ready' WHERE job_id=j.id AND ordinal=s.ordinal+1;
@@ -352,14 +357,15 @@ BEGIN
 END $$;
 
 -- The walkthrough is the product; the architecture stage is additional. If it cannot finish,
--- the job still succeeds with architecture='failed' and the reason kept on the stage.
-CREATE FUNCTION mv.architecture_failed(p_job uuid, p_stage uuid, p_code text) RETURNS void
- LANGUAGE plpgsql AS $$
+-- the job still succeeds, but its architecture outcome says exactly what did not happen and
+-- the cause stays on the stage. It is never recorded as published or as unsupported.
+CREATE FUNCTION mv.architecture_failed(p_job uuid, p_stage uuid, p_code text, p_outcome text)
+ RETURNS void LANGUAGE plpgsql AS $$
 BEGIN
  UPDATE media_stages SET state='failed',fence=fence+1,lease_expires_at=NULL,error_code=p_code WHERE id=p_stage;
  UPDATE media_attempts SET outcome='failed',error_code=p_code,ended_at=clock_timestamp()
   WHERE stage_id=p_stage AND outcome='running';
- UPDATE media_jobs SET architecture='failed' WHERE id=p_job;
+ UPDATE media_jobs SET architecture=p_outcome WHERE id=p_job;
  PERFORM mv.end_job(p_job,'succeeded',NULL);
 END $$;
 
@@ -380,7 +386,9 @@ BEGIN
    next_attempt_at=clock_timestamp()+least(120,5*power(2,s.attempt_count-1))*interval '1 second'
    WHERE id=p_stage;
   UPDATE media_jobs SET state='retry_wait' WHERE id=j.id;
- ELSIF s.ordinal=15 THEN PERFORM mv.architecture_failed(j.id,s.id,code);
+ ELSIF s.ordinal=15 THEN PERFORM mv.architecture_failed(j.id,s.id,code,
+  CASE WHEN left(code,11)='rendering__' THEN 'rendering_failed'
+   WHEN left(code,12)='extraction__' THEN 'extraction_failed' ELSE 'not_completed' END);
  ELSE PERFORM mv.end_job(j.id,'failed',code); END IF;
  RETURN true;
 END $$;
@@ -403,7 +411,7 @@ BEGIN
     UPDATE media_attempts SET outcome='lease_expired',error_code='lease_expired',ended_at=clock_timestamp()
      WHERE stage_id=s.id AND outcome='running';
     IF s.attempt_count>=s.max_attempts THEN
-     IF s.ordinal=15 THEN PERFORM mv.architecture_failed(j.id,s.id,'attempt_limit');
+     IF s.ordinal=15 THEN PERFORM mv.architecture_failed(j.id,s.id,'attempt_limit','not_completed');
      ELSE PERFORM mv.end_job(j.id,'failed','attempt_limit'); END IF;
     ELSE
      UPDATE media_stages SET state='retry_wait',fence=fence+1,lease_expires_at=NULL,error_code='lease_expired',
@@ -420,6 +428,13 @@ BEGIN
  END LOOP;
  RETURN n;
 END $$;
+
+-- Jobs waiting for their analysis, for the handoff process. It returns identities only; the
+-- analysis outputs are still read through each owner's own tenant scope in the core database.
+CREATE FUNCTION mv.awaiting() RETURNS TABLE(o_job uuid,o_owner uuid,o_analysis uuid)
+ LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog,public,mv AS $$
+ SELECT j.id,j.owner_id,j.analysis_job_id FROM media_jobs j
+ WHERE j.state='awaiting_analysis' AND j.deadline>clock_timestamp() ORDER BY j.created_at LIMIT 100 $$;
 
 CREATE FUNCTION mv.expired() RETURNS TABLE(o_owner uuid,o_job uuid)
  LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog,public,mv AS $$
@@ -440,7 +455,7 @@ SET LOCAL ROLE rvm_executor;
 REVOKE ALL ON ALL FUNCTIONS IN SCHEMA mv FROM PUBLIC,rvm_app,rvm_worker;
 GRANT EXECUTE ON FUNCTION mv.owner() TO rvm_app;
 GRANT EXECUTE ON FUNCTION mv.admit(uuid,uuid,text,text),mv.attach(uuid,jsonb),
- mv.analysis_failed(uuid),mv.cancel(uuid) TO rvm_app;
+ mv.analysis_failed(uuid),mv.cancel(uuid),mv.awaiting() TO rvm_app;
 GRANT EXECUTE ON FUNCTION mv.claim(text),mv.scope(uuid,bigint),mv.heartbeat(uuid,bigint),
  mv.finish(uuid,bigint,uuid,text,text,bigint,jsonb),mv.fail(uuid,bigint,text,boolean),
  mv.reconcile(),mv.expired(),mv.mark_deleted(uuid) TO rvm_worker;

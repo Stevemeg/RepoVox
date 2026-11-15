@@ -3,6 +3,7 @@ from typing import Annotated, Any, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Request, Response, Security
+from fastapi.responses import StreamingResponse
 from fastapi.security import APIKeyCookie
 
 from repovox.auth.session import Identity, digest
@@ -254,26 +255,37 @@ def byte_range(header: str | None, size: int) -> tuple[int, int] | None:
 
 @router.get("/video-jobs/{job_id}/videos/{video_id}")
 def video(job_id: UUID, video_id: UUID, request: Request, identity: ReadIdentity) -> Response:
-    body, _ = media(request).video(identity.owner_id, job_id, video_id)
-    headers = {"accept-ranges": "bytes"}
-    wanted = byte_range(request.headers.get("range"), len(body))
-    if wanted is None:
-        return Response(body, media_type="video/mp4", headers=headers)
-    start, end = wanted
-    headers["content-range"] = f"bytes {start}-{end}/{len(body)}"
-    return Response(body[start : end + 1], 206, headers, "video/mp4")
+    service = media(request)
+    row = service.video(identity.owner_id, job_id, video_id)
+    size = int(row["byte_count"])
+    wanted = byte_range(request.headers.get("range"), size)
+    start, end = wanted or (0, size - 1)
+    headers = {"accept-ranges": "bytes", "content-length": str(end - start + 1)}
+    if wanted is not None:
+        headers["content-range"] = f"bytes {start}-{end}/{size}"
+    return StreamingResponse(
+        service.storage.stream(row["object_key"], start, end),
+        status_code=206 if wanted is not None else 200,
+        media_type="video/mp4",
+        headers=headers,
+    )
 
 
 @router.get("/video-jobs/{job_id}/videos/{video_id}/download")
 def download_video(
     job_id: UUID, video_id: UUID, request: Request, identity: ReadIdentity
 ) -> Response:
-    body, row = media(request).video(identity.owner_id, job_id, video_id)
+    service = media(request)
+    row = service.video(identity.owner_id, job_id, video_id)
+    size = int(row["byte_count"])
     name = f"repovox-{row['category']}-{video_id}.mp4"
-    return Response(
-        body,
+    return StreamingResponse(
+        service.storage.stream(row["object_key"], 0, size - 1),
         media_type="video/mp4",
-        headers={"content-disposition": f'attachment; filename="{name}"'},
+        headers={
+            "content-disposition": f'attachment; filename="{name}"',
+            "content-length": str(size),
+        },
     )
 
 
@@ -281,5 +293,5 @@ def download_video(
 def video_captions(
     job_id: UUID, video_id: UUID, request: Request, identity: ReadIdentity
 ) -> Response:
-    _, row = media(request).video(identity.owner_id, job_id, video_id)
+    row = media(request).video(identity.owner_id, job_id, video_id)
     return Response(row["captions"], media_type="text/vtt; charset=utf-8")

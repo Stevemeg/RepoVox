@@ -1,10 +1,12 @@
 import json
 import logging
 import re
+import threading
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -16,6 +18,7 @@ from sqlalchemy.exc import DBAPIError
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
+from repovox.analysis.github import HTTP
 from repovox.analysis.transport import GitHubHTTP
 from repovox.api.routes import router
 from repovox.auth.session import DevelopmentSessions
@@ -26,6 +29,7 @@ from repovox.db.database import make_engine, verify_role
 from repovox.services.jobs import Jobs
 from repovox.services.media_jobs import MediaJobs
 from repovox.services.projects import Projects
+from repovox.synthetic_source import SyntheticSource
 
 logger = logging.getLogger("repovox")
 if not logger.handlers:
@@ -56,7 +60,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         verify_role(engine, "rv_app")
+        stop = threading.Event()
+        handoff = app.state.media
+        if handoff is not None and config.media_handoff_seconds > 0:
+            # Moves waiting video jobs forward on its own, so progress never depends on a
+            # browser being open. State lives in the databases; this loop holds none.
+            def run() -> None:
+                while not stop.wait(config.media_handoff_seconds):
+                    try:
+                        handoff.handoff()
+                    except Exception:
+                        logger.warning('{"event":"media_handoff_dependency_unavailable"}')
+
+            threading.Thread(target=run, name="media-handoff", daemon=True).start()
         yield
+        stop.set()
         engine.dispose()
         if media_engine is not None:
             media_engine.dispose()
@@ -67,7 +85,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.sessions = DevelopmentSessions(engine, config)
     app.state.projects = Projects(engine)
     token = config.github_token.get_secret_value() if config.github_token else None
-    app.state.jobs = Jobs(engine, config.fixtures, config.analysis, GitHubHTTP(token))
+    source: HTTP = (
+        SyntheticSource(Path(config.synthetic_source_dir))
+        if config.synthetic_source_dir
+        else GitHubHTTP(token)
+    )
+    app.state.jobs = Jobs(engine, config.fixtures, config.analysis, source)
     # Video generation uses a separate media database; without it the feature is off.
     media_engine = (
         make_engine(config.media_database_url.get_secret_value())

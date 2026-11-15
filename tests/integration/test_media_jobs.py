@@ -252,7 +252,7 @@ def test_submission_to_playback_publishes_both_video_categories(
             assert current["videos"] == []  # Nothing is offered before the job succeeds.
     done = status(a, job)
     assert done["state"] == "succeeded", done
-    assert done["architecture"] == "supported" and done["error_code"] is None
+    assert done["architecture"] == "published" and done["error_code"] is None
     assert all(s["state"] == "succeeded" for s in done["stages"])
     categories = [v["category"] for v in done["videos"]]
     assert categories.count("walkthrough") == 1 and categories.count("architecture") >= 1
@@ -521,3 +521,294 @@ def test_idempotency_quota_and_role_boundaries(
         assert c.scalar(text("SELECT state FROM media_jobs WHERE id=:id"), {"id": job["id"]}) == (
             "awaiting_analysis"
         )
+
+
+def media_state(media_admin: Engine, job: dict[str, Any]) -> tuple[Any, ...]:
+    """Job state read straight from the media database, without touching the video API."""
+    with media_admin.connect() as c:
+        found = c.execute(
+            text("SELECT state,architecture,error_code FROM media_jobs WHERE id=:id"),
+            {"id": job["id"]},
+        ).one()
+    return tuple(found)
+
+
+def test_handoff_advances_waiting_jobs_without_any_owner_request(
+    clients: tuple[TestClient, TestClient],
+    orchestrator: Orchestrator,
+    worker: MediaWorker,
+    media_admin: Engine,
+    admin: Engine,
+) -> None:
+    a, b = clients
+    service = a.app.state.media
+    ready = submit(a, orchestrator, "handoff-ready")
+    doomed = submit(b, orchestrator, "handoff-doomed")
+    waiting = submit(b, orchestrator, "handoff-waiting")
+    assert service.handoff() == 0  # No analysis has settled yet: nothing moves.
+    analyse(a, orchestrator, ready)
+    assert b.post(f"/v1/jobs/{doomed['analysis_job_id']}/cancel").status_code == 200
+    # From here on nobody reads a video job. The owner's browser may be closed.
+    service.handoff()
+    assert media_state(media_admin, ready)[0] == "queued"
+    assert media_state(media_admin, doomed) == ("failed", None, "analysis_failed")
+    assert media_state(media_admin, waiting)[0] == "awaiting_analysis"
+    with media_admin.connect() as c:
+        attached = c.execute(
+            text("SELECT analysis,commit_sha,version FROM media_jobs WHERE id=:id"),
+            {"id": ready["id"]},
+        ).one()
+    assert attached.analysis["analysis_job_id"] == ready["analysis_job_id"]
+    assert attached.analysis["owner_id"] == str(A) and attached.commit_sha == "a" * 40
+    # Repeating the pass is harmless: one immutable reference, no further transition.
+    assert service.handoff() == 0
+    with media_admin.connect() as c:
+        again = c.execute(
+            text("SELECT analysis,version FROM media_jobs WHERE id=:id"), {"id": ready["id"]}
+        ).one()
+    assert (again.analysis, again.version) == (attached.analysis, attached.version)
+    # The worker then proceeds on its own, still with no owner request.
+    assert worker.run_once()
+    with media_admin.connect() as c:
+        first = c.execute(
+            text("SELECT state FROM media_stages WHERE job_id=:id AND ordinal=10"),
+            {"id": ready["id"]},
+        ).scalar_one()
+    assert first == "succeeded"
+    # The pass lists identities only and the core database is still untouched by media.
+    with tenant(a.app.state.media_engine, B) as c:
+        listed = {str(row[0]) for row in c.execute(text("SELECT o_job FROM mv.awaiting()"))}
+    assert listed == {waiting["id"]}
+    with pytest.raises(DBAPIError, match="permission denied"):
+        with worker.engine.begin() as c:
+            c.execute(text("SELECT * FROM mv.awaiting()"))
+    with admin.connect() as c:
+        assert c.scalar(text("SELECT version_num FROM alembic_version")) == "0004"
+        assert c.scalar(text("SELECT to_regnamespace('mv')")) is None
+
+
+def test_handoff_runs_in_the_background_of_the_api_process(
+    settings: Settings,
+    clients: tuple[TestClient, TestClient],
+    orchestrator: Orchestrator,
+    media_admin: Engine,
+) -> None:
+    import time
+
+    a, _ = clients
+    job = submit(a, orchestrator, "background-handoff")
+    analyse(a, orchestrator, job)
+    assert media_state(media_admin, job)[0] in {"awaiting_analysis", "queued"}
+    # A second API process with a short interval: no request is ever made to it.
+    from repovox.main import create_app
+
+    with TestClient(create_app(settings.model_copy(update={"media_handoff_seconds": 0.2}))):
+        deadline = time.monotonic() + 20
+        while media_state(media_admin, job)[0] != "queued" and time.monotonic() < deadline:
+            time.sleep(0.1)
+    assert media_state(media_admin, job)[0] == "queued"
+
+
+def direct_job(engine: Engine, owner: UUID, key: str) -> UUID:
+    """A media job with a well-formed reference, created through the tenant functions only."""
+    analysis = uuid4()
+    reference = {
+        "owner_id": str(owner),
+        "analysis_job_id": str(analysis),
+        "snapshot_id": str(uuid4()),
+        "commit_sha": "b" * 40,
+        "repository": "https://github.com/synthetic/outcomes",
+        "archive": {"artifact": str(uuid4()), "checksum": "c" * 64, "bytes": 10},
+        "verify": {"artifact": str(uuid4()), "checksum": "d" * 64, "bytes": 10},
+    }
+    with tenant(engine, owner) as c:
+        job = c.scalar(
+            text("SELECT mv.admit(:p,:a,:k,repeat('a',64))"),
+            {"p": uuid4(), "a": analysis, "k": key},
+        )
+        assert c.scalar(
+            text("SELECT mv.attach(:id,CAST(:r AS jsonb))"), {"id": job, "r": json.dumps(reference)}
+        )
+    return UUID(str(job))
+
+
+def finish_stage(
+    worker: MediaWorker, lease: dict[str, Any], summary: dict[str, Any], owner: UUID = A
+) -> Any:
+    body = f"{lease['o_job']}-{lease['o_ordinal']}-{lease['o_fence']}".encode()
+    checksum, artifact = hashlib.sha256(body).hexdigest(), uuid4()
+    key = media_key(owner, lease["o_job"], lease["o_ordinal"], artifact, checksum)
+    with worker.engine.begin() as c:
+        return c.scalar(
+            text("SELECT mv.finish(:s,:f,:a,:c,:k,:n,CAST(:summary AS jsonb))"),
+            {
+                "s": lease["o_stage"],
+                "f": lease["o_fence"],
+                "a": artifact,
+                "c": checksum,
+                "k": key,
+                "n": len(body),
+                "summary": json.dumps(summary),
+            },
+        )
+
+
+def to_architecture_stage(worker: MediaWorker, engine: Engine, key: str) -> dict[str, Any]:
+    """Publish a walkthrough record and return the claimed architecture stage."""
+    job = direct_job(engine, A, key)
+    walkthrough = {"video": {"video_frames": 30, "full_decode": "passed", "captions": "WEBVTT"}}
+    for ordinal in range(10, 15):
+        lease = worker.claim()
+        assert lease is not None and (lease["o_job"], lease["o_ordinal"]) == (job, ordinal)
+        assert finish_stage(worker, lease, walkthrough if ordinal == 14 else {})
+    lease = worker.claim()
+    assert lease is not None and lease["o_ordinal"] == 15
+    return lease
+
+
+def fail_stage(worker: MediaWorker, lease: dict[str, Any], code: str, transient: bool) -> Any:
+    with worker.engine.begin() as c:
+        return c.scalar(
+            text("SELECT mv.fail(:s,:f,:c,:t)"),
+            {"s": lease["o_stage"], "f": lease["o_fence"], "c": code, "t": transient},
+        )
+
+
+@pytest.mark.parametrize(
+    ("code", "outcome"),
+    [
+        ("extraction__parser_isolation_unavailable", "extraction_failed"),
+        ("rendering__encode_failed", "rendering_failed"),
+        ("object_corrupt", "not_completed"),
+    ],
+)
+def test_architecture_failure_is_reported_apart_from_the_published_walkthrough(
+    clients: tuple[TestClient, TestClient],
+    worker: MediaWorker,
+    media_admin: Engine,
+    code: str,
+    outcome: str,
+) -> None:
+    a, b = clients
+    lease = to_architecture_stage(worker, a.app.state.media_engine, f"outcome-{outcome}")
+    with media_admin.connect() as c:
+        before = c.execute(
+            text("SELECT state,architecture FROM media_jobs WHERE id=:id"), {"id": lease["o_job"]}
+        ).one()
+    assert tuple(before) == ("running", None)  # A walkthrough alone decides nothing yet.
+    assert fail_stage(worker, lease, code, False)
+    view = status(a, {"id": str(lease["o_job"])})
+    assert (view["state"], view["architecture"], view["error_code"]) == ("succeeded", outcome, None)
+    assert [v["category"] for v in view["videos"]] == ["walkthrough"]
+    assert view["stages"][-1]["state"] == "failed" and view["stages"][-1]["error_code"] == code
+    assert all(s["state"] == "succeeded" for s in view["stages"][:-1])
+    assert b.get(f"/v1/video-jobs/{lease['o_job']}").status_code == 404
+    # The outcome is final: it cannot later be turned into a published explainer.
+    assert finish_stage(worker, lease, {"architecture": "supported", "videos": []}) is False
+    with pytest.raises(DBAPIError, match="terminal_immutable"):
+        with media_admin.begin() as c:
+            c.execute(
+                text("UPDATE media_jobs SET architecture='published' WHERE id=:id"),
+                {"id": lease["o_job"]},
+            )
+
+
+def test_unsupported_published_and_abandoned_architecture_outcomes(
+    clients: tuple[TestClient, TestClient], worker: MediaWorker, media_admin: Engine
+) -> None:
+    a, _ = clients
+    engine = a.app.state.media_engine
+    # Evidence was insufficient: an explicit result with no video.
+    lease = to_architecture_stage(worker, engine, "outcome-unsupported")
+    for claim in ("supported", "published", "failed"):
+        with pytest.raises(DBAPIError, match="invalid_summary"):
+            finish_stage(worker, lease, {"architecture": claim, "videos": []})
+    video = {"artifact": str(uuid4()), "checksum": "e" * 64, "bytes": 9, "title": "t"}
+    with pytest.raises(DBAPIError, match="invalid_summary"):
+        finish_stage(worker, lease, {"architecture": "unsupported", "videos": [video]})
+    assert finish_stage(worker, lease, {"architecture": "unsupported", "videos": []})
+    view = status(a, {"id": str(lease["o_job"])})
+    assert (view["state"], view["architecture"]) == ("succeeded", "unsupported")
+    assert [v["category"] for v in view["videos"]] == ["walkthrough"]
+
+    # A transient failure waits and decides nothing; the abandoned stage is then recorded.
+    lease = to_architecture_stage(worker, engine, "outcome-abandoned")
+    job = {"id": str(lease["o_job"])}
+    assert fail_stage(worker, lease, "rendering__object_unavailable", True)
+    assert media_state(media_admin, job) == ("retry_wait", None, None)
+    assert status(a, job)["videos"] == []
+    make_due(media_admin, job)
+    worker.reconcile()
+    second = worker.claim()
+    assert second is not None and second["o_attempt"] == 2
+    expire_lease(media_admin, job)
+    worker.reconcile()
+    view = status(a, job)
+    assert (view["state"], view["architecture"]) == ("succeeded", "not_completed")
+    assert view["stages"][-1]["error_code"] == "attempt_limit"
+    assert [v["category"] for v in view["videos"]] == ["walkthrough"]
+
+
+def test_retrieval_streams_and_refuses_changed_or_missing_objects(
+    clients: tuple[TestClient, TestClient], worker: MediaWorker, settings: Settings
+) -> None:
+    a, b = clients
+    storage = MediaStorage(settings)
+    job = direct_job(a.app.state.media_engine, A, "streaming")
+    body = bytes(range(256)) * 1024  # 256 KiB: several chunks.
+    checksum = hashlib.sha256(body).hexdigest()
+    video: dict[str, Any] = {}
+    for ordinal in range(10, 15):
+        lease = worker.claim()
+        assert lease is not None and lease["o_job"] == job
+        if ordinal < 14:
+            assert finish_stage(worker, lease, {})
+            continue
+        artifact = uuid4()
+        key = media_key(A, job, 14, artifact, checksum)
+        storage.write(key, body, "video/mp4")
+        summary = {"video": {"video_frames": 30, "full_decode": "passed", "captions": "WEBVTT"}}
+        with worker.engine.begin() as c:
+            assert c.scalar(
+                text("SELECT mv.finish(:s,:f,:a,:c,:k,:n,CAST(:summary AS jsonb))"),
+                {
+                    "s": lease["o_stage"],
+                    "f": lease["o_fence"],
+                    "a": artifact,
+                    "c": checksum,
+                    "k": key,
+                    "n": len(body),
+                    "summary": json.dumps(summary),
+                },
+            )
+        video = {"id": str(artifact), "key": key}
+    lease = worker.claim()
+    assert lease is not None
+    assert finish_stage(worker, lease, {"architecture": "unsupported", "videos": []})
+    base = f"/v1/video-jobs/{job}/videos/{video['id']}"
+
+    chunks = list(storage.stream(video["key"], 0, len(body) - 1))
+    assert b"".join(chunks) == body and len(chunks) >= 4
+    assert max(len(chunk) for chunk in chunks) <= 64 * 1024
+    with a.stream("GET", base) as response:
+        assert response.status_code == 200
+        assert response.headers["content-length"] == str(len(body))
+        received = b"".join(response.iter_bytes())
+    assert received == body
+    middle = a.get(base, headers={"range": "bytes=70000-200000"})
+    assert middle.status_code == 206 and middle.content == body[70000:200001]
+    assert middle.headers["content-range"] == f"bytes 70000-200000/{len(body)}"
+    tail = a.get(base, headers={"range": "bytes=262000-"})
+    assert tail.status_code == 206 and tail.content == body[262000:]
+    assert b.get(base).status_code == 404
+    # Integrity was confirmed once, by streaming, and remembered for this stored version.
+    assert video["key"] in a.app.state.media.storage.verified
+
+    # Same length, different bytes: the stored object no longer matches its record.
+    storage.client.delete_object(Bucket=storage.bucket, Key=video["key"])
+    storage.client.put_object(Bucket=storage.bucket, Key=video["key"], Body=bytes(len(body)))
+    for route in (base, f"{base}/download", f"{base}/captions"):
+        refused = a.get(route)
+        assert refused.status_code == 503 and refused.json()["error"]["code"] == "object_corrupt"
+    storage.client.delete_object(Bucket=storage.bucket, Key=video["key"])
+    assert a.get(base).status_code == 503
