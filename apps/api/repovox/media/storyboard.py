@@ -8,7 +8,7 @@ import re
 from collections import Counter
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field
 
 from repovox.analysis.common import canonical, digest
 from repovox.analysis.contracts import PAYLOADS
@@ -469,7 +469,7 @@ def summary_scene(index: Index, knowledge: dict[str, Any], verification: dict[st
 
 def build(payload: dict[str, Any]) -> Storyboard:
     try:
-        TypeAdapter(PAYLOADS["verify"]).validate_python(payload)
+        PAYLOADS["verify"].model_validate(payload)
     except ValueError:
         raise GroundingError("invalid_analysis_payload") from None
     knowledge, verification = payload["knowledge"], payload["verification"]

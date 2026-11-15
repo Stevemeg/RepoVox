@@ -9,7 +9,7 @@ import re
 from typing import Any, Literal
 from urllib.parse import quote as urlquote
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field
 
 from repovox.analysis.common import canonical, digest
 from repovox.analysis.contracts import PAYLOADS
@@ -186,7 +186,7 @@ class Context:
         self, payload: dict[str, Any], sources: dict[str, bytes], parse: bool = True
     ) -> None:
         try:
-            TypeAdapter(PAYLOADS["verify"]).validate_python(payload)
+            PAYLOADS["verify"].model_validate(payload)
         except ValueError:
             raise ArchitectureError("invalid_analysis_payload") from None
         knowledge = payload["knowledge"]

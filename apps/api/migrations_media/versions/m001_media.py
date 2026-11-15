@@ -16,12 +16,19 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Never discard published media or job history to make a rollback appear clean.
-    op.get_bind().exec_driver_sql(
+    # Never discard published media or job history to make a rollback appear clean. Row security
+    # is forced on these tables and the migrator has no policy, so the check counts as the
+    # internal role; counted as the migrator it would see no rows and always pass.
+    bind = op.get_bind()
+    bind.exec_driver_sql("SET LOCAL ROLE rvm_executor")
+    bind.exec_driver_sql(
         "DO $$ BEGIN IF EXISTS(SELECT 1 FROM media_jobs) THEN "
         "RAISE EXCEPTION 'media_rollback_requires_empty_database'; END IF; END $$;"
     )
-    op.get_bind().exec_driver_sql(
-        "DROP TABLE media_videos,media_artifacts,media_history,media_attempts,media_stages,"
-        "media_jobs; DROP SCHEMA mv CASCADE;"
+    bind.exec_driver_sql("RESET ROLE")
+    # Functions depend on the table row types and triggers depend on the functions, so the
+    # schema goes first.
+    bind.exec_driver_sql(
+        "DROP SCHEMA mv CASCADE; DROP TABLE media_videos,media_artifacts,media_history,"
+        "media_attempts,media_stages,media_jobs;"
     )

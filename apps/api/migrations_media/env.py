@@ -10,6 +10,9 @@ engine = create_engine(url)
 with engine.connect() as connection:
     if connection.exec_driver_sql("SELECT to_regclass('public.generation_jobs')").scalar():
         raise RuntimeError("media_migration_refuses_core_database")
+    # End the transaction the guard query opened. Left open, Alembic would run the migration
+    # inside it and never commit, so the upgrade would report success and apply nothing.
+    connection.rollback()
     context.configure(connection=connection)
     with context.begin_transaction():
         context.run_migrations()
