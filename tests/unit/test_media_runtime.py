@@ -14,6 +14,7 @@ from uuid import uuid4
 import pytest
 from botocore.exceptions import ClientError
 from fastapi.testclient import TestClient
+from repovox.analysis.archive import extract
 from repovox.analysis.common import AnalysisError
 from repovox.analysis.github import archive_path, repository_url, resolve
 from repovox.api.routes import authenticated
@@ -21,13 +22,17 @@ from repovox.auth.session import Identity
 from repovox.core.config import Settings
 from repovox.core.errors import DomainError
 from repovox.main import create_app
-from repovox.media.architecture import ArchitectureError
+from repovox.media.architecture import ArchitectureError, discover
+from repovox.media.narration import Engine as SpeechEngine
+from repovox.media.sandbox import sources_from
+from repovox.media.stages import RenderError
 from repovox.media.store import CHUNK, MediaStorage, media_key
-from repovox.media.worker import ArchitecturePhase
+from repovox.media.worker import ArchitecturePhase, MediaWorker
 from repovox.services.media_jobs import MediaJobs
 from repovox.storage import ObjectRef
 from repovox.synthetic_source import SyntheticSource
 from repovox.workers import tasks
+from test_architecture import analyzed
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "architectures"
 
@@ -531,6 +536,159 @@ def test_architecture_failures_name_their_phase(
     error = ArchitecturePhase(phase, cause)
     assert (error.code, error.transient) == (code, transient)
     assert len(error.code) <= 64 and error.code.replace("_", "").isalnum()
+
+
+@pytest.fixture(scope="module")
+def gan(tmp_path_factory: pytest.TempPathFactory) -> tuple[dict[str, Any], bytes]:
+    """A verified payload and the exact source archive it was derived from."""
+    body = SyntheticSource(FIXTURES).archive("gan_standard")
+    work = tmp_path_factory.mktemp("gan")
+    (work / "source.tar.gz").write_bytes(body)
+    extract(work / "source.tar.gz", work / "source")
+    payload, _ = analyzed(work / "source")
+    return payload, body
+
+
+class Inputs:
+    """Analysis inputs for one architecture stage; records anything published or removed."""
+
+    def __init__(self, archive: bytes) -> None:
+        self.archive = archive
+        self.writes: list[str] = []
+        self.deleted: list[str] = []
+
+    def analysis(self, reference: dict[str, Any], which: str) -> bytes:
+        assert which == "archive"
+        return self.archive
+
+    def write(self, key: str, body: bytes, content_type: str = "") -> None:
+        self.writes.append(key)
+
+    def delete(self, key: str) -> None:
+        self.deleted.append(key)
+
+
+def architecture_stage(
+    gan: tuple[dict[str, Any], bytes],
+) -> tuple[MediaWorker, Database, Inputs, Any, int]:
+    payload, archive = gan
+    stage, fence, owner, job = uuid4(), 3, uuid4(), uuid4()
+    scope = {
+        "job_id": str(job),
+        "owner_id": str(owner),
+        "ordinal": 15,
+        "analysis": {"owner_id": str(owner), "commit_sha": "a" * 40},
+        "outputs": [],
+    }
+
+    def answer(sql: str, params: dict[str, Any]) -> Any:
+        if "mv.claim(" in sql:
+            return [{"o_stage": stage, "o_fence": fence, "o_job": job, "o_ordinal": 15}]
+        if "mv.scope(" in sql:
+            return scope if (params["id"], params["fence"]) == (stage, fence) else None
+        return "mv.heartbeat(" in sql or "mv.fail(" in sql or None
+
+    database, inputs = Database(answer), Inputs(archive)
+    worker = MediaWorker(database, inputs, "unit", SpeechEngine("unused", Path("unused")))
+    worker.payload = lambda reference: payload  # Envelope checks are covered elsewhere.
+    return worker, database, inputs, stage, fence
+
+
+def test_stage_15_isolation_failure_is_a_permanent_extraction_outcome(
+    gan: tuple[dict[str, Any], bytes], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    worker, database, inputs, stage, fence = architecture_stage(gan)
+    seen: list[set[str]] = []
+
+    def unavailable(root: Path, payload: dict[str, Any], checkpoint: Any) -> Any:
+        seen.append({p.relative_to(root).as_posix() for p in root.rglob("*.py")})
+        raise ArchitectureError("parser_isolation_unavailable")
+
+    monkeypatch.setattr("repovox.media.worker.discover_isolated", unavailable)
+    assert worker.run_once()
+    assert seen and seen[0]  # The archive was extracted before discovery was refused.
+    assert database.called("mv.fail") == [
+        {
+            "id": stage,
+            "fence": fence,
+            "code": "extraction__parser_isolation_unavailable",
+            "transient": False,
+        }
+    ]
+    assert database.called("mv.finish") == [] and inputs.writes == inputs.deleted == []
+
+
+def test_stage_15_encode_failure_is_a_permanent_rendering_outcome(
+    gan: tuple[dict[str, Any], bytes], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    worker, database, inputs, stage, fence = architecture_stage(gan)
+    rendered: list[str] = []
+
+    def in_process(root: Path, payload: dict[str, Any], checkpoint: Any) -> Any:
+        return discover(payload, sources_from(root, payload))  # The worker still re-checks it.
+
+    def encode_failed(report: Any, architecture: Any, *args: Any) -> Any:
+        rendered.append(architecture.type)
+        raise RenderError("encode_failed")
+
+    monkeypatch.setattr("repovox.media.worker.discover_isolated", in_process)
+    monkeypatch.setattr("repovox.media.worker.render_architecture", encode_failed)
+    assert worker.run_once()
+    assert rendered == ["gan"]  # Discovery and the citation re-check passed; rendering failed.
+    assert database.called("mv.fail") == [
+        {"id": stage, "fence": fence, "code": "rendering__encode_failed", "transient": False}
+    ]
+    assert database.called("mv.finish") == [] and inputs.writes == inputs.deleted == []
+
+
+def media_job(analysis_job: Any) -> dict[str, Any]:
+    return {"id": uuid4(), "state": "awaiting_analysis", "analysis_job_id": analysis_job}
+
+
+def test_sync_attaches_the_reference_once_analysis_reaches_its_boundary() -> None:
+    owner, source = uuid4(), uuid4()
+    analyses = {source: analysis(owner, source, state="running", error=None)}
+    service = MediaJobs.__new__(MediaJobs)
+    service.core, service.engine = core(analyses), Database()
+    job = media_job(source)
+    assert service.sync(owner, job) is False  # Still running: nothing is written.
+    assert service.engine.calls == []
+    analyses[source] = analysis(owner, source)
+    assert service.sync(owner, job) is True
+    attached = service.engine.called("mv.attach")
+    assert [item["id"] for item in attached] == [job["id"]]
+    assert json.loads(attached[0]["reference"]) == reference(owner, source, analyses[source])
+    assert service.engine.called("mv.analysis_failed") == []
+    # Both core reads and the media write ran inside the owner's own tenant scope.
+    assert service.core.scopes() == [str(owner)] * 2 and service.engine.scopes() == [str(owner)]
+    before = (len(service.core.calls), len(service.engine.calls))
+    assert service.sync(owner, {**job, "state": "queued"}) is False  # Only waiting jobs move.
+    assert (len(service.core.calls), len(service.engine.calls)) == before
+
+
+@pytest.mark.parametrize(
+    ("state", "error", "ordinals"),
+    [
+        ("failed", "archive_download_limit", (2, 9)),
+        ("failed", "stage_deadline", (2, 9)),
+        ("failed", None, (2, 9)),
+        ("cancelled", None, (2, 9)),
+        ("succeeded", None, (2, 9)),
+        ("failed", "phase2_pipeline_boundary", (2,)),  # The Stage 9 result has expired.
+        ("missing", None, ()),  # No such analysis in this owner's scope.
+    ],
+)
+def test_sync_ends_the_job_when_analysis_ends_any_other_way(
+    state: str, error: str | None, ordinals: tuple[int, ...]
+) -> None:
+    owner, source = uuid4(), uuid4()
+    found = {} if state == "missing" else {source: analysis(owner, source, state, error, ordinals)}
+    service = MediaJobs.__new__(MediaJobs)
+    service.core, service.engine = core(found), Database()
+    job = media_job(source)
+    assert service.sync(owner, job) is True
+    assert service.engine.called("mv.analysis_failed") == [{"id": job["id"]}]
+    assert service.engine.called("mv.attach") == [] and service.engine.scopes() == [str(owner)]
 
 
 def test_handoff_isolates_one_job_failure_from_the_rest() -> None:
