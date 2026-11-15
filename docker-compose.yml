@@ -109,6 +109,10 @@ services:
     depends_on: {postgres: {condition: service_healthy}}
   api:
     <<: *api
+    environment:
+      <<: *environment
+      # Off unless SYNTHETIC_SOURCE_DIR is set: development-only synthetic repositories.
+      REPOVOX_SYNTHETIC_SOURCE_DIR: ${SYNTHETIC_SOURCE_DIR:-}
     ports: ['127.0.0.1:8000:8000']
     healthcheck:
       test: ['CMD', 'python', '-c', "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready')"]
@@ -121,6 +125,7 @@ services:
       <<: *environment
       REPOVOX_DATABASE_URL: postgresql+psycopg://rv_worker:${WORKER_DATABASE_PASSWORD:?Generate .env}@postgres:5432/repovox
       REPOVOX_WORKER_DATABASE_URL: postgresql+psycopg://rv_worker:${WORKER_DATABASE_PASSWORD:?Generate .env}@postgres:5432/repovox
+      REPOVOX_SYNTHETIC_SOURCE_DIR: ${SYNTHETIC_SOURCE_DIR:-}
     command: ['celery', '-A', 'repovox.workers.tasks:celery', 'worker', '--loglevel=WARNING', '--concurrency=2']
   dispatcher:
     <<: *api

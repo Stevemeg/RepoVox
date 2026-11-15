@@ -103,7 +103,7 @@ jobs:
       - run: npm audit --audit-level=high
   integration:
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 70
     steps:
       - uses: actions/checkout@v4
         with: {ref: '${{ github.event.pull_request.head.sha || github.sha }}'}
@@ -125,6 +125,7 @@ jobs:
       - name: Generate ephemeral local credentials
         run: python tools/phase1_env.py
       - name: Fresh migration and real-service integration tests
+        shell: bash
         run: |
           docker compose build --pull --no-cache migrate tests
           docker image inspect repovox-tests --format '{{.Id}}'
@@ -135,7 +136,7 @@ jobs:
           docker compose run --rm --no-deps tests pip-audit --cache-dir /tmp/repovox-audit --local
           docker compose run --rm --no-deps tests pip-audit --cache-dir /tmp/repovox-audit --path /usr/local/lib/python3.12/site-packages
           docker compose up -d postgres redis storage storage-init migrate media-migrate
-          docker compose run --rm --build tests
+          docker compose run --rm --build tests 2>&1 | tee integration-tests.log
           CUSTODIAN_TEST_IMAGE=$(docker image inspect repovox-tests --format '{{.Id}}')
           docker run --rm --user 10002:10002 --cap-drop ALL --security-opt no-new-privileges:true \
             --read-only --network none --memory 256m --cpus 1 --pids-limit 64 \
@@ -148,6 +149,9 @@ jobs:
           docker compose run --rm --no-deps --user 0 --cap-add SETUID --cap-add SETGID --cap-add CHOWN tests python tools/phase2_storage_probe.py
           docker compose run --rm --no-deps --user 0 --cap-add SETUID --cap-add SETGID --cap-add CHOWN tests python tools/phase2_v2_storage_probe.py
       - name: Boot complete local stack
+        env:
+          # Locally authored synthetic repositories for the browser-to-video test only.
+          SYNTHETIC_SOURCE_DIR: /workspace/tests/fixtures/architectures
         run: |
           docker pull node:24.22.1-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
           docker compose up -d --build --wait api web worker dispatcher media-worker
@@ -162,11 +166,14 @@ jobs:
           docker compose exec -T web node /security_node.mjs
           docker compose exec -T web node -e 'console.log({next:require("next/package.json").version,sharp:require("sharp").versions.sharp,libvips:require("sharp").versions.vips}); if(require("next/package.json").version!=="16.4.2"||require("sharp").versions.sharp!=="0.35.5")process.exit(1)'
       - name: Browser interaction test
+        shell: bash
         run: |
           npm --prefix apps/web ci
           cd apps/web
           npx playwright install --with-deps chromium
-          npm run test:e2e
+          # The video test needs H.264/AAC decoders, which bundled Chromium does not have.
+          google-chrome --version || npx playwright install chrome
+          npm run test:e2e 2>&1 | tee e2e.log
       - name: Preserve synthetic desktop/mobile UI evidence
         uses: actions/upload-artifact@v4
         with:
@@ -174,6 +181,27 @@ jobs:
           path: apps/web/test-results/ui/*.png
           retention-days: 7
           if-no-files-found: error
+      - name: Preserve browser-to-video evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-to-video
+          path: |
+            apps/web/test-results/video/
+            apps/web/e2e.log
+            integration-tests.log
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Summarise failures as annotations
+        if: failure()
+        run: |
+          for log in integration-tests.log apps/web/e2e.log; do
+            [ -f "$log" ] || continue
+            grep -aE '^(FAILED|ERROR|E  ) |✘|Error:|expect\(|[0-9]+ (failed|passed)' "$log" | cut -c1-240 | head -n 45 > summary.txt || true
+            [ -s summary.txt ] || tail -n 25 "$log" | cut -c1-240 > summary.txt
+            body=$(sed -e 's/%/%25/g' summary.txt | awk '{printf "%s%%0A", $0}')
+            echo "::error title=$log::$body"
+          done
       - name: Service status
         if: always()
         run: docker compose ps -a
