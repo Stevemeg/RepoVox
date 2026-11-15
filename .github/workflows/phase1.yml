@@ -192,6 +192,33 @@ jobs:
             integration-tests.log
           retention-days: 7
           if-no-files-found: warn
+      - name: Publish browser-to-video evidence summary as annotations
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          for path in sorted(pathlib.Path("apps/web/test-results/video").glob("*.json")):
+              data = json.loads(path.read_text(encoding="utf-8"))
+              job = data["job"]
+              summary = {
+                  "job": job["id"],
+                  "repository": job["repository"],
+                  "identifier": job["identifier"],
+                  "architecture": job["architecture"],
+                  "stages": [f"{s['stage_key']}:{s['state']}:{s['error_code']}" for s in job["stages"]],
+                  "while_page_closed": data.get("progressed_while_page_closed"),
+                  "videos": [
+                      {k: v for k, v in video.items() if k != "playback"}
+                      | {"playback": {k: video["playback"][k] for k in ("currentTime", "duration", "width", "height", "decodedFrames", "cues", "error")}}
+                      if "playback" in video else video
+                      for video in data["videos"]
+                  ],
+                  "denied": sorted({f"{a}/{b}" for a, b in data.get("denied", {}).values()}),
+                  "denied_routes": len(data.get("denied", {})),
+              }
+              body = json.dumps(summary, separators=(",", ":")).replace("%", "%25")
+              print(f"::notice title=browser-to-video {path.stem}::{body}")
+          PY
       - name: Summarise failures as annotations
         if: failure()
         run: |
