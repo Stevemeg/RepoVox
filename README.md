@@ -8,9 +8,18 @@ is a separate blind source-review preparation track. It contributes no official
 human-reviewed gold. [Reviewer handoff](docs/development/exploratory-handoff.md).
 Accepted Phase 0 `e35d8ef8a8a53cb34e46271a9813b5332ea42c1f` and Phase 1
 `ec09b733ab3ceffe592ad96d07902b92596dfd1b` remain in history. PRs #1/#2 are
-unmerged; Phase 2 is stacked on Phase 1. Development analysis executes Stages 1–9;
-video generation, models, deployment and Phase 3 remain disabled. Independent human
+unmerged; Phase 2 is stacked on Phase 1. Development analysis executes Stages 1–9.
+Models, deployment and Phase 3 remain disabled. Independent human
 reviewer is PENDING OWNER APPOINTMENT; the official evaluation corpus is UNFROZEN.
+
+**Branch `feature/repository-to-video`: video generation is implemented, not yet
+independently reviewed.** Repository walkthroughs and architecture-explainer videos are
+generated from verified analysis of Python, JavaScript and TypeScript (including JSX and
+TSX) source, in a separate [media database](docs/operations/media-database.md) (revision
+`m001`, enabled with `REPOVOX_VIDEO`). The core database stays at revision `0004`, where
+`rv.job_guard` and `rv.video_disabled` still refuse every core video row. What the
+[architecture explainer](docs/development/architecture-explainer.md) reads in each language,
+and its known limits, are documented there.
 
 ## Local development
 

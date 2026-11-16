@@ -170,14 +170,17 @@ class Scope:
 
 
 class SourceFile:
-    def __init__(self, path: str, body: bytes) -> None:
-        self.path, self.body = path, body
-        self.tree = Parser(language("python")).parse(body)  # Keeps nodes alive.
+    """One analysed file parsed with its own grammar. The named enrichers read Python only."""
+
+    def __init__(self, path: str, body: bytes, lang: str = "python") -> None:
+        self.path, self.body, self.language = path, body, lang
+        self.tree = Parser(language(lang)).parse(body)  # Keeps nodes alive.
         self.root: Node = self.tree.root_node
         self.valid = not self.root.has_error
+        self.python = lang == "python"
         self.lines = body.decode("utf-8", "replace").split("\n")
         self.constants: dict[str, str] = {}
-        if self.valid:
+        if self.valid and self.python:
             for statement in self.root.named_children:
                 node = statement.named_children[0] if statement.named_child_count else None
                 if statement.type == "expression_statement" and node is not None:
@@ -219,7 +222,7 @@ class SourceFile:
 
     def module_classes(self) -> list[ModuleClass]:
         classes: list[ModuleClass] = []
-        for node in descendants(self.root) if self.valid else []:
+        for node in descendants(self.root) if self.valid and self.python else []:
             if node.type != "class_definition":
                 continue
             bases = node.child_by_field_name("superclasses")
@@ -301,7 +304,7 @@ class SourceFile:
         )
 
     def scopes(self, classes: dict[str, ModuleClass]) -> list[Scope]:
-        if not self.valid:
+        if not self.valid or not self.python:
             return []
         top = Scope(self.path, "<module>", 1)
         self.read(self.root, top, classes)

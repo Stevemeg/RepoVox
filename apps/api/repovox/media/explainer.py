@@ -267,8 +267,9 @@ def describe(component: Component) -> str:
         return f"{component.label} is a {detail} file under {component.group}."
     if component.group == "external":
         kind = component.kind.replace("_", " ")
+        what = "a client library" if detail == "client library" else "a built-in function"
         return (
-            f"{component.label} is a client library for a {kind}. It stands for something "
+            f"{component.label} is {what} for a {kind}. It stands for something "
             f"outside this repository.{weak}"
         )
     return f"{component.label} is a {KIND_WORDS.get(component.kind, component.kind)}.{weak}"

@@ -5,6 +5,9 @@ constructed parts, declared routes, external resources reached through an import
 library, and source files. Relationships are static: a value returned by one component being
 passed to another, an object handed to a constructor, a call site, a declared route, a resolved
 import, or a path literal that matches a declared route. Nothing here asserts runtime behavior.
+
+Python, JavaScript, TypeScript and TSX are read by two readers, one per syntax family, that
+produce the same scopes, call sites and values. Everything after reading is shared.
 """
 
 import re
@@ -13,6 +16,7 @@ from typing import Any
 
 from tree_sitter import Node
 
+from repovox.media import jsflow
 from repovox.media.architecture import (
     Architecture,
     Citation,
@@ -54,12 +58,42 @@ RESOURCES = {
     "httpx": "http_client",
     "aiohttp": "http_client",
 }
+# The same, for packages a JavaScript or TypeScript file imports or requires.
+SCRIPT_RESOURCES = {
+    "pg": "database",
+    "mysql": "database",
+    "mysql2": "database",
+    "mongodb": "database",
+    "mongoose": "database",
+    "sqlite3": "database",
+    "better-sqlite3": "database",
+    "@prisma/client": "database",
+    "redis": "cache",
+    "ioredis": "cache",
+    "@aws-sdk/client-s3": "object_storage",
+    "kafkajs": "message_broker",
+    "amqplib": "message_broker",
+    "axios": "http_client",
+    "node-fetch": "http_client",
+    "got": "http_client",
+}
+# The platform's global request function, when nothing in the file rebinds the name.
+GLOBAL_FETCH = "fetch"
+KINDS = {**RESOURCES, **SCRIPT_RESOURCES, GLOBAL_FETCH: "http_client"}
 BUILTINS = set(
     "len range print str int float list dict set tuple enumerate zip sorted isinstance open min "
     "max sum any all super getattr hasattr type bool map filter repr format round abs iter next "
     "ValueError TypeError KeyError RuntimeError Exception reversed vars id".split()
 )
+SCRIPT_BUILTINS = set(
+    "require parseInt parseFloat isNaN isFinite String Number Boolean Array Object Symbol BigInt "
+    "Date Promise Error TypeError RangeError Map Set WeakMap WeakSet RegExp setTimeout "
+    "setInterval clearTimeout clearInterval queueMicrotask structuredClone encodeURIComponent "
+    "decodeURIComponent encodeURI decodeURI".split()
+)
 MUTATORS = {"append", "extend", "add", "update", "put", "send", "insert"}
+SCRIPT_MUTATORS = {"push", "unshift", "add", "set", "append"}
+ROUTE_METHODS = {"get", "post", "put", "patch", "delete"}
 ROUTE = re.compile(r"""@(\w+)\.(get|post|put|patch|delete)\(\s*["']([^"']+)["']""")
 URL = re.compile(r"""["'`](?:https?://[^/"'`\s]+)?(/[A-Za-z0-9_\-./]*)["'`]""")
 MAX_NODES = 10
@@ -77,6 +111,10 @@ class Definition:
     owner: str | None = None
     # Line declaring each parameter: a signature can span lines after `def name(`.
     param_lines: dict[str, int] = field(default_factory=dict)
+    anchor: str = ""  # Text on the declaring line that shows this definition.
+    exported: bool = False
+    default: bool = False
+    inline: bool = False  # A function written in place, such as a route handler argument.
 
 
 @dataclass(frozen=True)
@@ -114,6 +152,23 @@ def slug(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_") or "x"
 
 
+def lead(callee: str) -> str:
+    """The callee text before its first call, on its first line: what the call line shows."""
+    return callee.split("(")[0].split("\n")[0].strip()
+
+
+def shown(citations: list[Citation | None], anchors: tuple[str, ...]) -> bool:
+    """The validator's rule: the cited lines together contain every name an element claims."""
+    joined = " ".join(c.quote for c in citations if c is not None)
+    return all(not anchor or anchor in joined for anchor in anchors)
+
+
+def package(name: str) -> str:
+    """The package a JavaScript module specifier names: `pg/lib/x` -> pg, `@a/b/c` -> @a/b."""
+    parts = name.split("/")
+    return "/".join(parts[:2]) if name.startswith("@") else parts[0]
+
+
 class Repo:
     def __init__(self, ctx: Context) -> None:
         self.ctx = ctx
@@ -125,9 +180,21 @@ class Repo:
         self.scopes: dict[str, FlowScope] = {}
         # Component keys whose binding the analyzer's stricter rules did not confirm.
         self.weak: set[str] = set()
+        # JavaScript and TypeScript only: what each module exports (exported name -> local
+        # definition), aliases bound by `require`, every name a file declares with a count,
+        # functions written in place as route handlers, and the routes the analyzer found.
+        self.exports: dict[str, dict[str, str]] = {}
+        self.required: set[tuple[str, str]] = set()
+        self.declared: dict[str, dict[str, int]] = {}
+        self.inline: dict[tuple[int, int], str] = {}
+        self.spans: dict[str, set[tuple[int, int]]] = {}  # Byte ranges of top-level definitions.
+        self.script_routes: dict[str, list[tuple[str, str, int, Node]]] = {}
+        # Module-level names bound once to a constructed instance or a client handle.
+        self.module_instances: dict[str, dict[str, str]] = {}
+        self.module_env: dict[str, dict[str, list[Producer]]] = {}
         for path, file in ctx.files.items():
             if file.valid:
-                self.index(path, file)
+                (self.index if file.python else self.index_script)(path, file)
         symbols = ctx.all_symbols
         for edge in ctx.payload["knowledge"]["edges"]:
             if edge["classification"] != "resolved_static":
@@ -141,11 +208,20 @@ class Repo:
             elif edge["relationship"] == "imports":
                 for support in edge["support_ids"]:
                     item = symbols[support]
-                    if item["kind"] == "import" and not item["syntax"]["imported_member"]:
+                    if item["kind"] != "import" or item["syntax"]["imported_member"]:
+                        continue
+                    module = symbols[edge["target"]]["path"]
+                    if self.script(item["path"]):
+                        # `import * as m` or `const m = require(...)`: a plain local name only.
+                        alias = item["syntax"]["local_binding"] or ""
+                        if not jsflow.IDENTIFIER.fullmatch(alias):
+                            continue
+                        node = self.node(item)
+                        if node is not None and node.type == "call_expression":
+                            self.required.add((item["path"], alias))
+                    else:
                         alias = item["syntax"]["local_binding"] or item["name"].split(".")[-1]
-                        self.aliases.setdefault(item["path"], {})[alias] = symbols[edge["target"]][
-                            "path"
-                        ]
+                    self.aliases.setdefault(item["path"], {})[alias] = module
         modules = {
             (symbols[e["support_ids"][0]]["path"], symbols[e["support_ids"][0]]["name"]): symbols[
                 e["target"]
@@ -157,6 +233,9 @@ class Repo:
             if item["kind"] in {"function", "class"} and item["syntax"]["unsafe_binding"]:
                 self.weak.add(f"{item['path']}::{item['name']}")
             if item["kind"] != "import" or item["path"] not in ctx.files:
+                continue
+            if self.script(item["path"]):
+                self.script_import(item, modules.get((item["path"], item["name"])))
                 continue
             syntax = item["syntax"]
             local = syntax["local_binding"] or syntax["imported_member"]
@@ -174,11 +253,15 @@ class Repo:
                 self.weak.add(found)
         for path, file in ctx.files.items():
             if file.valid:
-                self.classes(path, file)
+                (self.classes if file.python else self.script_classes)(path, file)
         for path, file in ctx.files.items():
             if not file.valid:
                 continue
-            Reader(self, file, FlowScope(f"{path}::<module>", path, "<module>", 1)).run(file.root)
+            reader = Reader if file.python else ScriptReader
+            module = reader(self, file, FlowScope(f"{path}::<module>", path, "<module>", 1))
+            module.run(file.root)
+            if not file.python:
+                self.module_level(path, module)
             for definition in [d for d in self.defs.values() if d.path == path]:
                 if definition.kind == "class":
                     continue
@@ -191,7 +274,85 @@ class Repo:
                     param_lines=definition.param_lines,
                 )
                 if body is not None:
-                    Reader(self, file, scope, definition).run(body)
+                    reader(self, file, scope, definition).run(body)
+
+    def script(self, path: str) -> bool:
+        file = self.ctx.files.get(path)
+        return file is not None and not file.python
+
+    def node(self, item: dict[str, Any]) -> Node | None:
+        """The syntax node an analyzer symbol was recorded for, matched by exact byte range."""
+        file = self.ctx.files.get(item["path"])
+        if file is None:
+            return None
+        found = file.root.descendant_for_byte_range(item["start_byte"], item["end_byte"])
+        if found is None or (found.start_byte, found.end_byte) != (
+            item["start_byte"],
+            item["end_byte"],
+        ):
+            return None
+        return found
+
+    def script_import(self, item: dict[str, Any], module: str | None) -> None:
+        """Bindings one JavaScript or TypeScript import or `require` creates."""
+        path, syntax = item["path"], item["syntax"]
+        if syntax["type_only"]:
+            return  # `import type`: erased at compile time, never called or constructed.
+        local, member = syntax["local_binding"] or "", syntax["imported_member"]
+        node = self.node(item)
+        commonjs = node is not None and node.type == "call_expression"
+        pairs: list[tuple[str, str | None]] = []
+        if jsflow.IDENTIFIER.fullmatch(local):
+            pairs = [(local, member)]
+        elif node is not None and commonjs:
+            # `const { a, b: c } = require(...)`: each destructured member is its own name.
+            pairs = list(jsflow.destructured(node, self.ctx.files[path].body))
+        root = package(item["name"])
+        if not item["name"].startswith(".") and root in SCRIPT_RESOURCES:
+            for name, _ in pairs:
+                self.externals.setdefault(path, {})[name] = root
+            if syntax["unsafe_binding"]:
+                self.weak.add(f"resource::{root}")
+            return
+        if module is None or module not in self.exports:
+            return
+        for name, wanted in pairs:
+            if wanted is None or name in self.bindings.get(path, {}):
+                continue  # A whole module is an alias; a confirmed binding is kept.
+            target = wanted if commonjs else self.exports[module].get(wanted, "")
+            found = f"{module}::{target}"
+            if target and found in self.defs and self.defs[found].owner is None:
+                # Exported (or, for `require`, top-level) in a resolved local module, but not
+                # confirmed by the analyzer's stricter rules: inferred.
+                self.bindings.setdefault(path, {})[name] = found
+                self.weak.add(found)
+
+    def member(self, path: str, alias: str, module: str, name: str) -> str | None:
+        """The definition `alias.name` reaches through a namespace import or a `require`."""
+        if (path, alias) in self.required:
+            found = f"{module}::{name}"
+            if found in self.defs and self.defs[found].owner is None:
+                self.weak.add(found)  # What module.exports holds is not declared syntax.
+                return found
+            return None
+        target = self.exports.get(module, {}).get(name)
+        found = f"{module}::{target}"
+        return found if target and found in self.defs else None
+
+    def module_level(self, path: str, reader: "Reader") -> None:
+        """Module names bound once to an instance or a client handle, visible to functions."""
+        counts = self.declared.get(path, {})
+        once = {name for name, count in counts.items() if count == 1}
+        self.module_instances[path] = {
+            name: component for name, component in reader.instances.items() if name in once
+        }
+        self.module_env[path] = {
+            name: producers
+            for name, producers in reader.env.items()
+            if name in once
+            and producers
+            and all(p.direct and p.component.startswith("resource::") for p in producers)
+        }
 
     def index(self, path: str, file: SourceFile) -> None:
         local: dict[str, str] = {}
@@ -219,6 +380,7 @@ class Repo:
                 node,
                 params,
                 param_lines=parameter_positions(node, file.body) if kind == "function" else {},
+                anchor=f"{'class' if kind == 'class' else 'def'} {name}",
             )
             local[name] = identity
             if kind == "class":
@@ -241,8 +403,162 @@ class Repo:
                             parameter_names(inner, file.body)[1:],
                             identity,
                             parameter_positions(inner, file.body),
+                            anchor=f"def {method}",
                         )
         self.bindings.setdefault(path, {}).update(local)
+
+    def index_script(self, path: str, file: SourceFile) -> None:
+        """Top-level functions, classes and their methods in one JavaScript or TypeScript file.
+
+        A definition is cited on the line that names it, and anchored on text that line shows.
+        """
+        body = file.body
+        local: dict[str, str] = {}
+        exports: dict[str, str] = {}
+        self.declared[path] = jsflow.declared_names(file.root, body)
+        for item in jsflow.declarations(file.root):
+            name = text(item.name, body)
+            identity = f"{path}::{name}"
+            if item.exported:
+                exports[name] = name
+            if item.default:
+                exports["default"] = name
+            self.spans.setdefault(path, set()).add((item.node.start_byte, item.node.end_byte))
+            if identity in self.defs:
+                local.pop(name, None)  # Declared twice: not a unique binding.
+                continue
+            number = line(item.name)
+            preferred = {
+                "function_declaration": f"function {name}",
+                "class_declaration": f"class {name}",
+            }.get(item.node.type, f"{name} =")
+            functional = item.kind == "function"
+            self.defs[identity] = Definition(
+                identity,
+                path,
+                name,
+                item.kind,
+                number,
+                item.node,
+                jsflow.parameter_names(item.node, body) if functional else [],
+                param_lines=jsflow.parameter_positions(item.node, body) if functional else {},
+                anchor=preferred if preferred in file.quote(number) else name,
+                exported=item.exported,
+                default=item.default,
+            )
+            local[name] = identity
+            for member, label in jsflow.methods(item.node) if item.kind == "class" else []:
+                method = text(label, body)
+                key = f"{identity}.{method}"
+                if key in self.defs:
+                    continue  # An accessor pair or a repeated name: the first is kept.
+                self.defs[key] = Definition(
+                    key,
+                    path,
+                    f"{name}.{method}",
+                    "method",
+                    line(label),
+                    member,
+                    jsflow.parameter_names(member, body),
+                    identity,
+                    jsflow.parameter_positions(member, body),
+                    anchor=method,
+                )
+        for child in file.root.named_children:
+            if child.type != "export_statement" or child.child_by_field_name("source"):
+                continue
+            for clause in (c for c in child.named_children if c.type == "export_clause"):
+                for specifier in clause.named_children:
+                    original = text(specifier.child_by_field_name("name"), body)
+                    exported = text(specifier.child_by_field_name("alias"), body) or original
+                    if original:
+                        exports[exported] = original
+            value = child.child_by_field_name("value")
+            if value is not None and value.type == "identifier":
+                exports["default"] = text(value, body)  # `export default name;`
+        self.exports[path] = exports
+        self.bindings.setdefault(path, {}).update(local)
+        self.handlers(path, file)
+
+    def handlers(self, path: str, file: SourceFile) -> None:
+        """Route declarations the analyzer found here; functions written in place get a name.
+
+        Only calls the analyzer recorded as framework routes count, matched by byte range, so
+        the application object they are declared on is the one it bound.
+        """
+        wanted = {
+            (s["start_byte"], s["end_byte"])
+            for c in self.ctx.payload["knowledge"]["entrypoints"]["candidates"]
+            if c["rule"] == "framework-route-v1" and c["path"] == path
+            for s in [self.ctx.all_symbols[c["symbol_id"]]]
+        }
+        body = file.body
+        stack = [file.root]
+        while stack:
+            node = stack.pop()
+            stack.extend(reversed(node.named_children))
+            if node.type != "call_expression" or (node.start_byte, node.end_byte) not in wanted:
+                continue
+            function = node.child_by_field_name("function")
+            if function is None or function.type != "member_expression":
+                continue
+            method = text(function.child_by_field_name("property"), body)
+            values = jsflow.arguments(node)
+            route = jsflow.string_value(values[0], body) if len(values) >= 2 else None
+            if method not in ROUTE_METHODS or route is None or not route.startswith("/"):
+                continue
+            handler = values[-1]  # Express runs any middleware first; the last is the handler.
+            number = line(values[0])
+            self.script_routes.setdefault(path, []).append((method.upper(), route, number, handler))
+            if handler.type not in {"arrow_function", "function_expression"}:
+                continue
+            name = f"{method.upper()} {route} handler"
+            identity = f"{path}::{name}"
+            if identity in self.defs:
+                identity += f" L{line(handler)}"
+            first = jsflow.head(handler, body)
+            self.defs[identity] = Definition(
+                identity,
+                path,
+                name,
+                "function",
+                line(handler),
+                handler,
+                jsflow.parameter_names(handler, body),
+                param_lines=jsflow.parameter_positions(handler, body),
+                anchor="=>" if "=>" in first else first[:40],
+                inline=True,
+            )
+            self.inline[(handler.start_byte, handler.end_byte)] = identity
+
+    def script_classes(self, path: str, file: SourceFile) -> None:
+        """Parts a class constructs in its constructor: `this.x = new Something(...)`."""
+        body = file.body
+        for definition in [d for d in self.defs.values() if d.path == path and d.kind == "method"]:
+            if not definition.name.endswith(".constructor") or definition.owner is None:
+                continue
+            block = definition.node.child_by_field_name("body")
+            for statement in jsflow.flat(block) if block is not None else []:
+                node = statement.named_children[0] if statement.named_child_count else None
+                if node is None or node.type != "assignment_expression":
+                    continue
+                left, right = node.child_by_field_name("left"), node.child_by_field_name("right")
+                right = jsflow.unwrap(right) if right is not None else None
+                if left is None or right is None or left.type != "member_expression":
+                    continue
+                owner = left.child_by_field_name("object")
+                made = jsflow.callee(right) if right.type in jsflow.CALLS else None
+                if owner is None or owner.type != "this" or made is None:
+                    continue
+                attribute = text(left.child_by_field_name("property"), body)
+                callee = text(made, body)
+                bound = self.bindings.get(path, {}).get(callee)
+                kind = self.defs[bound].name if bound else re.sub(r"\s+", "", callee)
+                self.parts.setdefault(definition.owner, {})[attribute] = (
+                    bound or "",
+                    kind,
+                    line(node),
+                )
 
     def classes(self, path: str, file: SourceFile) -> None:
         """Parts a class constructs in __init__: `self.x = Something(...)`."""
@@ -505,6 +821,341 @@ class Reader:
         return list(dict.fromkeys(found))
 
 
+class ScriptReader(Reader):
+    """The same reading for JavaScript and TypeScript: one scope, statements in source order.
+
+    A function written inline, such as a callback, is read as part of the scope that contains
+    it, with its own parameters hiding outer names and without contributing returns; a route
+    handler written inline is its own definition instead. JSX elements that use a component
+    are call sites whose attribute values are the values passed.
+    """
+
+    def __init__(
+        self,
+        repo: Repo,
+        file: SourceFile,
+        scope: FlowScope,
+        definition: Definition | None = None,
+        outer: "ScriptReader | None" = None,
+        hidden: tuple[str, ...] = (),
+        arrow: bool = True,
+    ) -> None:
+        super().__init__(repo, file, scope, definition)
+        self.returns = outer is None
+        self.hidden = set(hidden)
+        self.local: set[str] = set(hidden)
+        self.owner = definition.owner if definition else None
+        if outer is not None:
+            self.env = {k: v for k, v in outer.env.items() if k not in self.hidden}
+            self.instances = {k: v for k, v in outer.instances.items() if k not in self.hidden}
+            self.local |= outer.local
+            self.hidden |= outer.hidden - set(self.env)
+            # Only an arrow function keeps the `this` of the method around it.
+            self.owner = outer.owner if arrow else None
+        elif definition is not None:
+            mine = set(definition.parameters)
+            path = file.path
+            for name, component in repo.module_instances.get(path, {}).items():
+                if name not in mine:
+                    self.instances[name] = component
+            for name, producers in repo.module_env.get(path, {}).items():
+                if name not in mine:
+                    self.env[name] = producers
+
+    def run(self, block: Node) -> None:
+        body = self.file.body
+        if block.type not in {"statement_block", "program"}:
+            # An expression body: the expression is the function's value.
+            self.calls(block)
+            parent = block.parent
+            arrow = next((c for c in parent.children if c.type == "=>"), None) if parent else None
+            if (
+                self.returns
+                and arrow is not None
+                and arrow.start_point.row == block.start_point.row
+            ):
+                self.returned(block, line(block))
+            return
+        for statement in jsflow.flat(block):
+            if statement.type == "for_in_statement":
+                left, right = (
+                    statement.child_by_field_name("left"),
+                    statement.child_by_field_name("right"),
+                )
+                if left is not None and right is not None:
+                    self.calls(right)
+                    found = self.producers(right)
+                    for ident in jsflow.pattern_names(left):
+                        name = text(ident, body)
+                        self.local.add(name)
+                        self.bind(
+                            name, [Producer(p.component, name, False, p.instance) for p in found]
+                        )
+                continue
+            if statement.type in {"lexical_declaration", "variable_declaration"}:
+                for declarator in statement.named_children:
+                    if declarator.type == "variable_declarator":
+                        self.declare(declarator)
+                continue
+            node = statement.named_children[0] if statement.named_child_count else None
+            if node is None:
+                continue
+            self.calls(node)
+            if statement.type == "return_statement":
+                if self.returns:
+                    self.returned(node, line(statement))
+            elif node.type == "assignment_expression":
+                left, right = node.child_by_field_name("left"), node.child_by_field_name("right")
+                if left is not None and right is not None and left.type != "member_expression":
+                    self.destructure(left, right)
+            else:
+                self.mutation(jsflow.unwrap(node))
+
+    def declare(self, declarator: Node) -> None:
+        name, value = (
+            declarator.child_by_field_name("name"),
+            declarator.child_by_field_name("value"),
+        )
+        if name is None:
+            return
+        if value is not None and (value.start_byte, value.end_byte) in self.repo.spans.get(
+            self.file.path, set()
+        ):
+            return  # A top-level definition, read as its own scope.
+        inner = jsflow.unwrap(value) if value is not None else None
+        function = inner.child_by_field_name("function") if inner is not None else None
+        if (
+            inner is not None
+            and inner.type == "call_expression"
+            and function is not None
+            and text(function, self.file.body) == "require"
+        ):
+            return  # An import: what it binds is resolved from the analyzer's import facts.
+        if value is None or value.type in jsflow.NESTED:
+            for node in jsflow.pattern_names(name):
+                self.local.add(text(node, self.file.body))
+                self.bind(text(node, self.file.body), [])
+            return
+        self.calls(value)
+        self.destructure(name, value)
+
+    def destructure(self, left: Node, right: Node) -> None:
+        body = self.file.body
+        if left.type == "identifier":
+            self.local.add(text(left, body))
+            self.assign(text(left, body), right)
+            return
+        found = self.producers(right)  # Destructured: each name holds a part of the value.
+        for node in jsflow.pattern_names(left):
+            name = text(node, body)
+            self.local.add(name)
+            self.bind(name, [Producer(p.component, name, False, p.instance) for p in found])
+
+    def mutation(self, node: Node) -> None:
+        """`items.push(value)`: the collection now also holds what was added."""
+        function = node.child_by_field_name("function") if node.type == "call_expression" else None
+        if function is None or function.type != "member_expression":
+            return
+        owner = function.child_by_field_name("object")
+        name = text(function.child_by_field_name("property"), self.file.body)
+        if owner is None or owner.type != "identifier" or name not in SCRIPT_MUTATORS:
+            return
+        target = text(owner, self.file.body)
+        added = [
+            Producer(p.component, target, False, p.instance)
+            for a in jsflow.arguments(node)
+            for p in self.producers(a)
+        ]
+        if added:
+            self.env[target] = [*self.env.get(target, []), *added]
+
+    def returned(self, node: Node, number: int) -> None:
+        inner = jsflow.unwrap(node)
+        plain = inner.type == "identifier" or (
+            inner.type in jsflow.CALLS and (inner.start_byte, inner.end_byte) in self.resolved
+        )
+        for producer in self.producers(node):
+            used = (
+                producer
+                if plain
+                else Producer(producer.component, producer.name, False, producer.instance)
+            )
+            self.scope.returns.append((used, number))
+
+    def assign(self, name: str, right: Node) -> None:
+        right = jsflow.unwrap(right)
+        found = (
+            self.resolved.get((right.start_byte, right.end_byte))
+            if right.type in jsflow.CALLS
+            else None
+        )
+        if found is not None:
+            component, constructed = found
+            self.bind(name, [Producer(component, name, True, constructed)])
+            if constructed:
+                self.instances[name] = component
+            return
+        self.bind(
+            name, [Producer(p.component, name, False, p.instance) for p in self.producers(right)]
+        )
+
+    def bound(self, name: str) -> bool:
+        """A name this scope binds to something, so a module-level definition is hidden."""
+        return (
+            name in self.env
+            or name in self.local
+            or name in self.hidden
+            or (self.definition is not None and name in self.definition.parameters)
+        )
+
+    def target(self, function: Node) -> tuple[str, bool] | None:
+        """Resolve a callee to a component id; None when the source does not bind it."""
+        body, path, repo = self.file.body, self.file.path, self.repo
+        if function.type == "identifier":
+            callee = text(function, body)
+            if callee in self.instances:
+                return self.instances[callee], False
+            if self.bound(callee):
+                return None  # A value or parameter being called: its definition is not bound.
+            found = repo.bindings.get(path, {}).get(callee)
+            if found:
+                return found, repo.defs[found].kind == "class"
+            if callee in repo.externals.get(path, {}):
+                return f"resource::{repo.externals[path][callee]}", False
+            if callee == GLOBAL_FETCH and callee not in repo.declared.get(path, {}):
+                return f"resource::{GLOBAL_FETCH}", False
+            if callee not in SCRIPT_BUILTINS:
+                self.scope.unresolved.append(callee)
+            return None
+        if function.type != "member_expression":
+            return None
+        owner = function.child_by_field_name("object")
+        name = text(function.child_by_field_name("property"), body)
+        if owner is None:
+            return None
+        parts = repo.parts.get(self.owner or "", {})
+        if self.owner and owner.type == "this" and name in parts:
+            return f"{self.owner}#{name}", False
+        if self.owner and owner.type == "member_expression":
+            inner = owner.child_by_field_name("object")
+            part = text(owner.child_by_field_name("property"), body)
+            if inner is not None and inner.type == "this" and part in parts:
+                return f"{self.owner}#{part}", False
+        if owner.type != "identifier":
+            return None
+        base = text(owner, body)
+        if base in self.instances:
+            return self.instances[base], False
+        if self.bound(base):
+            held = [
+                p
+                for p in self.env.get(base, [])
+                if p.component.startswith("resource::") and p.direct
+            ]
+            # A method on a handle a client library returned, or else an unbound value.
+            return (held[0].component, False) if held else None
+        module = repo.aliases.get(path, {}).get(base)
+        found = repo.member(path, base, module, name) if module else None
+        if found:
+            return found, repo.defs[found].kind == "class"
+        if base in repo.externals.get(path, {}):
+            return f"resource::{repo.externals[path][base]}", False
+        return None
+
+    def calls(self, node: Node) -> None:
+        body = self.file.body
+        for call in reversed(jsflow.reachable(node)):
+            if call.type in jsflow.NESTED:
+                self.nested(call)
+                continue
+            element = call.type in jsflow.ELEMENTS
+            if call.type not in jsflow.CALLS and not (
+                element and jsflow.component_element(call, body)
+            ):
+                continue
+            function = jsflow.callee(call)
+            found = self.target(function) if function is not None else None
+            if found is None or function is None:
+                continue
+            if not element:  # A JSX element is a use of a component, not a value from it.
+                self.resolved[(call.start_byte, call.end_byte)] = found
+            uses: list[tuple[Producer, int]] = []
+            for argument in jsflow.arguments(call):
+                inner = jsflow.unwrap(argument)
+                direct = inner.type == "identifier" or (
+                    inner.type in jsflow.CALLS
+                    and (inner.start_byte, inner.end_byte) in self.resolved
+                )
+                for producer in self.producers(argument):
+                    used = (
+                        producer
+                        if direct
+                        else Producer(producer.component, producer.name, False, producer.instance)
+                    )
+                    uses.append((used, self.where(argument, producer.name)))
+            self.scope.sites.append(Site(found[0], text(function, body), line(call), uses))
+
+    def nested(self, function: Node) -> None:
+        if (function.start_byte, function.end_byte) in self.repo.inline:
+            return  # A route handler written in place is its own definition.
+        if function.type not in {"arrow_function", "function_expression", "method_definition"}:
+            return
+        block = function.child_by_field_name("body")
+        if block is None:
+            return
+        hidden = tuple(jsflow.parameter_names(function, self.file.body))
+        ScriptReader(
+            self.repo,
+            self.file,
+            self.scope,
+            self.definition,
+            self,
+            hidden,
+            function.type == "arrow_function",
+        ).run(block)
+
+    def where(self, node: Node, token: str) -> int:
+        for part in jsflow.reachable(node):
+            if part.type in {
+                "identifier",
+                "member_expression",
+                "call_expression",
+                "shorthand_property_identifier",
+            } and text(part, self.file.body).startswith(token):
+                return line(part)
+        return line(node)
+
+    def producers(self, node: Node) -> list[Producer]:
+        """Components whose values an expression holds, in source order (iteratively)."""
+        found: list[Producer] = []
+        body = self.file.body
+        stack = [node]
+        while stack:
+            part = stack.pop()
+            if part.type in jsflow.NESTED or part.type in jsflow.MARKUP:
+                # A function value, or a JSX tree that describes markup, is not a value any
+                # component produced. What a JSX element passes is read from its attributes.
+                continue
+            key = (part.start_byte, part.end_byte)
+            if part.type in jsflow.CALLS and key in self.resolved:
+                component, constructed = self.resolved[key]
+                made = jsflow.callee(part)
+                name = jsflow.head(made, body) if made is not None else ""
+                found.append(Producer(component, name, True, constructed))
+            elif part.type in {"identifier", "shorthand_property_identifier"}:
+                if text(part, body) not in self.hidden:
+                    found.extend(self.env.get(text(part, body), []))
+            elif part.type in {"member_expression", "pair"}:
+                inner = part.child_by_field_name(
+                    "object" if part.type == "member_expression" else "value"
+                )
+                if inner is not None:
+                    stack.append(inner)
+            else:
+                stack.extend(reversed(part.named_children))
+        return list(dict.fromkeys(found))
+
+
 class Graph:
     """Collects components and connections for one architecture; drops what cannot be cited."""
 
@@ -519,8 +1170,18 @@ class Graph:
     def identity(self, key: str, parent: str | None) -> str:
         return (parent + "__" if parent else "") + slug(key.split("::")[-1] if "::" in key else key)
 
-    def add(self, key: str, scope: FlowScope, at: int, parent: str | None = None) -> str | None:
-        """Add the component a key names. Returns its id, or None if it has no verified citation."""
+    def quote(self, path: str, number: int) -> str:
+        lines = self.ctx.lines.get(path, [])
+        return lines[number - 1].strip()[:400] if 1 <= number <= len(lines) else ""
+
+    def add(
+        self, key: str, scope: FlowScope, at: int, parent: str | None = None, token: str = ""
+    ) -> str | None:
+        """Add the component a key names. Returns its id, or None if it has no verified citation.
+
+        `token` is text the cited line shows when the component's own name is not on it, such
+        as the local name a client class was imported as.
+        """
         lookup = f"{parent}|{key}"
         if lookup in self.ids:
             return self.ids[lookup]
@@ -535,33 +1196,42 @@ class Graph:
         elif key == "output::":
             kind, label, group = "output", "result", scope.path
             key = "output::result"
-            citation, anchor = ctx.cite(scope.path, at), "return"
+            citation = ctx.cite(scope.path, at)
+            # An expression-bodied arrow function returns without the keyword.
+            anchor = "return" if "return" in self.quote(scope.path, at) else "=>"
         elif key.startswith("resource::"):
             root = key.split("::")[1]
-            kind, label, group = RESOURCES[root], root, "external"
-            citation, anchor = ctx.cite(scope.path, at), root
-            lines = ("client library",)
+            kind, label, group = KINDS[root], root, "external"
+            citation = ctx.cite(scope.path, at)
+            anchor = root if root in self.quote(scope.path, at) or not token else token
+            lines = ("built-in function",) if root == GLOBAL_FETCH else ("client library",)
         elif "#" in key:
             owner, attribute = key.split("#")
             bound, made, number = repo.parts[owner][attribute]
             kind, label, group = "part", attribute, repo.defs[owner].path
-            citation, anchor = ctx.cite(repo.defs[owner].path, number), f"self.{attribute}"
+            receiver = "self" if ctx.files[repo.defs[owner].path].python else "this"
+            citation = ctx.cite(repo.defs[owner].path, number)
+            anchor = f"{receiver}.{attribute}"
             lines = (made[:40],)
         else:
             definition = repo.defs[key]
             kind, label, group = definition.kind, definition.name, definition.path
             citation = ctx.cite(definition.path, definition.line)
-            anchor = f"{'class' if kind == 'class' else 'def'} {definition.name}"
+            anchor = definition.anchor
             if kind == "function" and definition.parameters:
                 lines = (("takes " + ", ".join(definition.parameters))[:40],)
             elif kind == "class":
                 methods = sorted(
                     d.name.split(".")[-1]
                     for d in repo.defs.values()
-                    if d.owner == key and not d.name.endswith("__")
+                    if d.owner == key
+                    and not d.name.endswith("__")
+                    and not d.name.endswith(".constructor")
                 )
                 lines = (("methods " + ", ".join(methods))[:40],) if methods else ()
-        if citation is None:
+        if citation is None or (anchor and anchor not in citation.quote):
+            # The validator requires the cited line to show the element: never emit one
+            # that it would reject.
             self.dropped += 1
             return None
         identity = self.identity(key, parent)
@@ -596,7 +1266,7 @@ class Graph:
         if source == target:
             return None
         citations = [self.ctx.cite(path, number) for path, number in dict.fromkeys(cited)]
-        if any(c is None for c in citations) or not citations:
+        if any(c is None for c in citations) or not citations or not shown(citations, anchors):
             self.dropped += 1
             return None
         if "INFERRED" in (self.components[source].status, self.components[target].status):
@@ -605,13 +1275,12 @@ class Graph:
         existing = self.connections.get(identity)
         if existing is not None:
             merged = tuple(dict.fromkeys([*existing.citations, *[c for c in citations if c]]))[:6]
+            together = tuple(dict.fromkeys([*existing.anchors, *anchors]))
+            if not shown(list(merged), together):
+                return identity  # The extra site would not stay cited; keep what is shown.
             status = "VERIFIED" if "VERIFIED" in (existing.status, status) else status
             self.connections[identity] = existing.model_copy(
-                update={
-                    "citations": merged,
-                    "status": status,
-                    "anchors": tuple(dict.fromkeys([*existing.anchors, *anchors])),
-                }
+                update={"citations": merged, "status": status, "anchors": together}
             )
             return identity
         self.connections[identity] = Connection(
@@ -644,6 +1313,14 @@ class Graph:
         fits, everything added since `before` is undone and counted as left out, so a graph is
         never handed to the renderer with more than the diagram can place.
         """
+        if self.drawable(parent):
+            return True
+        self.components, self.connections, self.ids, self.order = before
+        self.dropped += 1
+        return False
+
+    def drawable(self, parent: str | None = None) -> bool:
+        """Whether one view lays out exactly as the diagram renderer will lay it out."""
         members = [c for c in self.components.values() if c.parent == parent]
         inside = {c.id for c in members}
         links = sorted(
@@ -653,10 +1330,17 @@ class Graph:
         try:
             automatic(members, links)
         except LayoutError:
-            self.components, self.connections, self.ids, self.order = before
-            self.dropped += 1
             return False
         return True
+
+    def remove(self, identity: str) -> None:
+        """Take one component, and every connection touching it, out of the graph."""
+        self.components.pop(identity, None)
+        for key in [k for k, c in self.connections.items() if identity in (c.source, c.target)]:
+            del self.connections[key]
+            self.order.pop(key, None)
+        self.ids = {k: v for k, v in self.ids.items() if v != identity}
+        self.dropped += 1
 
     def flow(self, scope: FlowScope, parent: str | None = None, limit: int = MAX_NODES) -> None:
         """Components called in one scope and the values passed between them."""
@@ -668,16 +1352,16 @@ class Graph:
                 self.dropped += 1
                 continue
             before = self.snapshot()
-            target = self.add(site.target, scope, site.line, parent)
+            head = lead(site.callee)
+            target = self.add(site.target, scope, site.line, parent, head.split(".")[0])
             if target is None:
                 continue
             for producer, where in site.uses:
                 step = self.snapshot()
-                source = self.add(producer.component, scope, where, parent)
+                source = self.add(producer.component, scope, where, parent, producer.name)
                 if source is None:
                     continue
                 wires = producer.instance
-                head = site.callee.split("(")[0]
                 self.link(
                     source,
                     target,
@@ -696,6 +1380,7 @@ class Graph:
                 continue
             before = self.snapshot()
             target = self.add("output::", scope, where, parent)
+            keyword = "return" if "return" in self.quote(scope.path, where) else "=>"
             if target:
                 self.link(
                     source,
@@ -705,7 +1390,7 @@ class Graph:
                     "static_data_flow",
                     "VERIFIED" if producer.direct else "INFERRED",
                     [(scope.path, where)],
-                    ("return", producer.name),
+                    (keyword, producer.name),
                 )
                 self.fits(parent, before)
 
@@ -716,7 +1401,8 @@ class Graph:
             for site in scope.sites:
                 if site.target.startswith("resource::") and len(self.components) < MAX_NODES + 3:
                     before = self.snapshot()
-                    target = self.add(site.target, scope, site.line, parent)
+                    token = lead(site.callee).split(".")[0]
+                    target = self.add(site.target, scope, site.line, parent, token)
                     if target:
                         self.link(
                             identity,
@@ -726,7 +1412,7 @@ class Graph:
                             "static_structure",
                             "VERIFIED",
                             [(scope.path, site.line)],
-                            (site.callee.split(".")[0],),
+                            (token,),
                         )
                         self.fits(parent, before)
 
@@ -738,7 +1424,8 @@ class Graph:
         candidates = [
             s
             for k, s in self.repo.scopes.items()
-            if k == key or (k.startswith(key + ".") and not k.endswith("__init__"))
+            if k == key
+            or (k.startswith(key + ".") and not k.endswith(("__init__", ".constructor")))
         ]
         candidates.sort(
             key=lambda s: (
@@ -866,10 +1553,14 @@ def sentence(connection: Connection, components: dict[str, Component]) -> str:
     if connection.kind == "wires":
         return f"The {source.label} object is handed to {target.label}{how}."
     if connection.kind == "uses":
+        what = (
+            f"the {target.label} client library"
+            if "client library" in target.lines
+            else f"the built-in {target.label} function"
+        )
         return (
-            f"{source.label} calls the {target.label} client library, a "
-            f"{target.kind.replace('_', ' ')} interaction. Whether it succeeds at runtime "
-            f"is not established."
+            f"{source.label} calls {what}, a {target.kind.replace('_', ' ')} interaction. "
+            f"Whether it succeeds at runtime is not established."
         )
     if connection.kind == "calls":
         return f"The source of {source.label} contains a call to {target.label}."
@@ -973,8 +1664,32 @@ def orchestrations(
     return found
 
 
+def handler_of(repo: Repo, path: str, node: Node) -> str | None:
+    """The function definition a route declaration names as its handler, if the source binds it."""
+    body = repo.ctx.files[path].body
+    found: str | None = None
+    if (node.start_byte, node.end_byte) in repo.inline:
+        found = repo.inline[(node.start_byte, node.end_byte)]
+    elif node.type == "identifier":
+        found = repo.bindings.get(path, {}).get(text(node, body))
+    elif node.type == "member_expression":
+        owner = node.child_by_field_name("object")
+        alias = text(owner, body) if owner is not None and owner.type == "identifier" else ""
+        module = repo.aliases.get(path, {}).get(alias)
+        name = text(node.child_by_field_name("property"), body)
+        found = repo.member(path, alias, module, name) if module else None
+    if found is None or repo.defs[found].kind != "function" or found not in repo.scopes:
+        return None
+    return found
+
+
 def routes(repo: Repo) -> dict[str, list[tuple[str, str, int, str, int]]]:
-    """Declared routes per file: (method, path, decorator line, handler definition id, def line)."""
+    """Declared routes per file: (method, path, route line, handler definition id, def line).
+
+    Python routes are decorators; JavaScript and TypeScript routes are calls such as
+    `app.get("/items", handler)` on the application object the analyzer bound. Routes in test
+    files are not the repository's service.
+    """
     allowed = {
         c["path"]
         for c in repo.ctx.payload["knowledge"]["entrypoints"]["candidates"]
@@ -983,6 +1698,16 @@ def routes(repo: Repo) -> dict[str, list[tuple[str, str, int, str, int]]]:
     found: dict[str, list[tuple[str, str, int, str, int]]] = {}
     for path, file in repo.ctx.files.items():
         if path not in allowed or not file.valid:
+            continue
+        if repo.ctx.manifest.get(path, {}).get("classification") == "test":
+            continue
+        if not file.python:
+            for method, route, number, written in repo.script_routes.get(path, []):
+                handler = handler_of(repo, path, written)
+                if handler is not None:
+                    found.setdefault(path, []).append(
+                        (method, route, number, handler, repo.defs[handler].line)
+                    )
             continue
         for child in file.root.named_children:
             node = (
@@ -1012,8 +1737,10 @@ def services(
         for method, route, number, handler, def_line in items[:4]:
             citation = repo.ctx.cite(path, number)
             scope = repo.scopes[handler]
+            before = graph.snapshot()
             target = graph.add(handler, scope, def_line)
-            if citation is None or target is None:
+            if citation is None or target is None or route not in citation.quote:
+                graph.components, graph.connections, graph.ids, graph.order = before
                 continue
             endpoint = slug(f"{method} {route}") or "route"
             graph.components[endpoint] = Component(
@@ -1034,9 +1761,11 @@ def services(
                 "declared on",
                 "declared_route",
                 "INFERRED",
-                [(path, number), (path, def_line)],
-                (route, f"def {repo.defs[handler].name}"),
+                [(path, number), (repo.defs[handler].path, def_line)],
+                (route, repo.defs[handler].anchor),
             )
+            if not graph.fits(None, before):
+                continue
             for site in scope.sites:
                 # Bounded before adding, as in Graph.flow: a callee past the limit is never
                 # added, so no unlinked component is left behind.
@@ -1047,7 +1776,8 @@ def services(
                     graph.dropped += 1
                     continue
                 before = graph.snapshot()
-                callee = graph.add(site.target, scope, site.line)
+                head = lead(site.callee)
+                callee = graph.add(site.target, scope, site.line, None, head.split(".")[0])
                 if callee is None:
                     continue
                 kind = "uses" if site.target.startswith("resource::") else "calls"
@@ -1058,8 +1788,8 @@ def services(
                     "call site",
                     "static_structure",
                     "VERIFIED",
-                    [(path, site.line)],
-                    (site.callee.split("(")[0],),
+                    [(scope.path, site.line)],
+                    (head,),
                 )
                 if graph.fits(None, before) and site.target in repo.defs:
                     graph.uses(site.target, callee)
@@ -1119,7 +1849,7 @@ def overview(
             (scope.path, site.line)
             for site in scope.sites
             if site.target.startswith("resource::")
-            and RESOURCES[site.target.split("::")[1]] == "http_client"
+            and KINDS[site.target.split("::")[1]] == "http_client"
         ]
     for path, number in sorted(set(clients)):
         literal = URL.search(ctx.lines.get(path, [""] * number)[number - 1])
@@ -1155,7 +1885,8 @@ def overview(
         degree[target] = degree.get(target, 0) + 1
     for path, _ in resources:
         degree[path] = degree.get(path, 0) + 1
-    keep = set(sorted(degree, key=lambda p: (-degree[p], p))[:9])
+    ranked = sorted(degree, key=lambda p: (-degree[p], p))[:9]
+    keep = set(ranked)
     ids: dict[str, str] = {}
     for path in sorted(keep):
         text_lines = ctx.lines.get(path, [])
@@ -1165,13 +1896,19 @@ def overview(
             continue
         identity = slug(path)
         entry = ctx.manifest[path]
-        count = sum(1 for d in repo.defs.values() if d.path == path and d.kind != "method")
+        count = sum(
+            1 for d in repo.defs.values() if d.path == path and d.kind != "method" and not d.inline
+        )
         graph.components[identity] = Component(
             id=identity,
             role="source_file",
             kind="source_file",
             label=path.split("/")[-1][:28],
-            lines=(f"{entry['language']}, {count} definitions" if count else entry["language"],),
+            lines=(
+                f"{entry['language']}, {count} definition{'' if count == 1 else 's'}"
+                if count
+                else entry["language"],
+            ),
             status="VERIFIED",
             anchors=(citation.quote[:24],),
             citations=(citation,),
@@ -1190,10 +1927,13 @@ def overview(
                 cited,
                 anchors,
             )
+    external: list[str] = []
     for path, site in resources:
         if path in ids and len(graph.components) < MAX_NODES + 3:
-            reached = graph.add(site.target, FlowScope(path, path, path, 1), site.line)
+            token = lead(site.callee).split(".")[0]
+            reached = graph.add(site.target, FlowScope(path, path, path, 1), site.line, None, token)
             if reached:
+                external.append(reached)
                 graph.link(
                     ids[path],
                     reached,
@@ -1202,8 +1942,17 @@ def overview(
                     "static_structure",
                     "VERIFIED",
                     [(path, site.line)],
-                    (site.callee.split(".")[0],),
+                    (token,),
                 )
+    # Several languages and boundaries can need more rows than the diagram has. Leave out
+    # external resources first, then the least connected files, until the view lays out.
+    for identity in [
+        *reversed(dict.fromkeys(external)),
+        *(ids[p] for p in reversed(ranked) if p in ids),
+    ]:
+        if graph.drawable():
+            break
+        graph.remove(identity)
     unresolved = [
         Unresolved(
             topic="integration",

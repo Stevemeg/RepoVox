@@ -32,6 +32,7 @@ TECHNOLOGY = re.compile(
     r"(?i)\b(transformer|self-attention|rag|retrieval-augmented|multi-agent|microservices?)\b"
 )
 DECLARATIONS = {"class", "function", "method"}
+LANGUAGES = {"python", "javascript", "typescript", "tsx"}
 
 
 class ArchitectureError(Exception):
@@ -197,11 +198,13 @@ class Context:
             if entry is None or entry["file_sha256"] != digest(body):
                 raise ArchitectureError("source_mismatch")
         self.sources = sources
+        # Every analysed language the parser supports. Each file is read with its own grammar;
+        # the GAN and supervised enrichers below only read Python scopes.
         self.files = {
-            path: SourceFile(path, body)
+            path: SourceFile(path, body, self.manifest[path]["language"])
             for path, body in (sorted(sources.items()) if parse else [])
             if self.manifest[path]["status"] == "parsed"
-            and self.manifest[path]["language"] == "python"
+            and self.manifest[path]["language"] in LANGUAGES
         }
         verdicts = {v["claim_id"]: v for v in payload["verification"]["verdicts"]}
         valid = {e["id"] for e in payload["evidence"]["items"] if e["validation_status"] == "valid"}

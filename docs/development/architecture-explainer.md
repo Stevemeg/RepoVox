@@ -1,6 +1,7 @@
 # Architecture explainer
 
-Status: implementation record, 2026-11-14. Not independently reviewed or accepted.
+Status: implementation record, 2026-11-14; JavaScript and TypeScript reading added
+2026-11-16. Not independently reviewed or accepted.
 Branch `feature/repository-to-video`. Related:
 [media stage compatibility](../delivery/media-stage-compatibility.md),
 [relationship edge correction](relationship-edge-correction.md),
@@ -17,8 +18,9 @@ relationships found in the code, not on recognising a named pattern.
 
 | Module | Role |
 | --- | --- |
-| `archgraph.py` | Generic graph extraction: components, relationships, hierarchy, boundaries, zoom views. No named-architecture logic. |
-| `pyflow.py` | Static Python facts used by the two named enrichers. Source is parsed, never executed. |
+| `archgraph.py` | Generic graph extraction: components, relationships, hierarchy, boundaries, zoom views. No named-architecture logic. One reader for Python and one for JavaScript/TypeScript feed the same graph builder. |
+| `pyflow.py` | Static Python facts used by the generic reader and the two named enrichers. Each source file is parsed with its own grammar, never executed. |
+| `jsflow.py` | Static JavaScript, TypeScript and TSX syntax facts: top-level declarations, class members, parameters, statements, calls, `new` and JSX elements. |
 | `architecture.py` | Architecture IR `architecture-ir-1.0`, the GAN and supervised-network enrichers, and the independent validator. |
 | `diagram.py` | One renderer: automatic layered layout, boundary lanes, routing, animation frames. |
 | `explainer.py` | Narration generated from the IR, synchronised animation, video bundle. |
@@ -26,8 +28,34 @@ relationships found in the code, not on recognising a named pattern.
 ## Generic extraction
 
 Components are things the source defines or reaches: functions, classes, parts a class
-constructs in `__init__`, declared routes, external resources reached through an imported
-client library, and source files.
+constructs in `__init__` (`self.x = ...`) or in a JavaScript/TypeScript `constructor`
+(`this.x = ...`), declared routes, external resources reached through an imported client
+library, and source files.
+
+### Languages
+
+Every file the analyzer parsed in Python, JavaScript, TypeScript or TSX is read. JSX in
+`.js`/`.jsx` files is read with the JavaScript grammar.
+
+| Source shape | Python | JavaScript / TypeScript |
+| --- | --- | --- |
+| Definitions | top-level `def` and `class`, class methods | `function`, `class`, top-level `const name = (...) =>` or `function` expressions, class methods |
+| Bindings | resolved imports | resolved ESM imports, namespace imports, `require` (whole module or destructured) |
+| Calls | `name(...)`, `module.name(...)`, `self.part(...)` | the same plus `new Name(...)`, `this.part(...)` and JSX elements that use a component (`<List items={rows} />`, attribute values are the values passed) |
+| Routes | `@app.get("/path")` decorators | `app.get("/path", handler)` calls the analyzer recorded as framework routes; the last argument is the handler, named or written in place |
+| Resources | `sqlite3`, `redis`, `requests`, ... | `pg`, `mongodb`, `redis`, `ioredis`, `axios`, ... and the global `fetch` when the file does not rebind it |
+
+Inline callbacks (`items.map((x) => save(x))`) are read as part of the scope that contains
+them: their calls are call sites of that scope, their own parameters hide outer names, and
+they contribute no returned value. A handler written in place in a route declaration is its
+own definition, named after its route (`GET /items handler`). A module-level name bound once
+to a constructed instance or a client handle (`const pool = new Pool()`) is visible to the
+functions of that file. Returned JSX is markup, not a value from any component.
+
+Bindings the analyzer does not confirm are `INFERRED`, as for Python: names destructured from
+`require`, members reached through a `require`d module, and every binding in a file the
+analyzer treats as unsafe (for example one with a destructured parameter such as React
+`({ items })` props).
 
 Relationships are static and each records its evidence basis:
 
@@ -48,7 +76,15 @@ execution is not established.
 An architecture is emitted for a scope that connects at least three components through at
 least two relationships. A scope called from another such scope becomes a zoom view of its
 caller instead of a separate architecture. A system overview at file level is added when
-there are several subsystems or a cross-file request-to-route match.
+there are several subsystems or a cross-file request-to-route match. Scopes and routes in
+test files are not the repository's architecture.
+
+Every view is laid out with the renderer's own layout before it is kept, so no architecture
+reaches rendering with `diagram_overflow`. When a system overview spanning several languages
+and boundaries needs more columns or rows than the diagram has, external resources and then
+the least connected files are left out and counted under "not drawn". Each element is also
+checked against its citation before it is emitted: an element whose cited line does not show
+the name it claims is left out rather than failing the whole discovery.
 
 ### Binding strength
 
@@ -82,16 +118,27 @@ and classes they explain are not repeated as generic graphs.
 `tests/fixtures/architectures`: `gan_standard`, `gan_conditional`, `cnn_classifier`,
 `cnn_model`, `rag_pipeline`, `transformer_model`, `multi_agent`, `fullstack_web`,
 `microservices`, `data_pipeline`, `custom_unnamed`, `multi`, `gan_mention_only`,
-`tech_mention_only`, `gan_incomplete`. All are locally authored and parsed as data only.
+`tech_mention_only`, `gan_incomplete`, and for JavaScript and TypeScript `express_service`
+(CommonJS Express routes and `pg`), `typescript_pipeline` (typed multi-line signatures,
+namespace imports, constructor parts and a zoom view), `react_frontend` (TSX components
+receiving values through JSX, global `fetch`) and `fullstack_typescript` (a TypeScript client
+matched to an ESM Express backend using `mongodb`). All are locally authored and parsed as
+data only.
 
 ## Known limits
 
-- Python only for data flow. TypeScript and JavaScript files appear in the system overview
-  through resolved imports and request-path literals, not through data-flow analysis.
 - Direct patterns only: calls to names bound in the same scope, constructed instances,
-  `self.part(...)` calls. Callables passed as parameters, dynamic dispatch, decorators that
-  rewire calls, containers of components and inheritance-based dispatch are not followed
-  and are reported as unbound or left out.
+  `self.part(...)` / `this.part(...)` calls. Callables passed as parameters, dynamic
+  dispatch, decorators that rewire calls, containers of components and inheritance-based
+  dispatch are not followed and are reported as unbound or left out.
+- JavaScript and TypeScript routes: only Express-style `app.<method>("/path", ...)` calls on
+  the object the analyzer bound to `express()`. Routers (`express.Router()`), chained
+  `app.route(...)`, decorator frameworks (NestJS) and file-system routing (Next.js) are not
+  recognised. Exports assigned to `module.exports` are not read as declarations, which is
+  why members reached through `require` are `INFERRED`.
+- A callback sees the values of the scope around it, but what a callback returns, promise
+  chains (`.then(...)`) and React state or hooks are not followed; calls to hooks are
+  reported as unbound.
 - At most ten top-level components and two zoom views per architecture, and three rendered
   architectures per repository. What is dropped is counted under unresolved.
 - Parallel edges between the same pair of boxes, and skip connections along one row, can be

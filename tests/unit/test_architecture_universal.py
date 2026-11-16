@@ -47,11 +47,15 @@ FAMILIES = [
     "cnn_model",
     "custom_unnamed",
     "data_pipeline",
+    "express_service",
+    "fullstack_typescript",
     "fullstack_web",
     "microservices",
     "multi_agent",
     "rag_pipeline",
+    "react_frontend",
     "transformer_model",
+    "typescript_pipeline",
 ]
 NAMED = re.compile(r"(?i)\b(gan|rag|transformer|attention|agent|cnn|microservice|pipeline)\b")
 
@@ -744,3 +748,389 @@ def test_test_functions_are_not_chosen_as_the_architecture(tmp_path: Path) -> No
         assert not any(path.startswith("tests/") for path in architecture.scope)
         assert "test_report_matches_the_pipeline" not in architecture.title
     drawn(graph)
+
+
+# JavaScript, TypeScript and TSX go through the same extractor, validator, layout and narrator.
+# Nothing below is filtered out by language; every element is checked against exact source.
+
+
+def cited(component: Component) -> tuple[str, int, str]:
+    citation = component.citations[0]
+    return citation.path, citation.line, citation.quote
+
+
+def test_express_routes_handlers_and_client_library(loaded: dict[str, Loaded]) -> None:
+    payload, sources, report = loaded["express_service"]
+    assert {f["language"] for f in payload["knowledge"]["coverage"]["files"]} == {"javascript"}
+    (service,) = report.architectures
+    assert (service.type, service.title) == ("service", "HTTP service in server.js")
+    assert edges(service) == {
+        ("GET /items", "routes", "GET /items handler"),
+        ("GET /items handler", "calls", "listItems"),
+        ("POST /items", "routes", "createItem"),
+        ("createItem", "calls", "addItem"),
+        ("listItems", "uses", "pg"),
+        ("addItem", "uses", "pg"),
+    }
+    parts = labels(service)
+    # A handler written in place is cited where it starts; a named one where it is declared.
+    assert cited(parts["GET /items handler"]) == (
+        "server.js",
+        7,
+        'app.get("/items", async (req, res) => {',
+    )
+    assert cited(parts["createItem"]) == ("server.js", 14, "async function createItem(req, res) {")
+    assert cited(parts["POST /items"]) == ("server.js", 12, 'app.post("/items", createItem);')
+    assert parts["GET /items handler"].lines == ("takes req, res",)
+    # `new Pool()` from "pg" at module level is a client handle the functions use.
+    assert (parts["pg"].kind, parts["pg"].group, parts["pg"].lines) == (
+        "database",
+        "external",
+        ("client library",),
+    )
+    assert "pool.query(" in parts["pg"].citations[0].quote and parts["pg"].anchors == ("pool",)
+    # Members destructured from `require` are bound by syntax the analyzer does not confirm.
+    assert (parts["listItems"].status, parts["createItem"].status) == ("INFERRED", "VERIFIED")
+    assert "binding strength" in {u.topic for u in service.unresolved}
+    assert all(
+        (c.basis, c.status) == ("declared_route", "INFERRED")
+        for c in service.connections
+        if c.kind == "routes"
+    )
+    spoken = [line.text for line in explainer.narrate(service)]
+    assert "The route GET /items is declared on GET /items handler. Which handler serves a " in (
+        " ".join(spoken)
+    )
+    assert "listItems calls the pg client library, a database interaction." in " ".join(spoken)
+    drawn(service)
+
+
+def test_typescript_values_parameters_and_constructed_parts(loaded: dict[str, Loaded]) -> None:
+    payload, sources, report = loaded["typescript_pipeline"]
+    (graph,) = report.architectures
+    assert (graph.type, graph.status, graph.title) == (
+        "component_graph",
+        "VERIFIED",
+        "runPipeline() in src/pipeline.ts",
+    )
+    top = {c for c in edges(graph) if c[0] not in {"scores", "key", "encoder"}}
+    assert top == {
+        ("source", "data", "readRecords"),
+        ("readRecords", "data", "normalise"),
+        ("normalise", "data", "score"),
+        ("weight", "data", "score"),
+        ("url", "data", "ScoreStore"),
+        ("score", "data", "ScoreStore"),
+        ("ScoreStore", "data", "result"),
+        ("ScoreStore", "uses", "redis"),
+    }
+    parts = labels(graph)
+    # A namespace import (`transform.score`) and an arrow-function constant both bind.
+    assert (parts["normalise"].group, parts["normalise"].anchors) == (
+        "src/transform.ts",
+        ("normalise =",),
+    )
+    assert parts["ScoreStore"].lines == ("methods save",)  # The constructor is not listed.
+    # Each parameter of a multi-line typed signature is cited on the line that declares it.
+    assert {name: cited(parts[name])[1:] for name in ("source", "weight", "url")} == {
+        "source": (6, "source: string,"),
+        "weight": (7, "weight: number,"),
+        "url": (8, "url: string,"),
+    }
+    assert "The value from readRecords, held in rows, is passed to normalise." in [
+        step.text for step in graph.flows[0].steps
+    ]
+    # `redis` is reached through `createClient`, which is what the cited line shows.
+    assert (parts["redis"].kind, parts["redis"].anchors) == ("cache", ("createClient",))
+    # `this.part = ...` in the constructor, used by a method: a zoom view, as for Python.
+    zoom = graph.views[1]
+    assert (zoom.id, zoom.title) == ("inside-scorestore", "Inside ScoreStore.save")
+    inner = {c.label: c for c in graph.components if c.parent == zoom.parent}
+    assert set(inner) == {"scores", "key", "encoder", "client"}
+    assert (inner["encoder"].lines, inner["encoder"].anchors) == (("Encoder",), ("this.encoder",))
+    assert {(a, k, b) for a, k, b in edges(graph) if a in inner} == {
+        ("scores", "data", "encoder"),
+        ("key", "data", "client"),
+        ("encoder", "data", "client"),
+    }
+    drawn(graph)
+    # Citing a parameter on the signature's first line, which does not show it, is rejected.
+    weight = parts["weight"]
+    at_signature = Context(payload, sources).cite("src/pipeline.ts", 5)
+    assert at_signature is not None and at_signature.quote == "export async function runPipeline("
+    forged = graph.model_copy(
+        update={
+            "components": tuple(
+                c.model_copy(update={"citations": (at_signature,)}) if c.id == weight.id else c
+                for c in graph.components
+            )
+        }
+    )
+    with pytest.raises(ArchitectureError) as raised:
+        check(rebuilt(report, forged), payload, sources)
+    assert raised.value.code == "unsupported_element"
+    moved = graph.model_copy(
+        update={
+            "components": tuple(
+                c.model_copy(
+                    update={
+                        "citations": (
+                            c.citations[0].model_copy(
+                                update={"quote": "export function readRecords(input: string) {"}
+                            ),
+                        )
+                    }
+                )
+                if c.label == "readRecords"
+                else c
+                for c in graph.components
+            )
+        }
+    )
+    with pytest.raises(ArchitectureError) as raised:
+        check(rebuilt(report, moved), payload, sources)
+    assert raised.value.code == "false_citation"
+
+
+def test_tsx_components_receive_values_through_jsx(loaded: dict[str, Loaded]) -> None:
+    payload, sources, report = loaded["react_frontend"]
+    assert {f["language"] for f in payload["knowledge"]["coverage"]["files"]} == {
+        "typescript",
+        "tsx",
+    }
+    (graph,) = report.architectures
+    assert (graph.type, graph.title) == ("component_graph", "Page() in web/Page.tsx")
+    assert edges(graph) == {
+        ("props", "data", "loadItems"),
+        ("loadItems", "data", "rank"),
+        ("rank", "data", "ItemList"),
+        ("rank", "data", "Summary"),
+        ("props", "data", "Summary"),
+        ("loadItems", "uses", "fetch"),
+    }
+    status = {(c.source, c.target): c.status for c in graph.connections}
+    ids = {c.label: c.id for c in graph.components}
+    # `items={ranked}` passes the value itself; `total={ranked.length}` passes part of it.
+    assert status[ids["rank"], ids["ItemList"]] == "VERIFIED"
+    assert status[ids["rank"], ids["Summary"]] == "INFERRED"
+    assert status[ids["props"], ids["loadItems"]] == "INFERRED"
+    element = next(
+        c for c in graph.connections if (c.source, c.target) == (ids["rank"], ids["ItemList"])
+    )
+    assert [x.quote for x in element.citations] == ["<ItemList items={ranked} />"]
+    # The platform's fetch, not rebound in the file, is drawn as a built-in client.
+    fetch = labels(graph)["fetch"]
+    assert (fetch.kind, fetch.group, fetch.lines) == (
+        "http_client",
+        "external",
+        ("built-in function",),
+    )
+    spoken = " ".join(line.text for line in explainer.narrate(graph))
+    assert "loadItems calls the built-in fetch function, a http client interaction." in spoken
+    assert "fetch is a built-in function for a http client." in spoken
+    # Returned JSX describes markup; it is not a value from any component.
+    assert "output" not in {c.kind for c in graph.components}
+    drawn(graph)
+
+
+def test_typescript_frontend_and_express_backend_share_one_overview(
+    loaded: dict[str, Loaded],
+) -> None:
+    payload, sources, report = loaded["fullstack_typescript"]
+    assert [a.type for a in report.architectures] == ["system_overview", "service"]
+    overview, service = report.architectures
+    assert edges(overview) == {
+        ("view.ts", "imports", "api.ts"),
+        ("api.ts", "http_request", "app.js"),
+        ("api.ts", "uses", "fetch"),
+        ("app.js", "imports", "orders.js"),
+        ("orders.js", "uses", "mongodb"),
+    }
+    files = {c.label: c.lines[0] for c in overview.components if c.kind == "source_file"}
+    assert files == {
+        "api.ts": "typescript, 1 definition",
+        "view.ts": "typescript, 1 definition",
+        "app.js": "javascript",
+        "orders.js": "javascript, 2 definitions",
+    }
+    request = next(c for c in overview.connections if c.kind == "http_request")
+    assert (request.basis, request.status) == ("literal_match", "INFERRED")
+    assert {c.path for c in request.citations} == {"client/api.ts", "server/app.js"}
+    assert edges(service) == {
+        ("GET /api/orders", "routes", "GET /api/orders handler"),
+        ("GET /api/orders handler", "calls", "findOrders"),
+        ("POST /api/orders", "routes", "POST /api/orders handler"),
+        ("POST /api/orders handler", "calls", "placeOrder"),
+        ("findOrders", "uses", "mongodb"),
+        ("placeOrder", "uses", "mongodb"),
+    }
+    assert service.status == "INFERRED" and {c.status for c in service.components} >= {"VERIFIED"}
+    # Neither a declared route nor a matching literal can be promoted to a verified interaction.
+    for architecture in report.architectures:
+        for connection in architecture.connections:
+            if connection.basis not in {"declared_route", "literal_match"}:
+                continue
+            promoted = architecture.model_copy(
+                update={
+                    "connections": tuple(
+                        c.model_copy(update={"status": "VERIFIED"}) if c.id == connection.id else c
+                        for c in architecture.connections
+                    )
+                }
+            )
+            with pytest.raises(ArchitectureError) as raised:
+                check(rebuilt(report, promoted), payload, sources)
+            assert raised.value.code == "unsupported_runtime_claim"
+    for architecture in report.architectures:
+        drawn(architecture)
+
+
+def test_script_scopes_bind_conservatively(tmp_path: Path) -> None:
+    steps = (
+        "export function fetchRows(source) {\n  return source;\n}\n\n"
+        "export function clean(rows) {\n  return rows;\n}\n\n"
+        "export function save(row) {\n  return row;\n}\n\n"
+        "export function audit(entry) {\n  return entry;\n}\n"
+    )
+    job = (
+        'import { audit, clean, fetchRows, save } from "./steps.js";\n'
+        'import { load } from "./client.js";\n\n'
+        "export function run(source, entry) {\n"
+        "  const rows = fetchRows(source);\n"
+        "  const tidy = clean(rows);\n"
+        "  tidy.forEach((rows) => save(rows));\n"
+        "  load(entry);\n"
+        "  return audit(entry);\n"
+        "}\n"
+    )
+    # `fetch` is rebound in this file, so it is not the platform's request function.
+    client = (
+        'import { getJSON } from "./http.js";\n\n'
+        "const fetch = getJSON;\n\n"
+        "export function load(url) {\n  return fetch(url);\n}\n"
+    )
+    http = "export function getJSON(url) {\n  return url;\n}\n"
+    # An Express application in a test file is not the repository's service.
+    test = (
+        'import express from "express";\n'
+        'import { run } from "../lib/job.js";\n\n'
+        "const app = express();\n\n"
+        'app.get("/health", (req, res) => {\n'
+        "  const seen = run(req.query, req.body);\n"
+        "  res.json(seen);\n"
+        "});\n"
+    )
+    root = written(
+        tmp_path / "source",
+        {
+            "lib/steps.js": steps,
+            "lib/job.js": job,
+            "lib/client.js": client,
+            "lib/http.js": http,
+            "tests/server.test.js": test,
+        },
+    )
+    payload, sources, report = load(root)
+    validate(report, payload, sources)
+    routes = {
+        c["path"]
+        for c in payload["knowledge"]["entrypoints"]["candidates"]
+        if c["rule"] == "framework-route-v1"
+    }
+    assert routes == {"tests/server.test.js"}  # Found by the analyzer, then not drawn.
+    assert by_type(report, "service") == []
+    (graph,) = report.architectures
+    assert graph.title == "run() in lib/job.js"
+    found = edges(graph)
+    assert {
+        ("source", "data", "fetchRows"),
+        ("fetchRows", "data", "clean"),
+        ("entry", "data", "audit"),
+        ("entry", "data", "load"),
+        ("audit", "data", "result"),
+    } <= found
+    # A call inside a callback is a call site of run, but the callback's own parameter `rows`
+    # hides the outer `rows`: no value from fetchRows or clean is claimed to reach save.
+    assert "save" in labels(graph)
+    assert not {(a, k, b) for a, k, b in found if b == "save"}
+    assert "fetch" not in {c.label for c in graph.components}
+    assert not any(path.startswith("tests/") for path in graph.scope)
+    drawn(graph)
+
+
+def test_a_long_multi_language_import_chain_still_fits_the_overview(tmp_path: Path) -> None:
+    """Before the overview was bounded by layout, a chain this long raised diagram_overflow."""
+    files = {
+        f"web/m{i}.ts": (
+            f'import {{ step{i + 1} }} from "./m{i + 1}";\n\n'
+            f"export function step{i}(x: number): number {{\n  return step{i + 1}(x);\n}}\n"
+        )
+        for i in range(9)
+    }
+    files["web/m9.ts"] = "export function step9(x: number): number {\n  return x;\n}\n"
+    files["web/m0.ts"] = (
+        'import { step1 } from "./m1";\n\n'
+        "export async function step0(x: number): Promise<number> {\n"
+        '  const response = await fetch("/api/items");\n'
+        "  return step1(x);\n"
+        "}\n"
+    )
+    files["backend/app.py"] = (
+        "from fastapi import FastAPI\n\napp = FastAPI()\n\n\n"
+        '@app.get("/api/items")\ndef items():\n    return []\n'
+    )
+    payload, sources, report = load(written(tmp_path / "source", files))
+    validate(report, payload, sources)
+    (overview,) = by_type(report, "system_overview")
+    top = [c for c in overview.components if c.parent is None]
+    assert len(top) <= 9
+    assert {"python", "typescript"} <= {
+        f["language"] for f in payload["knowledge"]["coverage"]["files"]
+    }
+    assert ("m0.ts", "imports", "m1.ts") in edges(overview)
+    assert "not drawn" in {u.topic for u in overview.unresolved}
+    drawn(overview)  # Would raise LayoutError("diagram_overflow") without the bound.
+
+
+def test_script_architecture_is_animated_and_narrated(
+    loaded: dict[str, Loaded], tmp_path: Path
+) -> None:
+    engine = media_tools()
+    payload, sources, report = loaded["typescript_pipeline"]
+    manifest = explainer.explain(report, payload, sources, tmp_path / "architecture", engine=engine)
+    (item,) = manifest["architectures"]
+    assert (item["type"], item["status"]) == ("component_graph", "VERIFIED")
+    assert item["media"]["full_decode"] == "passed"
+    bundle = tmp_path / "architecture" / "published" / item["id"]
+    narration = json.loads((bundle / "narration.json").read_text(encoding="utf-8"))
+    assert item["media"]["video_frames"] == sum(n["frames"] for n in narration)
+    assert {n["view"] for n in narration} == {"overview", "inside-scorestore"}
+    citations = json.loads((bundle / "citations.json").read_text(encoding="utf-8"))
+    assert {c["path"] for c in citations} == {
+        "src/ingest.ts",
+        "src/pipeline.ts",
+        "src/store.ts",
+        "src/transform.ts",
+    }
+    for citation in citations:
+        source = sources[citation["path"]].decode().split("\n")
+        assert source[citation["line"] - 1].strip() == citation["quote"]
+    probed = json.loads(
+        subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_streams",
+                "-of",
+                "json",
+                str(bundle / "video.mp4"),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+    )
+    streams = {s["codec_type"]: s for s in probed["streams"]}
+    assert (streams["video"]["width"], streams["video"]["height"]) == (WIDTH, HEIGHT)
+    assert streams["audio"]["codec_name"] == "aac"
