@@ -21,6 +21,7 @@ from repovox.media.architecture import (
     ArchitectureError,
     Component,
     Connection,
+    Context,
     Report,
     check,
     discover,
@@ -562,3 +563,184 @@ def test_unseen_architecture_is_animated_and_narrated(
     moving = next(n for n in narration if n["connection_ids"] and n["frames"] >= 60)
     start = moving["start_frame"] / FPS
     assert gray_frame(video, start + 0.4) != gray_frame(video, start + 1.0)
+
+
+# Shapes first met in a real repository: a signature spread over several lines, a handler
+# with many call sites, and test functions that call the production code they test.
+
+
+def drawn(architecture: Architecture) -> None:
+    """Every view lays out inside the canvas and its narration is reproducible."""
+    lines_ = explainer.narrate(architecture)
+    explainer.check_narration(lines_, architecture)
+    for view in architecture.views:
+        diagram = Diagram(architecture, "example/demo", "a" * 40, view)  # No diagram_overflow.
+        assert set(diagram.boxes) == set(view.component_ids)
+        placed = list(diagram.boxes.values())
+        for i, (ax, ay, aw, ah) in enumerate(placed):
+            assert 0 <= ax and ax + aw <= WIDTH and 120 <= ay and ay + ah <= 548
+            for bx, by, bw, bh in placed[i + 1 :]:
+                assert ax + aw <= bx or bx + bw <= ax or ay + ah <= by or by + bh <= ay
+
+
+def test_parameters_are_cited_where_a_multiline_signature_declares_them(tmp_path: Path) -> None:
+    steps = "".join(
+        f"def {name}({args}):\n    return {args.split(',')[0]}\n\n\n"
+        for name, args in [
+            ("soak", "grain"),
+            ("grind", "grain, mesh"),
+            ("press", "meal, weight"),
+            ("sift", "harvest"),
+            ("bake", "flour"),
+        ]
+    )
+    mill = (
+        "from steps import bake, grind, press, sift, soak\n\n\n"
+        "def mill(\n"
+        "    grain: list,\n"
+        "    mesh=2,\n"
+        "    *,\n"
+        "    weight: float = 1.0,\n"
+        "):\n"
+        "    wet = soak(grain)\n"
+        "    meal = grind(wet, mesh)\n"
+        "    return press(meal, weight)\n\n\n"
+        "def run(\n"
+        "    harvest,\n"
+        "    sieve,\n"
+        "    stone,\n"
+        "):\n"
+        "    clean = sift(harvest)\n"
+        "    flour = mill(clean, sieve, weight=stone)\n"
+        "    return bake(flour)\n"
+    )
+    root = written(tmp_path / "source", {"steps.py": steps, "mill.py": mill})
+    payload, sources, report = load(root)  # discover() runs check() on its own report.
+    validate(report, payload, sources)
+    (graph,) = report.architectures
+    assert graph.title == "run() in mill.py"
+    assert [v.id for v in graph.views] == ["overview", "inside-mill"]
+    zoom = graph.views[1]
+    inputs = {
+        (c.label, c.parent is None): (c.citations[0].line, c.citations[0].quote)
+        for c in graph.components
+        if c.kind == "input"
+    }
+    # Top level (run) and inside the zoom (mill): each on its own line, never the `def` line.
+    assert inputs == {
+        ("harvest", True): (16, "harvest,"),
+        ("sieve", True): (17, "sieve,"),
+        ("stone", True): (18, "stone,"),
+        ("grain", False): (5, "grain: list,"),
+        ("mesh", False): (6, "mesh=2,"),
+        ("weight", False): (8, "weight: float = 1.0,"),
+    }
+    inner = {c.id for c in graph.components if c.parent == zoom.parent}
+    assert {c.label for c in graph.components if c.id in inner and c.kind == "input"} == {
+        "grain",
+        "mesh",
+        "weight",
+    }
+    assert set(zoom.component_ids) == inner
+    drawn(graph)
+    # The defect: citing a parameter on the `def` line, which does not show it, is rejected.
+    weight = next(c for c in graph.components if c.label == "weight")
+    at_def = Context(payload, sources).cite("mill.py", 4)
+    assert at_def is not None and at_def.quote == "def mill("
+    forged = graph.model_copy(
+        update={
+            "components": tuple(
+                c.model_copy(update={"citations": (at_def,)}) if c.id == weight.id else c
+                for c in graph.components
+            )
+        }
+    )
+    with pytest.raises(ArchitectureError) as raised:
+        check(rebuilt(report, forged), payload, sources)
+    assert raised.value.code == "unsupported_element"
+
+
+def test_a_handler_with_many_call_sites_stays_within_the_diagram(tmp_path: Path) -> None:
+    names = [f"stage{n:02d}" for n in range(1, 21)]
+    steps = "import sqlite3\n\n\n" + "".join(
+        f"def {name}(order):\n"
+        + ("    sqlite3.connect(order)\n" if name == "stage01" else "")
+        + "    return order\n\n\n"
+        for name in names
+    )
+    calls = "".join(f"    {name}(order)\n" for name in names)
+    app = (
+        f"from fastapi import FastAPI\nfrom steps import {', '.join(names)}\n\n"
+        'app = FastAPI()\n\n\n@app.post("/orders")\n'
+        f"def place(order):\n{calls}    return order\n\n\n"
+        '@app.get("/orders")\ndef listing(order):\n    return stage02(order)\n'
+    )
+    root = written(tmp_path / "source", {"steps.py": steps, "app.py": app})
+    payload, sources, report = load(root)
+    validate(report, payload, sources)
+    (service,) = by_type(report, "service")
+    assert service.title == "HTTP service in app.py"
+    # Bounded before anything is added: no component is left without a connection.
+    linked = {end for c in service.connections for end in (c.source, c.target)}
+    assert {c.id for c in service.components} == linked
+    assert len(service.components) <= archgraph.MAX_NODES + 2
+    called = {c.target for c in service.connections if c.kind == "calls"}
+    assert 0 < len(called) < len(names)  # Many call sites, a bounded drawing.
+    assert {"POST /orders", "GET /orders", "place", "listing"} <= set(labels(service))
+    assert ("listing", "calls", "stage02") in edges(service)
+    assert "not drawn" in {u.topic for u in service.unresolved}
+    drawn(service)
+
+
+def test_test_functions_are_not_chosen_as_the_architecture(tmp_path: Path) -> None:
+    parts = "".join(
+        f"def {name}({args}):\n    return {args.split(',')[0]}\n\n\n"
+        for name, args in [
+            ("load", "path"),
+            ("clean", "rows"),
+            ("score", "rows, weights"),
+            ("report", "scores"),
+        ]
+    )
+    pipeline = (
+        "from app.parts import clean, load, report, score\n\n\n"
+        "def run(path, weights):\n"
+        "    rows = load(path)\n"
+        "    tidy = clean(rows)\n"
+        "    scores = score(tidy, weights)\n"
+        "    return report(scores)\n"
+    )
+    # Larger than the production function, and it calls it: before the fix this test was
+    # the only root scope, so it alone was drawn as the repository's architecture.
+    test = (
+        "from app.parts import clean, load, report, score\n"
+        "from app.pipeline import run\n\n\n"
+        "def test_report_matches_the_pipeline(tmp_path, weights):\n"
+        "    rows = load(tmp_path)\n"
+        "    tidy = clean(rows)\n"
+        "    scores = score(tidy, weights)\n"
+        "    summary = report(scores)\n"
+        "    expected = run(tmp_path, weights)\n"
+        "    assert expected == summary\n"
+    )
+    root = written(
+        tmp_path / "source",
+        {
+            "app/__init__.py": "",
+            "app/parts.py": parts,
+            "app/pipeline.py": pipeline,
+            "tests/test_pipeline.py": test,
+        },
+    )
+    payload, sources, report = load(root)
+    validate(report, payload, sources)
+    classes = {f["path"]: f["classification"] for f in payload["knowledge"]["coverage"]["files"]}
+    assert classes["tests/test_pipeline.py"] == "test"
+    assert classes["app/pipeline.py"] == "source"
+    (graph,) = by_type(report, "component_graph")
+    assert graph.title == "run() in app/pipeline.py"
+    assert {"load", "clean", "score", "report"} <= set(labels(graph))
+    for architecture in report.architectures:
+        assert not any(path.startswith("tests/") for path in architecture.scope)
+        assert "test_report_matches_the_pipeline" not in architecture.title
+    drawn(graph)

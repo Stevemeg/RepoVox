@@ -25,6 +25,7 @@ from repovox.media.architecture import (
     Unresolved,
     View,
 )
+from repovox.media.diagram import automatic
 from repovox.media.pyflow import (
     SourceFile,
     arguments,
@@ -32,8 +33,10 @@ from repovox.media.pyflow import (
     flat,
     line,
     parameter_names,
+    parameter_positions,
     text,
 )
+from repovox.media.raster import LayoutError
 
 # Client libraries whose calls reach something outside the repository. This types the far
 # end of a call; it is not an architecture detector.
@@ -72,6 +75,8 @@ class Definition:
     node: Node
     parameters: list[str]
     owner: str | None = None
+    # Line declaring each parameter: a signature can span lines after `def name(`.
+    param_lines: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -99,6 +104,10 @@ class FlowScope:
     sites: list[Site] = field(default_factory=list)
     returns: list[tuple[Producer, int]] = field(default_factory=list)
     unresolved: list[str] = field(default_factory=list)
+    param_lines: dict[str, int] = field(default_factory=dict)
+
+
+Snapshot = tuple[dict[str, Component], dict[str, Connection], dict[str, str], dict[str, int]]
 
 
 def slug(value: str) -> str:
@@ -174,7 +183,13 @@ class Repo:
                 if definition.kind == "class":
                     continue
                 body = definition.node.child_by_field_name("body")
-                scope = FlowScope(definition.id, path, definition.name, definition.line)
+                scope = FlowScope(
+                    definition.id,
+                    path,
+                    definition.name,
+                    definition.line,
+                    param_lines=definition.param_lines,
+                )
                 if body is not None:
                     Reader(self, file, scope, definition).run(body)
 
@@ -195,7 +210,16 @@ class Repo:
                 local.pop(name, None)  # Defined twice: not a unique binding.
                 continue
             params = parameter_names(node, file.body) if kind == "function" else []
-            self.defs[identity] = Definition(identity, path, name, kind, line(node), node, params)
+            self.defs[identity] = Definition(
+                identity,
+                path,
+                name,
+                kind,
+                line(node),
+                node,
+                params,
+                param_lines=parameter_positions(node, file.body) if kind == "function" else {},
+            )
             local[name] = identity
             if kind == "class":
                 block = node.child_by_field_name("body")
@@ -216,6 +240,7 @@ class Repo:
                             inner,
                             parameter_names(inner, file.body)[1:],
                             identity,
+                            parameter_positions(inner, file.body),
                         )
         self.bindings.setdefault(path, {}).update(local)
 
@@ -504,7 +529,9 @@ class Graph:
         if key.startswith("input::"):
             name = key.split("::")[1]
             kind, label, group = "input", name, scope.path
-            citation, anchor = ctx.cite(scope.path, scope.line), name
+            # Cite the line that declares the parameter, which need not be the `def` line.
+            citation = ctx.cite(scope.path, scope.param_lines.get(name, scope.line))
+            anchor = name
         elif key == "output::":
             kind, label, group = "output", "result", scope.path
             key = "output::result"
@@ -602,6 +629,35 @@ class Graph:
         self.order[identity] = cited[0][1]
         return identity
 
+    def position(self, connection: Connection) -> tuple[str, int, str]:
+        """Narration and drawing order of a connection."""
+        parent = self.components[connection.source].parent or ""
+        return parent, self.order.get(connection.id, 0), connection.id
+
+    def snapshot(self) -> Snapshot:
+        return dict(self.components), dict(self.connections), dict(self.ids), dict(self.order)
+
+    def fits(self, parent: str | None, before: Snapshot) -> bool:
+        """Keep what was added since `before` only if its view can still be drawn.
+
+        The view is laid out exactly as the diagram renderer will lay it out. When it no longer
+        fits, everything added since `before` is undone and counted as left out, so a graph is
+        never handed to the renderer with more than the diagram can place.
+        """
+        members = [c for c in self.components.values() if c.parent == parent]
+        inside = {c.id for c in members}
+        links = sorted(
+            (c for c in self.connections.values() if {c.source, c.target} <= inside),
+            key=self.position,
+        )
+        try:
+            automatic(members, links)
+        except LayoutError:
+            self.components, self.connections, self.ids, self.order = before
+            self.dropped += 1
+            return False
+        return True
+
     def flow(self, scope: FlowScope, parent: str | None = None, limit: int = MAX_NODES) -> None:
         """Components called in one scope and the values passed between them."""
         for site in scope.sites:
@@ -611,10 +667,12 @@ class Graph:
             ):
                 self.dropped += 1
                 continue
+            before = self.snapshot()
             target = self.add(site.target, scope, site.line, parent)
             if target is None:
                 continue
             for producer, where in site.uses:
+                step = self.snapshot()
                 source = self.add(producer.component, scope, where, parent)
                 if source is None:
                     continue
@@ -630,10 +688,13 @@ class Graph:
                     [(scope.path, site.line), (scope.path, where)],
                     (head, producer.name),
                 )
+                self.fits(parent, step)
+            self.fits(parent, before)
         for producer, where in scope.returns:
             source = self.ids.get(f"{parent}|{producer.component}")
             if source is None or producer.component.startswith("input::"):
                 continue
+            before = self.snapshot()
             target = self.add("output::", scope, where, parent)
             if target:
                 self.link(
@@ -646,6 +707,7 @@ class Graph:
                     [(scope.path, where)],
                     ("return", producer.name),
                 )
+                self.fits(parent, before)
 
     def uses(self, key: str, identity: str, parent: str | None = None) -> None:
         """External resources reached from inside a function or any method of a class."""
@@ -653,6 +715,7 @@ class Graph:
         for scope in scopes:
             for site in scope.sites:
                 if site.target.startswith("resource::") and len(self.components) < MAX_NODES + 3:
+                    before = self.snapshot()
                     target = self.add(site.target, scope, site.line, parent)
                     if target:
                         self.link(
@@ -665,6 +728,7 @@ class Graph:
                             [(scope.path, site.line)],
                             (site.callee.split(".")[0],),
                         )
+                        self.fits(parent, before)
 
     def zoom(self, key: str, identity: str, wanted: set[str]) -> View | None:
         """A detail view: what one function, or one method of a class, wires together inside."""
@@ -723,10 +787,7 @@ class Graph:
         ]
         if len(top) < 3 or len(links) < 2:
             return None
-        ordered = sorted(
-            self.connections.values(),
-            key=lambda c: (self.components[c.source].parent or "", self.order.get(c.id, 0), c.id),
-        )
+        ordered = sorted(self.connections.values(), key=self.position)
         steps = tuple(
             Step(
                 order=i + 1,
@@ -845,11 +906,20 @@ def unknown_callees(scope: FlowScope) -> list[Unresolved]:
 def orchestrations(
     repo: Repo, claimed: set[tuple[str, str]], classes: set[str], start: int
 ) -> list[Architecture]:
-    """Scopes that wire several components together, largest first, without overlap."""
-    called = {site.target for scope in repo.scopes.values() for site in scope.sites}
+    """Scopes that wire several components together, largest first, without overlap.
+
+    Scopes in test files are not the repository's architecture: they neither become one nor,
+    by calling production code, turn it into an inner scope.
+    """
+    production = [
+        scope
+        for scope in repo.scopes.values()
+        if repo.ctx.manifest.get(scope.path, {}).get("classification") != "test"
+    ]
+    called = {site.target for scope in production for site in scope.sites}
     called |= {bound for parts in repo.parts.values() for bound, _, _ in parts.values() if bound}
     ranked = []
-    for scope in repo.scopes.values():
+    for scope in production:
         nodes = {s.target for s in scope.sites}
         edges = sum(len(s.uses) for s in scope.sites)
         definition = repo.defs.get(scope.key)
@@ -968,21 +1038,31 @@ def services(
                 (route, f"def {repo.defs[handler].name}"),
             )
             for site in scope.sites:
+                # Bounded before adding, as in Graph.flow: a callee past the limit is never
+                # added, so no unlinked component is left behind.
+                if (
+                    len(graph.components) >= MAX_NODES + 2
+                    and f"None|{site.target}" not in graph.ids
+                ):
+                    graph.dropped += 1
+                    continue
+                before = graph.snapshot()
                 callee = graph.add(site.target, scope, site.line)
-                if callee and len(graph.components) <= MAX_NODES + 2:
-                    kind = "uses" if site.target.startswith("resource::") else "calls"
-                    graph.link(
-                        target,
-                        callee,
-                        kind,
-                        "call site",
-                        "static_structure",
-                        "VERIFIED",
-                        [(path, site.line)],
-                        (site.callee.split("(")[0],),
-                    )
-                    if site.target in repo.defs:
-                        graph.uses(site.target, callee)
+                if callee is None:
+                    continue
+                kind = "uses" if site.target.startswith("resource::") else "calls"
+                graph.link(
+                    target,
+                    callee,
+                    kind,
+                    "call site",
+                    "static_structure",
+                    "VERIFIED",
+                    [(path, site.line)],
+                    (site.callee.split("(")[0],),
+                )
+                if graph.fits(None, before) and site.target in repo.defs:
+                    graph.uses(site.target, callee)
             unresolved += unknown_callees(scope)
         unresolved.append(
             Unresolved(

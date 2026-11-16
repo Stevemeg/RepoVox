@@ -493,15 +493,27 @@ class SourceFile:
         return terms
 
 
-def parameter_names(definition: Node, body: bytes) -> list[str]:
-    names: list[str] = []
+def parameter_identifiers(definition: Node) -> list[Node]:
+    found: list[Node] = []
     parameters = definition.child_by_field_name("parameters")
     for parameter in parameters.named_children if parameters is not None else []:
         if parameter.type == "identifier":
-            names.append(text(parameter, body))
+            found.append(parameter)
         else:
             name = parameter.child_by_field_name("name")
             first = name or (parameter.named_children[0] if parameter.named_child_count else None)
             if first is not None and first.type == "identifier":
-                names.append(text(first, body))
-    return names
+                found.append(first)
+    return found
+
+
+def parameter_names(definition: Node, body: bytes) -> list[str]:
+    return [text(node, body) for node in parameter_identifiers(definition)]
+
+
+def parameter_positions(definition: Node, body: bytes) -> dict[str, int]:
+    """1-based line declaring each parameter; a signature may span several lines."""
+    positions: dict[str, int] = {}
+    for node in parameter_identifiers(definition):
+        positions.setdefault(text(node, body), line(node))
+    return positions
