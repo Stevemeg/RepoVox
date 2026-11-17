@@ -77,7 +77,8 @@ An architecture is emitted for a scope that connects at least three components t
 least two relationships. A scope called from another such scope becomes a zoom view of its
 caller instead of a separate architecture. A system overview at file level is added when
 there are several subsystems or a cross-file request-to-route match. Scopes and routes in
-test files are not the repository's architecture.
+test files are not the repository's architecture, and the system overview draws no test file:
+imports to or from one, and its requests and resources, are left out of the overview.
 
 Every view is laid out with the renderer's own layout before it is kept, so no architecture
 reaches rendering with `diagram_overflow`. When a system overview spanning several languages

@@ -750,6 +750,62 @@ def test_test_functions_are_not_chosen_as_the_architecture(tmp_path: Path) -> No
     drawn(graph)
 
 
+def test_test_files_are_left_out_of_the_system_overview(
+    loaded: dict[str, Loaded], tmp_path: Path
+) -> None:
+    root = tmp_path / "source"
+    shutil.copytree(FIXTURES / "fullstack_web", root)
+    production = {p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file()}
+    # Each test file imports, requests and uses more than any production file, so before the
+    # fix both ranked among the overview's highest-degree files.
+    written(
+        root,
+        {
+            "tests/test_app.py": (
+                "import sqlite3\n\n"
+                "import requests\n"
+                "from backend.app import create_item, read_items\n"
+                "from backend.repository import add_item, list_items\n\n\n"
+                "def test_items_round_trip(tmp_path):\n"
+                '    connection = sqlite3.connect(":memory:")\n'
+                '    response = requests.get("http://localhost/api/items")\n'
+                '    add_item(tmp_path, "x")\n'
+                "    assert list_items(tmp_path) == read_items()\n"
+                '    assert create_item("x") == response.json()\n'
+                "    connection.close()\n"
+            ),
+            "frontend/api.test.ts": (
+                'import { loadItems } from "./api";\n'
+                'import { renderPage } from "./page";\n\n'
+                "export async function checkItems(): Promise<void> {\n"
+                '  const response = await fetch("/api/items");\n'
+                '  await renderPage({ textContent: "" });\n'
+                "  await loadItems();\n"
+                "  await response.json();\n"
+                "}\n"
+            ),
+        },
+    )
+    payload, sources, report = load(root)
+    validate(report, payload, sources)
+    classes = {f["path"]: f["classification"] for f in payload["knowledge"]["coverage"]["files"]}
+    assert classes["tests/test_app.py"] == classes["frontend/api.test.ts"] == "test"
+    assert all(classes[path] == "source" for path in production)
+
+    (overview,) = by_type(report, "system_overview")
+    cited_paths = {
+        citation.path
+        for item in (*overview.components, *overview.connections)
+        for citation in item.citations
+    }
+    assert cited_paths <= production
+    assert not {"test_app.py", "api.test.ts"} & {c.label for c in overview.components}
+    # The production view is exactly the one the fixture draws without any test files.
+    (reference,) = by_type(loaded["fullstack_web"][2], "system_overview")
+    assert edges(overview) == edges(reference)
+    drawn(overview)
+
+
 # JavaScript, TypeScript and TSX go through the same extractor, validator, layout and narrator.
 # Nothing below is filtered out by language; every element is checked against exact source.
 

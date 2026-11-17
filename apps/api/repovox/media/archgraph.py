@@ -1818,19 +1818,27 @@ def services(
 def overview(
     repo: Repo, declared: dict[str, list[tuple[str, str, int, str, int]]], subsystems: int
 ) -> Architecture | None:
-    """File-level system view: resolved imports, client-to-route path matches and resources."""
+    """File-level system view: resolved imports, client-to-route path matches and resources.
+
+    Test files are not the repository's system: as in `orchestrations()` and `routes()`, they
+    contribute no file, import, request or resource to the view.
+    """
     ctx = repo.ctx
     graph = Graph(repo)
     symbols = ctx.all_symbols
+    tests = {path for path, entry in ctx.manifest.items() if entry.get("classification") == "test"}
     edges: list[tuple[str, str, str, list[tuple[str, int]], tuple[str, ...], Any, Status]] = []
     for edge in ctx.payload["knowledge"]["edges"]:
         if edge["relationship"] == "imports" and edge["classification"] == "resolved_static":
             support = symbols[edge["support_ids"][0]]
             module = support["name"]
+            imported = symbols[edge["target"]]["path"]
+            if support["path"] in tests or imported in tests:
+                continue
             edges.append(
                 (
                     support["path"],
-                    symbols[edge["target"]]["path"],
+                    imported,
                     "imports",
                     [(support["path"], support["start_line"])],
                     (module,),
@@ -1839,12 +1847,15 @@ def overview(
                 )
             )
     matched = 0
+    scopes = [scope for scope in repo.scopes.values() if scope.path not in tests]
     clients: list[tuple[str, int]] = [
         (s["path"], s["start_line"])
         for s in symbols.values()
-        if s["kind"] == "call" and s["name"].split(".")[0] in {"fetch", "axios"}
+        if s["kind"] == "call"
+        and s["name"].split(".")[0] in {"fetch", "axios"}
+        and s["path"] not in tests
     ]
-    for scope in repo.scopes.values():
+    for scope in scopes:
         clients += [
             (scope.path, site.line)
             for site in scope.sites
@@ -1873,7 +1884,7 @@ def overview(
                     matched += 1
     resources = [
         (scope.path, site)
-        for scope in repo.scopes.values()
+        for scope in scopes
         for site in scope.sites
         if site.target.startswith("resource::")
     ]

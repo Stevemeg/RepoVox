@@ -59,6 +59,16 @@ const architectureNote = (job: VideoJob): string =>
   (job.architecture && architectureNotes[job.architecture]) ||
   "Architecture outcome was not recorded.";
 
+// Every frame already shows its caption in the lower band, so the WebVTT track is loaded
+// hidden: its cues are available to the page and to the player's captions menu, but the
+// browser does not draw a second caption box over the burned-in one. Without `default` a
+// track starts disabled and is never fetched; "hidden" fetches it without drawing it.
+// The callback is module-level, so its identity is stable and React calls it only when
+// the track mounts: a re-render does not undo a viewer's own captions choice.
+function loadCaptionsHidden(element: HTMLTrackElement | null) {
+  if (element?.track) element.track.mode = "hidden";
+}
+
 export function VideoPlayer({ jobId, video }: { jobId: string; video: Video }) {
   const [failed, setFailed] = useState(false);
   const routes = videoRoutes(jobId, video.id);
@@ -90,11 +100,11 @@ export function VideoPlayer({ jobId, video }: { jobId: string; video: Video }) {
       >
         <source src={routes.video} type="video/mp4" />
         <track
+          ref={loadCaptionsHidden}
           kind="captions"
           src={routes.captions}
           srcLang="en"
           label="English"
-          default
         />
       </video>
       <p className="actions">

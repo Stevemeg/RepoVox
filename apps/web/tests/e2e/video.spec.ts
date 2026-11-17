@@ -251,6 +251,7 @@ test("supported repository: submit, generate with the browser closed, play, down
         decodedFrames: quality.totalVideoFrames,
         error: media.error ? media.error.code : null,
         cues: media.textTracks[0]?.cues?.length ?? 0,
+        captionMode: media.textTracks[0]?.mode ?? null,
         source: media.currentSrc,
       };
     });
@@ -260,6 +261,8 @@ test("supported repository: submit, generate with the browser closed, play, down
     expect(playback.width).toBeGreaterThan(0);
     expect(playback.decodedFrames).toBeGreaterThan(0);
     expect(playback.cues).toBeGreaterThan(0);
+    // Loaded but not drawn: each frame already carries its caption in the lower band.
+    expect(playback.captionMode).toBe("hidden");
     expect(playback.source).toContain(base);
 
     // Download through the page's own link, as a user would.

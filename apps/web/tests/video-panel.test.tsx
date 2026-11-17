@@ -70,6 +70,35 @@ it("plays and offers download only through same-origin owner routes", () => {
   );
 });
 
+it("loads captions hidden so they are not drawn over the burned-in captions", () => {
+  // jsdom has no TextTrack; give each <track> a minimal one, as a browser would.
+  const tracks = new WeakMap<HTMLTrackElement, { mode: TextTrackMode }>();
+  Object.defineProperty(HTMLTrackElement.prototype, "track", {
+    configurable: true,
+    get(this: HTMLTrackElement) {
+      if (!tracks.has(this)) tracks.set(this, { mode: "disabled" });
+      return tracks.get(this);
+    },
+  });
+  try {
+    const { container, rerender } = render(
+      <VideoPlayer jobId={job} video={succeeded.videos[0]} />,
+    );
+    const element = container.querySelector("track") as HTMLTrackElement;
+    expect(element).toHaveAttribute("kind", "captions");
+    // `default` would start the track "showing", drawing a second caption box.
+    expect(element).not.toHaveAttribute("default");
+    expect(element.track.mode).toBe("hidden");
+    // A viewer who turns captions on keeps them on across re-renders.
+    element.track.mode = "showing";
+    rerender(<VideoPlayer jobId={job} video={succeeded.videos[0]} />);
+    expect(container.querySelector("track")).toBe(element);
+    expect(element.track.mode).toBe("showing");
+  } finally {
+    delete (HTMLTrackElement.prototype as { track?: unknown }).track;
+  }
+});
+
 it("shows an unavailable state instead of a broken player", () => {
   render(<VideoPlayer jobId={job} video={succeeded.videos[0]} />);
   fireEvent.error(screen.getByLabelText("Repository walkthrough"));
