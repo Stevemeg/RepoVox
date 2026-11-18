@@ -1,0 +1,64 @@
+# Hardened self-hosted overlay. Additive only: docker-compose.yml, which CI uses, is unchanged.
+#
+#   docker compose -f docker-compose.yml -f infrastructure/local/docker-compose.prod.yml up -d --build
+#
+# It restarts long-running services after a crash or a host reboot, gives the three background
+# processes healthchecks, and runs the web server with a read-only root file system. It does
+# not change any REPOVOX_* setting: Settings.fail_closed still allows only the development
+# identity adapter and the local origin. See docs/operations/deployment-guide.md.
+services:
+  postgres:
+    restart: unless-stopped
+  redis:
+    restart: unless-stopped
+  storage:
+    restart: unless-stopped
+  api:
+    restart: unless-stopped
+  web:
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    # The image's working directory is /web (infrastructure/local/web.Dockerfile), so the
+    # Next.js cache is /web/.next/cache. The node user is UID/GID 1000 in node:alpine.
+    tmpfs:
+      - '/tmp:rw,nosuid,nodev,noexec,size=268435456,mode=1777'
+      - '/web/.next/cache:rw,nosuid,nodev,noexec,size=268435456,uid=1000,gid=1000,mode=0700'
+  worker:
+    restart: unless-stopped
+    # Readiness: the Celery worker answers a ping sent through the Redis broker.
+    healthcheck:
+      test: ['CMD-SHELL', 'celery -A repovox.workers.tasks:celery inspect ping --timeout 10 --destination "celery@$${HOSTNAME}" > /dev/null']
+      interval: 30s
+      timeout: 25s
+      start_period: 60s
+      retries: 3
+  dispatcher:
+    restart: unless-stopped
+    # Process and dependency check: PID 1 is the dispatcher, and PostgreSQL and Redis accept
+    # connections. A loop that is alive but stuck is not detected; its logs are the signal.
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import pathlib, socket, sys; ok = b'repovox.workers.dispatcher' in pathlib.Path('/proc/1/cmdline').read_bytes(); [socket.create_connection(a, 3).close() for a in (('postgres', 5432), ('redis', 6379))]; sys.exit(0 if ok else 1)"
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+  media-worker:
+    restart: unless-stopped
+    # Process and dependency check: PID 1 is the media worker, and PostgreSQL and object
+    # storage accept connections. As for the dispatcher, a stuck loop is not detected.
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import pathlib, socket, sys; ok = b'repovox.media.worker' in pathlib.Path('/proc/1/cmdline').read_bytes(); [socket.create_connection(a, 3).close() for a in (('postgres', 5432), ('storage', 8333))]; sys.exit(0 if ok else 1)"
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
