@@ -225,6 +225,35 @@ jobs:
               body = json.dumps(summary, separators=(",", ":")).replace("%", "%25")
               print(f"::notice title=browser-to-video {path.stem}::{body}")
           PY
+      # The base docker-compose.yml above is unchanged. This recreates the same stack with the
+      # hardened self-hosted overlay and checks what the overlay promises on live containers.
+      - name: Hardened self-hosted overlay boots and passes its healthchecks
+        shell: bash
+        run: |
+          bash -n scripts/deploy_selfhosted.sh
+          bash scripts/deploy_selfhosted.sh --check
+          overlay=(docker compose -f docker-compose.yml -f infrastructure/local/docker-compose.prod.yml)
+          "${overlay[@]}" config --quiet
+          "${overlay[@]}" up -d --no-build --wait --wait-timeout 300 \
+            postgres redis storage api web worker dispatcher media-worker
+          for service in postgres redis storage api web worker dispatcher media-worker; do
+            id=$("${overlay[@]}" ps -q "$service")
+            restart=$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$id")
+            health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$id")
+            echo "$service restart=$restart health=$health"
+            test "$restart" = unless-stopped
+          done
+          for service in worker dispatcher media-worker web api; do
+            test "$(docker inspect --format '{{.State.Health.Status}}' "$("${overlay[@]}" ps -q "$service")")" = healthy
+          done
+          web=$("${overlay[@]}" ps -q web)
+          test "$(docker inspect --format '{{.HostConfig.ReadonlyRootfs}}' "$web")" = true
+          docker inspect --format '{{json .HostConfig.CapDrop}} {{json .HostConfig.SecurityOpt}}' "$web" | tee web-security.txt
+          grep -q '"ALL"' web-security.txt && grep -q 'no-new-privileges:true' web-security.txt
+          "${overlay[@]}" exec -T web sh -c 'touch /web/.next/cache/probe && ! touch /web/probe 2>/dev/null'
+          curl -fsS http://127.0.0.1:8000/health
+          curl -fsS http://127.0.0.1:8000/ready
+          curl -fsS -o /dev/null -w 'web /sign-in %{http_code}\n' http://127.0.0.1:3000/sign-in
       - name: Summarise failures as annotations
         if: failure()
         run: |
