@@ -1,11 +1,13 @@
+import hmac
 import secrets
 from typing import Annotated, Any, cast
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Request, Response, Security
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, Header, Query, Request, Response, Security
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.security import APIKeyCookie
 
+from repovox.auth.github import STATE_COOKIE, STATE_SECONDS, VERIFIER_COOKIE, pkce, provisioned
 from repovox.auth.session import Identity, digest
 from repovox.core.errors import DomainError
 from repovox.core.services import Services
@@ -46,20 +48,21 @@ ReadIdentity = Annotated[Identity, Depends(authenticated)]
 WriteIdentity = Annotated[Identity, Depends(mutation)]
 
 
-@router.post("/auth/development/sign-in")
-def sign_in(body: SignIn, request: Request, response: Response) -> dict[str, str]:
-    if request.headers.get("origin") != services(request).settings.origin:
-        raise DomainError("origin_rejected", 403)
-    cookie, csrf = services(request).sessions.sign_in(
-        body.subject, request.client.host if request.client else "local"
-    )
+def secure_cookies(request: Request) -> bool:
+    """Cookies carry `Secure` whenever the browser origin is served over TLS."""
+    return services(request).settings.origin.startswith("https://")
+
+
+def session_cookies(request: Request, response: Response, cookie: str, csrf: str) -> None:
+    seconds = services(request).settings.session_seconds
+    secure = secure_cookies(request)
     response.set_cookie(
         "rv_session",
         cookie,
         httponly=True,
         samesite="strict",
-        secure=False,
-        max_age=services(request).settings.session_seconds,
+        secure=secure,
+        max_age=seconds,
         path="/",
     )
     response.set_cookie(
@@ -67,11 +70,106 @@ def sign_in(body: SignIn, request: Request, response: Response) -> dict[str, str
         csrf,
         httponly=False,
         samesite="strict",
-        secure=False,
-        max_age=services(request).settings.session_seconds,
+        secure=secure,
+        max_age=seconds,
         path="/",
     )
+
+
+@router.post("/auth/development/sign-in")
+def sign_in(body: SignIn, request: Request, response: Response) -> dict[str, str]:
+    if request.headers.get("origin") != services(request).settings.origin:
+        raise DomainError("origin_rejected", 403)
+    cookie, csrf = services(request).sessions.sign_in(
+        body.subject, request.client.host if request.client else "local"
+    )
+    session_cookies(request, response, cookie, csrf)
     return {"environment": services(request).settings.environment}
+
+
+def auth_status(request: Request) -> dict[str, Any]:
+    settings = services(request).settings
+    return {
+        "auth_provider": settings.auth_provider,
+        "github_oauth_enabled": services(request).github is not None,
+    }
+
+
+@router.get("/auth/config")
+def auth_config(request: Request) -> dict[str, Any]:
+    """Public: which sign-in the browser should offer. Never includes a credential."""
+    return {**auth_status(request), "environment": services(request).settings.environment}
+
+
+@router.get("/auth/github/login")
+def github_login(request: Request) -> Response:
+    github = services(request).github
+    if github is None:
+        raise DomainError("not_found", 404)
+    state = secrets.token_urlsafe(32)
+    verifier, challenge = pkce()
+    response = RedirectResponse(github.authorize_url(state, challenge), status_code=302)
+    # Lax, not Strict: the callback is a top-level navigation coming back from github.com.
+    for name, value in ((STATE_COOKIE, state), (VERIFIER_COOKIE, verifier)):
+        response.set_cookie(
+            name,
+            value,
+            httponly=True,
+            samesite="lax",
+            secure=secure_cookies(request),
+            max_age=STATE_SECONDS,
+            path="/",
+        )
+    return response
+
+
+@router.get("/auth/github/callback")
+def github_callback(
+    request: Request,
+    code: Annotated[str, Query(max_length=512)] = "",
+    state: Annotated[str, Query(max_length=512)] = "",
+    error: Annotated[str, Query(max_length=128)] = "",
+) -> Response:
+    github = services(request).github
+    if github is None:
+        raise DomainError("not_found", 404)
+    expected = request.cookies.get(STATE_COOKIE, "")
+    verifier = request.cookies.get(VERIFIER_COOKIE, "")
+
+    def clear(response: Response) -> None:
+        for name in (STATE_COOKIE, VERIFIER_COOKIE):
+            response.delete_cookie(name, path="/")
+
+    def refuse(reason: str, status: int) -> JSONResponse:
+        refused = JSONResponse(
+            {"error": {"code": reason, "request_id": request.state.request_id}},
+            status_code=status,
+        )
+        clear(refused)
+        return refused
+
+    # The state and verifier are single-use: they are cleared on every outcome below.
+    if (
+        not expected
+        or not state
+        or not verifier
+        or not hmac.compare_digest(expected.encode(), state.encode())
+    ):
+        return refuse("oauth_state_rejected", 400)
+    if error or not code:
+        return refuse("oauth_denied", 401)
+    try:
+        account = github.account(code, verifier)
+    except DomainError as exc:
+        return refuse(exc.code, exc.status)
+    owner = provisioned(services(request).sessions.engine, account.id)
+    if owner is None:
+        return refuse("account_not_provisioned", 403)
+    cookie, csrf = services(request).sessions.issue(owner)
+    response = RedirectResponse("/", status_code=302)
+    clear(response)
+    session_cookies(request, response, cookie, csrf)
+    return response
 
 
 @router.get("/auth/session")
@@ -84,6 +182,7 @@ def session(request: Request, identity: ReadIdentity) -> dict[str, Any]:
         "fixtures_enabled": services(request).settings.fixtures,
         "analysis_enabled": services(request).settings.analysis,
         "video_enabled": services(request).media is not None,
+        **auth_status(request),
     }
 
 

@@ -32,15 +32,29 @@ class IdentityAdapter(Protocol):
 
 
 class DevelopmentSessions:
+    """RepoVox sessions: one signed cookie and one CSRF token per row in `auth_sessions`.
+
+    Whichever identity adapter resolved the owner, `issue()` creates the same kind of session,
+    so `authenticate()` and sign-out never depend on how someone signed in. Development and
+    GitHub sessions are signed with different salts and cannot be used in place of each other.
+    """
+
     def __init__(self, engine: Engine, settings: Settings) -> None:
         self.engine = engine
         self.settings = settings
-        self.signer = URLSafeTimedSerializer(
-            settings.session_secret.get_secret_value(), salt="repovox-development-session-v1"
+        salt = (
+            "repovox-development-session-v1"
+            if settings.auth_provider == "dev"
+            else "repovox-github-session-v1"
         )
+        self.signer = URLSafeTimedSerializer(settings.session_secret.get_secret_value(), salt=salt)
 
     def sign_in(self, subject: str, client_address: str = "local") -> tuple[str, str]:
-        if not self.settings.dev_auth or self.settings.environment not in {"development", "test"}:
+        if (
+            self.settings.auth_provider != "dev"
+            or not self.settings.dev_auth
+            or self.settings.environment not in {"development", "test"}
+        ):
             raise DomainError("development_auth_disabled", 503)
         with self.engine.begin() as connection:
             users = rows(
@@ -51,7 +65,10 @@ class DevelopmentSessions:
             )
         if not users:
             raise DomainError("invalid_development_identity", 401)
-        owner = users[0]["id"]
+        return self.issue(users[0]["id"])
+
+    def issue(self, owner: UUID) -> tuple[str, str]:
+        """A new session for an owner an identity adapter has already resolved."""
         nonce, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
         with tenant(self.engine, owner) as connection:
             connection.execute(

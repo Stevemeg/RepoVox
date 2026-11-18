@@ -21,6 +21,7 @@ from starlette.responses import Response
 from repovox.analysis.github import HTTP
 from repovox.analysis.transport import GitHubHTTP
 from repovox.api.routes import router
+from repovox.auth.github import GitHubOAuth
 from repovox.auth.session import DevelopmentSessions
 from repovox.core.config import Settings
 from repovox.core.errors import DomainError
@@ -102,7 +103,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         MediaJobs(media_engine, engine, app.state.jobs, config) if media_engine else None
     )
     app.state.services = Services(
-        config, app.state.sessions, app.state.projects, app.state.jobs, app.state.media
+        config,
+        app.state.sessions,
+        app.state.projects,
+        app.state.jobs,
+        app.state.media,
+        GitHubOAuth(config) if config.auth_provider == "github" else None,
     )
 
     def error(request: Request, code: str, status: int) -> JSONResponse:

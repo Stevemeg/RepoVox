@@ -1304,6 +1304,7 @@ dependencies = [
     { name = "celery", extra = ["redis"] },
     { name = "certifi" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "itsdangerous" },
     { name = "jsonschema" },
     { name = "psycopg", extra = ["binary"] },
@@ -1320,7 +1321,6 @@ dependencies = [
 dev = [
     { name = "boto3-stubs", extra = ["s3"] },
     { name = "cryptography" },
-    { name = "httpx" },
     { name = "jsonschema" },
     { name = "mypy" },
     { name = "pip" },
@@ -1339,6 +1339,7 @@ requires-dist = [
     { name = "celery", extras = ["redis"], specifier = ">=5.5,<6" },
     { name = "certifi", specifier = ">=2026.10.19" },
     { name = "fastapi", specifier = ">=0.115,<1" },
+    { name = "httpx", specifier = ">=0.28,<1" },
     { name = "itsdangerous", specifier = ">=2.2,<3" },
     { name = "jsonschema", specifier = "==4.26.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4" },
@@ -1355,7 +1356,6 @@ requires-dist = [
 dev = [
     { name = "boto3-stubs", extras = ["s3"], specifier = ">=1.37,<2" },
     { name = "cryptography", specifier = "==50.0.2" },
-    { name = "httpx", specifier = ">=0.28,<1" },
     { name = "jsonschema", specifier = "==4.26.0" },
     { name = "mypy", specifier = ">=1.15,<2" },
     { name = "pip", specifier = ">=26.2.2" },
