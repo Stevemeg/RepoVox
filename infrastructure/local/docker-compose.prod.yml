@@ -4,8 +4,8 @@
 #
 # It restarts long-running services after a crash or a host reboot, gives the three background
 # processes healthchecks, and runs the web server with a read-only root file system. It does
-# not change any REPOVOX_* setting: Settings.fail_closed still allows only the development
-# identity adapter and the local origin. See docs/operations/deployment-guide.md.
+# not change any REPOVOX_* setting. Production settings and GitHub sign-in come from
+# infrastructure/local/docker-compose.production.yml. See docs/operations/deployment-guide.md.
 services:
   postgres:
     restart: unless-stopped

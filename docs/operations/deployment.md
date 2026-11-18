@@ -1,8 +1,9 @@
 # Production deployment design
 
 The single-host [self-hosted deployment guide](deployment-guide.md) is the runbook for the
-repository's Compose stack, including the production boot gate that still refuses a
-production configuration. It is a readiness document, not a deployment.
+repository's Compose stack in local mode and in production mode with GitHub sign-in for
+operator-provisioned accounts ([ADR-0024](../adr/0024-github-oauth-allowlist-identity.md)).
+It is a readiness document, not a deployment.
 
 The additive [AWS integration](aws-retention-integration.md) and
 [$10 synthetic proposal](aws-synthetic-test-runbook.md) are deployment-disabled.

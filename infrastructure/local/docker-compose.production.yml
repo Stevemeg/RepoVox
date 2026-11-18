@@ -1,0 +1,28 @@
+# Public HTTPS production overlay, layered on the base file and the hardened overlay:
+#
+#   docker compose -f docker-compose.yml -f infrastructure/local/docker-compose.prod.yml \
+#     -f infrastructure/local/docker-compose.production.yml up -d --build
+#
+# It switches every service that reads RepoVox settings to production with the GitHub identity
+# adapter. Settings.fail_closed refuses to start unless the origin is an exact https:// origin
+# and the GitHub OAuth client id and secret are set, so these values must be in .env (never in
+# Git). Only operator-provisioned GitHub accounts can sign in: python -m repovox.auth.accounts.
+# Normally started by: bash scripts/deploy_selfhosted.sh --mode production
+x-production: &production
+  REPOVOX_ENVIRONMENT: production
+  REPOVOX_DEV_AUTH: 'false'
+  REPOVOX_FIXTURES: 'false'
+  REPOVOX_SYNTHETIC_SOURCE_DIR: ''
+  REPOVOX_AUTH_PROVIDER: github
+  REPOVOX_ORIGIN: ${REPOVOX_ORIGIN:?Set REPOVOX_ORIGIN to the https:// origin in .env}
+  REPOVOX_GITHUB_CLIENT_ID: ${REPOVOX_GITHUB_CLIENT_ID:?Set REPOVOX_GITHUB_CLIENT_ID in .env}
+  REPOVOX_GITHUB_CLIENT_SECRET: ${REPOVOX_GITHUB_CLIENT_SECRET:?Set REPOVOX_GITHUB_CLIENT_SECRET in .env}
+services:
+  api:
+    environment: *production
+  worker:
+    environment: *production
+  dispatcher:
+    environment: *production
+  media-worker:
+    environment: *production

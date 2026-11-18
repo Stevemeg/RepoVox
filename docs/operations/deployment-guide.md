@@ -1,6 +1,7 @@
 # Self-hosted deployment guide
 
-Status: readiness runbook, 2026-11-18, on branch `feat/js-ts-frameworks-and-deploy-readiness`.
+Status: readiness runbook, 2026-11-18, on branch `feat/js-ts-frameworks-and-deploy-readiness`;
+production GitHub sign-in added the same day ([ADR-0024](../adr/0024-github-oauth-allowlist-identity.md)).
 Not independently reviewed or accepted. **Nothing was deployed or provisioned while writing
 it**, and no cloud account, paid service or real customer data was used. It does not
 authorize a deployment, lift any phase gate or change `Stage 3: BLOCKED`, `CR-04: PENDING`
@@ -13,28 +14,36 @@ or `EVAL-ENTRY: UNFROZEN`. Related: [production deployment design](deployment.md
 
 The guide covers one Linux host running the repository's `docker-compose.yml`. It names every
 service, the order they start in, how each is checked, which identity each runs as, and every
-setting and secret they read. Steps that only become possible once the production boot gate
-below is lifted are marked **(after gate)**.
+setting and secret they read. There are two modes:
 
-## Production boot gate: read first
-
-`apps/api/repovox/core/config.py` (`Settings.fail_closed`) refuses to start the API, the
-workers, the dispatcher and the media worker with a production configuration. This is a
-deliberate fail-closed control, not a defect, and this guide does not change it.
-
-| Setting | Target production value | What the code accepts today | Message on refusal |
+| Mode | Who can sign in | Origin | Command |
 | --- | --- | --- | --- |
-| `REPOVOX_ENVIRONMENT` | `production` | `development` or `test` only | `Phase 1 has no production identity adapter; production boot is disabled` |
-| `REPOVOX_DEV_AUTH` | `false` | `true` only | `An explicitly enabled development identity adapter is required` |
-| `REPOVOX_ORIGIN` | the TLS origin, for example `https://repovox.example.com` | `http://localhost:3000` or `http://127.0.0.1:3000` only | `Phase 1 requires an authorized local browser origin` |
-| `REPOVOX_FIXTURES` | `false` | `false` or `true`; `REPOVOX_SYNTHETIC_SOURCE_DIR` requires `true` | `Synthetic source requires the development fixture mode` |
-| `REPOVOX_VIDEO` | `true` | `true` or `false` | (accepted) |
+| [Local / private host](#local--private-host-deployment---mode-local) | the two seeded development identities | `http://localhost:3000`, this host only | `bash scripts/deploy_selfhosted.sh` |
+| [Public HTTPS production](#public-https-production-deployment---mode-production) | GitHub accounts an operator provisioned | your `https://` origin behind a TLS reverse proxy | `bash scripts/deploy_selfhosted.sh --mode production` |
 
-Consequence: today the stack boots only as a private single-host stack that uses the
-development identity adapter and is reached from the same machine at
-`http://localhost:3000`. Serving other users needs, at minimum, a production identity
-adapter, an origin allowlist that accepts the TLS origin, and an independent security review
-of both. Each needs its own owner authorization; none is part of this branch.
+Production is not approved by this guide. The GitHub identity adapter is proposed in
+[ADR-0024](../adr/0024-github-oauth-allowlist-identity.md) and needs an independent security
+review before a public deployment.
+
+## Identity adapters and fail-closed settings
+
+`Settings.fail_closed` (`apps/api/repovox/core/config.py`) runs in the API, the workers, the
+dispatcher and the media worker, and refuses to start any of them with an unsafe
+combination:
+
+| Environment | Must hold | Refused with |
+| --- | --- | --- |
+| `production` | `REPOVOX_DEV_AUTH=false` | `Production forbids the development identity adapter` |
+| `production` | `REPOVOX_FIXTURES=false` and no `REPOVOX_SYNTHETIC_SOURCE_DIR` | `Production forbids fixtures and synthetic sources` |
+| `production` | `REPOVOX_AUTH_PROVIDER=github` with a non-empty `REPOVOX_GITHUB_CLIENT_ID` and `REPOVOX_GITHUB_CLIENT_SECRET` | `Production requires the GitHub identity adapter with a client id and secret` |
+| `production` | `REPOVOX_ORIGIN` an exact `https://host[:port]`: lowercase, no path, query, fragment, user info or wildcard. `http://localhost:3000` or `http://127.0.0.1:3000` only with `REPOVOX_ALLOW_LOOPBACK_ORIGIN=true` | `Production requires an exact https:// browser origin` |
+| `development`, `test` | with the `dev` adapter: `REPOVOX_DEV_AUTH=true` and a loopback origin | `An explicitly enabled development identity adapter is required`, `Phase 1 requires an authorized local browser origin` |
+| `development`, `test` | with the `github` adapter: `REPOVOX_DEV_AUTH=false`, client id and secret, loopback or `https://` origin | `The GitHub identity adapter ...` |
+| any | `REPOVOX_SYNTHETIC_SOURCE_DIR` only with `REPOVOX_FIXTURES=true` | `Synthetic source requires the development fixture mode` |
+
+The GitHub adapter signs in **only accounts an operator has provisioned**: the API's database
+role cannot create users, so there is no self sign-up (see
+[GitHub OAuth App and accounts](#github-oauth-app-and-accounts)).
 
 ## Quickstart
 
@@ -42,34 +51,37 @@ On a Linux host that meets the [prerequisites](#1-host-prerequisites), from a ch
 reviewed commit:
 
 ```sh
-bash scripts/deploy_selfhosted.sh --check   # preflight; needs no Docker daemon
-bash scripts/deploy_selfhosted.sh           # prerequisites, .env, build, start, health
+bash scripts/deploy_selfhosted.sh --check                    # preflight; no Docker daemon needed
+bash scripts/deploy_selfhosted.sh --repair-env               # only if an older .env lacks keys
+bash scripts/deploy_selfhosted.sh                            # --mode local (default)
+bash scripts/deploy_selfhosted.sh --mode production          # GitHub sign-in, https origin
 ```
 
-`scripts/deploy_selfhosted.sh --check` confirms the required files are present. It also
-confirms that its secret list matches every `${VAR:?}` the base Compose file requires, and it
-generates a throwaway `.env` in a temporary directory to check it: every key appears once,
-secret values are distinct and at least 32 characters, and the file is mode 600. It then
-checks the overlay's structure and, where the Docker CLI exists, runs `docker compose config`
-on both files. Prerequisites (Linux, Landlock, Docker, Compose v2, `curl`) are reported as
-warnings in this mode. An existing `.env` with missing keys is reported, not changed.
+`--check` (with an optional `--mode`) confirms the required files exist and that the script's
+secret list matches every `${VAR:?}` in the base Compose file. It generates a throwaway `.env`
+in a temporary directory and checks it: every key once, distinct values of at least 32
+characters, mode 600. It shows `--repair-env` restoring a copy with keys removed. It checks
+the structure of both overlays and, where the Docker CLI exists, runs `docker compose config`
+for both modes. Prerequisites and an existing `.env` are reported as warnings in this mode;
+nothing is changed.
+
+`--repair-env` appends any missing generated key (for example `MEDIA_MIGRATION_PASSWORD`,
+`MEDIA_APP_PASSWORD`, `MEDIA_WORKER_PASSWORD` in a `.env` from before the media database
+existed) with a new random value. It never changes or removes an existing key, stops if a key
+is set twice, sets the file to mode 600 and prints key names only. A database volume that
+already exists keeps the roles it was created with: `infrastructure/local/init-db.sh` runs only
+on a new volume, so a role added later must be created with its password before use (see
+[section 2](#2-environment-and-secrets)).
 
 A normal run fails on any missing prerequisite. If `.env` is absent, it generates one with
 mode 600: `openssl rand -hex 32` (or Python `secrets` when OpenSSL is absent) for each
-password and the session secret, plus the two fixed storage identifiers. No value is printed,
-and an existing `.env` is kept and only checked. It then runs:
+password and the session secret, plus the two fixed storage identifiers. No value is printed.
+It then starts the stack and polls `http://127.0.0.1:8000/health`, `/ready` and
+`http://127.0.0.1:3000/sign-in` for up to `DEPLOY_TIMEOUT` seconds (600 by default). It stops
+unless `/ready` reports the expected environment, `development` or `production`.
 
-```sh
-docker compose -f docker-compose.yml -f infrastructure/local/docker-compose.prod.yml up -d --build
-```
-
-It polls `http://127.0.0.1:8000/health`, `http://127.0.0.1:8000/ready` and
-`http://127.0.0.1:3000/sign-in` for up to `DEPLOY_TIMEOUT` seconds (600 by default). Then it
-prints the local URLs and how to reach the stack through an SSH tunnel. Reverse-proxy steps
-stay **(after gate)**: the API still accepts only the local origin.
-
-`infrastructure/local/docker-compose.prod.yml` is additive; `docker-compose.yml`, which CI
-uses, is unchanged. It sets no `REPOVOX_*` value. It adds:
+`infrastructure/local/docker-compose.prod.yml` is the hardening overlay, used in both modes;
+`docker-compose.yml`, which CI uses, is unchanged. It sets no `REPOVOX_*` value. It adds:
 
 | Service | Overlay change |
 | --- | --- |
@@ -81,9 +93,47 @@ uses, is unchanged. It sets no `REPOVOX_*` value. It adds:
 
 The dispatcher and media worker checks confirm the process and its dependencies, not
 progress: a loop that is alive but stuck still reports healthy, and its logs remain the
-signal. The CI `integration` job boots the stack with this overlay and checks the restart
-policies, every healthcheck, the read-only web root and the writable cache on the running
-containers.
+signal.
+
+### Local / private host deployment (`--mode local`)
+
+```sh
+bash scripts/deploy_selfhosted.sh
+```
+
+Runs the base file with the hardening overlay:
+`docker compose -f docker-compose.yml -f infrastructure/local/docker-compose.prod.yml up -d --build`.
+The settings are those in `docker-compose.yml`: `REPOVOX_ENVIRONMENT=development`,
+`REPOVOX_DEV_AUTH=true`, `REPOVOX_AUTH_PROVIDER=dev` (the default) and
+`REPOVOX_ORIGIN=http://localhost:3000`. Open `http://localhost:3000` on the host. On WSL2 the
+Windows browser reaches the same address. From another machine use an SSH tunnel
+(`ssh -N -L 3000:127.0.0.1:3000 <user>@<host>`), never a published port: the development
+identities have no password.
+
+### Public HTTPS production deployment (`--mode production`)
+
+1. **Create a GitHub OAuth App** (GitHub > Settings > Developer settings > OAuth Apps). Set the
+   homepage URL to your origin. Set the authorization callback URL to exactly
+   `https://<your-host>/api/v1/auth/github/callback`.
+2. **Add the production keys to `.env`** on the host (never to Git):
+
+   ```sh
+   REPOVOX_ORIGIN=https://repovox.example.com
+   REPOVOX_GITHUB_CLIENT_ID=<the OAuth App's client id>
+   REPOVOX_GITHUB_CLIENT_SECRET=<the OAuth App's client secret>
+   ```
+
+3. **Start** with `bash scripts/deploy_selfhosted.sh --mode production`. The script checks the
+   three keys (origin format, non-empty id, secret length) without printing the secret, then
+   runs the base file, the hardening overlay and
+   `infrastructure/local/docker-compose.production.yml`. That overlay sets
+   `REPOVOX_ENVIRONMENT=production`, `REPOVOX_DEV_AUTH=false`, `REPOVOX_FIXTURES=false`,
+   `REPOVOX_AUTH_PROVIDER=github`, clears `REPOVOX_SYNTHETIC_SOURCE_DIR`, and passes the three
+   keys to `api`, `worker`, `dispatcher` and `media-worker`. Every one of those services
+   validates the production settings, so each receives the client secret.
+4. **Put a TLS reverse proxy in front** ([TLS reverse proxy](#tls-reverse-proxy)) and
+   **provision the people allowed to sign in**
+   ([GitHub OAuth App and accounts](#github-oauth-app-and-accounts)).
 
 ## 1. Host prerequisites
 
@@ -131,10 +181,11 @@ chmod 600 .env
 
 The tool creates `.env` with distinct random values and refuses to overwrite an existing
 file. It never prints a value. `scripts/deploy_selfhosted.sh` writes the same keys, with longer
-values, when `.env` is absent ([Quickstart](#quickstart)). `.env` is ignored by Git and must never be committed, pasted
+values, when `.env` is absent, and `--repair-env` adds keys an older file lacks
+([Quickstart](#quickstart)). `.env` is ignored by Git and must never be committed, pasted
 into an issue, or copied between hosts: generate it on the host that uses it. The file header
-says the values are for development; a host serving other users **(after gate)** must use
-values generated on that host and kept only there.
+says the values are for development; a host serving other users must use values generated
+on that host and kept only there.
 
 | Variable in `.env` | Used by | Purpose |
 | --- | --- | --- |
@@ -149,6 +200,8 @@ values generated on that host and kept only there.
 | `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` | `storage-config`, `storage-init` | Object storage administrator, used only to write the S3 identity file and create the bucket |
 | `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY` | `storage-config`, `storage-init`, `api` and workers | The application's object storage identity |
 | `SYNTHETIC_SOURCE_DIR` (optional, not generated) | `api`, `worker` | Development only: serve locally authored synthetic repositories. Leave unset outside development |
+| `REPOVOX_ORIGIN` (production, set by you) | production overlay | The exact public `https://` origin |
+| `REPOVOX_GITHUB_CLIENT_ID`, `REPOVOX_GITHUB_CLIENT_SECRET` (production, set by you) | production overlay: `api`, `worker`, `dispatcher`, `media-worker` | The GitHub OAuth App's credentials; the secret is never printed or logged |
 
 Core and media roles are separate and cannot cross: `rv_*` roles connect only to `repovox`,
 `rvm_*` roles only to `repovox_media` (`infrastructure/local/init-db.sh`). The init script runs
@@ -162,12 +215,15 @@ file sets them in the shared `x-api` block.
 
 | Setting | Code default | `docker-compose.yml` | Target production value | Notes |
 | --- | --- | --- | --- | --- |
-| `REPOVOX_ENVIRONMENT` | `production` | `development` | `production` **(after gate)** | Refused today, see the gate above |
-| `REPOVOX_DEV_AUTH` | `false` | `true` | `false` **(after gate)** | Refused today |
-| `REPOVOX_FIXTURES` | `false` | `true` | `false` | Accepted |
+| `REPOVOX_ENVIRONMENT` | `production` | `development` | `production` | Production rules in [the table above](#identity-adapters-and-fail-closed-settings) |
+| `REPOVOX_DEV_AUTH` | `false` | `true` | `false` | Production refuses `true` |
+| `REPOVOX_AUTH_PROVIDER` | `dev` | not set (`dev`) | `github` | Set by the production overlay |
+| `REPOVOX_GITHUB_CLIENT_ID`, `REPOVOX_GITHUB_CLIENT_SECRET` | unset | not set | from `.env` | Required with `github` |
+| `REPOVOX_ALLOW_LOOPBACK_ORIGIN` | `false` | not set | `false` | Only for a production rehearsal on `http://localhost:3000` |
+| `REPOVOX_FIXTURES` | `false` | `true` | `false` | Production refuses `true` |
 | `REPOVOX_ANALYSIS` | `false` | `true` | `true` | Static analysis through Stage 9 |
 | `REPOVOX_VIDEO` | `false` | `true` | `true` | Video jobs in the media database |
-| `REPOVOX_ORIGIN` | `http://localhost:3000` | `http://localhost:3000` | the reverse proxy's TLS origin **(after gate)** | Refused today unless local |
+| `REPOVOX_ORIGIN` | `http://localhost:3000` | `http://localhost:3000` | your exact `https://` origin | Also the base of the OAuth callback URL |
 | `REPOVOX_DATABASE_URL` | none | core role per service | unchanged | `postgresql+psycopg://rv_...@postgres:5432/repovox` |
 | `REPOVOX_WORKER_DATABASE_URL` | unset | `rv_worker` for `worker` and `dispatcher` | unchanged | |
 | `REPOVOX_MEDIA_DATABASE_URL` | unset | `rvm_app` | unchanged | |
@@ -185,34 +241,68 @@ file sets them in the shared `x-api` block.
 | `REPOVOX_SYNTHETIC_SOURCE_DIR` | unset | `${SYNTHETIC_SOURCE_DIR:-}` | unset | Development only |
 | `REPOVOX_API_URL` (web) | `http://localhost:8000` | `http://api:8000` | `http://api:8000` | Read by `apps/web/src/app/api/v1/[...path]/route.ts` |
 
-**(after gate)** Production values belong in a separate override file kept on the host, not in
-`docker-compose.yml`, for example:
+### TLS reverse proxy
 
-```yaml
-# docker-compose.production.yml: an example only. The boot gate refuses it today.
-# Use with: docker compose -f docker-compose.yml -f docker-compose.production.yml up -d
-x-production: &production
-  REPOVOX_ENVIRONMENT: production
-  REPOVOX_DEV_AUTH: 'false'
-  REPOVOX_FIXTURES: 'false'
-  REPOVOX_ORIGIN: https://repovox.example.com
-services:
-  api: {environment: *production}
-  worker: {environment: *production}
-  dispatcher: {environment: *production}
-  media-worker: {environment: *production}
+In production, terminate TLS at a reverse proxy on the host and forward only to the web
+container at `127.0.0.1:3000`. The web server forwards `/api/v1/...` to the API over the
+compose network (`REPOVOX_API_URL`), so the API's `127.0.0.1:8000` port must stay on loopback.
+The browser's `Origin` header must equal `REPOVOX_ORIGIN` exactly, and session cookies are
+`Secure` because the origin is `https://`. Caddy obtains and renews the certificate itself:
+
+```text
+repovox.example.com {
+	reverse_proxy 127.0.0.1:3000
+}
 ```
 
-Compose merges `environment` keys from the override into each service, so the database,
-storage and secret settings from `docker-compose.yml` are kept.
+Nginx, with a certificate you manage:
 
-### TLS reverse proxy (after gate)
+```text
+server {
+    listen 443 ssl;
+    server_name repovox.example.com;
+    ssl_certificate     /etc/ssl/repovox/fullchain.pem;
+    ssl_certificate_key /etc/ssl/repovox/privkey.pem;
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+}
+server {
+    listen 80;
+    server_name repovox.example.com;
+    return 301 https://$host$request_uri;
+}
+```
 
-Terminate TLS at a reverse proxy on the host and forward to the web container at
-`127.0.0.1:3000`. The web server forwards `/api/v1/...` to the API over the compose network
-(`REPOVOX_API_URL`), so the API's `127.0.0.1:8000` port does not need to be reachable from
-outside the host and should not be published beyond loopback. Set `REPOVOX_ORIGIN` to the
-proxy's exact `https://` origin.
+Do not add a path prefix: the OAuth callback is fixed at `/api/v1/auth/github/callback` on the
+origin.
+
+### GitHub OAuth App and accounts
+
+Sign-in uses the OAuth 2.0 authorization code flow with scope `read:user`. RepoVox reads the
+account's numeric id and discards the access token after that request; the token is not
+stored, logged or sent to the browser. The single-use `state` and a PKCE code verifier (S256)
+live in `HttpOnly`, `SameSite=Lax`, `Secure` cookies for ten minutes; the state is compared
+in constant time. A mismatch or a missing cookie is refused (`400 oauth_state_rejected`)
+before GitHub is contacted.
+
+Only provisioned accounts can sign in; anyone else gets `403 account_not_provisioned`.
+Provision, list and disable accounts with the migration role on the `migrate` service. Use
+the numeric id (`https://api.github.com/users/<login>` shows it), never the login, which can
+change:
+
+```sh
+compose="docker compose -f docker-compose.yml -f infrastructure/local/docker-compose.prod.yml -f infrastructure/local/docker-compose.production.yml"
+$compose run --rm migrate python -m repovox.auth.accounts add --github-id 583231 --name "Ada Lovelace" --email ada@example.com
+$compose run --rm migrate python -m repovox.auth.accounts list
+$compose run --rm migrate python -m repovox.auth.accounts disable --github-id 583231
+```
+
+`add` also creates the account's quota and reactivates a disabled account; a deleted account
+stays deleted. `disable` stops sign-in and revokes the account's open sessions; its data is
+kept. The account's owner id is derived from the numeric id, so it never changes.
 
 ## 3. Services, startup order and health
 
@@ -295,7 +385,7 @@ docker compose logs --since 5m worker dispatcher media-worker
 | Check | Expected |
 | --- | --- |
 | `/health` | `{"status":"alive","version":"0.1.0"}`: the process answers; says nothing about dependencies |
-| `/ready` | `{"status":"ready","generation_available":false,"environment":"development"}`; HTTP 503 with `database_unavailable` when the core database cannot be reached |
+| `/ready` | `{"status":"ready","generation_available":false,"environment":"development"}` (`"production"` in production mode); HTTP 503 with `database_unavailable` when the core database cannot be reached |
 | `/sign-in` | `200` |
 | Web versions | `16.4.6 0.35.5` |
 | Landlock inside the API container | `1` or higher |
@@ -376,7 +466,7 @@ stack. The base files are unchanged. A4 to A6 are addressed only by the opt-in o
 
 | # | Finding | Effect | Follow-up (needs its own review) |
 | --- | --- | --- | --- |
-| A1 | Production configuration is refused by `Settings.fail_closed` | No production or multi-user deployment is possible | Production identity adapter, origin allowlist, security review |
+| A1 | `Settings.fail_closed` refused every production configuration | No production deployment was possible | Addressed by the GitHub identity adapter and the production rules above ([ADR-0024](../adr/0024-github-oauth-allowlist-identity.md)); independent security review still required |
 | A2 | All 12 required `${VAR:?}` references are generated by `tools/phase1_env.py`, none is left over; `SYNTHETIC_SOURCE_DIR` is the only optional one | `.env` generation is complete | none |
 | A3 | The `depends_on` graph has no cycle and every `service_healthy` target has a healthcheck; every `service_completed_successfully` target is a one-shot service | Startup order is deterministic (section 3) | none |
 | A4 | `worker`, `dispatcher` and `media-worker` have no healthcheck in the base file | A hung process shows as `running` | Overlay: Celery ping for `worker`; process and dependency checks for the other two. A progress heartbeat is still open |
