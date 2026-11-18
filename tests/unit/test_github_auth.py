@@ -6,6 +6,7 @@ fakes. The real database path is covered by tests/integration/test_github_oauth.
 
 import base64
 import hashlib
+import os
 from dataclasses import replace
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
@@ -44,6 +45,14 @@ PRODUCTION: dict[str, Any] = {
     "origin": "https://repovox.example.test",
 }
 ORIGIN = PRODUCTION["origin"]
+
+
+@pytest.fixture(autouse=True)
+def no_ambient_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Settings also read REPOVOX_* variables, and the CI test container sets several (for
+    example REPOVOX_DEV_AUTH=true). Every case here states its settings explicitly."""
+    for name in [n for n in os.environ if n.upper().startswith("REPOVOX_")]:
+        monkeypatch.delenv(name)
 
 
 def test_production_accepts_github_oauth_on_an_https_origin() -> None:
