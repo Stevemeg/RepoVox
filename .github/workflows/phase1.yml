@@ -254,6 +254,34 @@ jobs:
           curl -fsS http://127.0.0.1:8000/health
           curl -fsS http://127.0.0.1:8000/ready
           curl -fsS -o /dev/null -w 'web /sign-in %{http_code}\n' http://127.0.0.1:3000/sign-in
+      # Production mode on the same stack: GitHub sign-in with placeholder OAuth credentials.
+      # No request reaches GitHub; the checks stop at the redirect GitHub would receive.
+      - name: Production mode boots with the GitHub identity adapter
+        shell: bash
+        run: |
+          production=(docker compose -f docker-compose.yml -f infrastructure/local/docker-compose.prod.yml -f infrastructure/local/docker-compose.production.yml)
+          bash scripts/deploy_selfhosted.sh --check --mode production
+          printf 'REPOVOX_ORIGIN=https://repovox.invalid\nREPOVOX_GITHUB_CLIENT_ID=ci-placeholder\nREPOVOX_GITHUB_CLIENT_SECRET=%s\n' "$(openssl rand -hex 20)" >> .env
+          bash scripts/deploy_selfhosted.sh --repair-env --mode production
+          "${production[@]}" config --quiet
+          "${production[@]}" up -d --no-build --wait --wait-timeout 300 api web worker dispatcher media-worker
+          curl -fsS http://127.0.0.1:8000/ready | tee ready.json; echo
+          grep -q '"environment":"production"' ready.json
+          curl -fsS http://127.0.0.1:3000/api/v1/auth/config | tee auth-config.json; echo
+          grep -q '"auth_provider":"github"' auth-config.json
+          curl -fsS http://127.0.0.1:3000/sign-in | grep -q 'Continue with GitHub'
+          login=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' http://127.0.0.1:3000/api/v1/auth/github/login)
+          echo "login: ${login%%\?*}"
+          case "$login" in
+            "302 https://github.com/login/oauth/authorize?"*"redirect_uri=https%3A%2F%2Frepovox.invalid%2Fapi%2Fv1%2Fauth%2Fgithub%2Fcallback"*) ;;
+            *) echo "unexpected login redirect"; exit 1 ;;
+          esac
+          test "$(curl -s -o /dev/null -w '%{http_code}' -H 'cookie: rv_oauth_state=browser' 'http://127.0.0.1:3000/api/v1/auth/github/callback?code=x&state=forged')" = 400
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'origin: https://repovox.invalid' -H 'content-type: application/json' -d '{"subject":"alex"}' http://127.0.0.1:3000/api/v1/auth/development/sign-in)" = 503
+          accounts=("${production[@]}" run --rm --no-deps migrate python -m repovox.auth.accounts)
+          "${accounts[@]}" add --github-id 4242 --name 'CI Account' --email ci@example.invalid
+          "${accounts[@]}" list | grep -q '^4242'
+          "${accounts[@]}" disable --github-id 4242
       - name: Summarise failures as annotations
         if: failure()
         run: |
