@@ -923,6 +923,27 @@
         "summary": "Ready"
       }
     },
+    "/v1/auth/config": {
+      "get": {
+        "description": "Public: which sign-in the browser should offer. Never includes a credential.",
+        "operationId": "auth_config_v1_auth_config_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Auth Config V1 Auth Config Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Auth Config"
+      }
+    },
     "/v1/auth/development/sign-in": {
       "post": {
         "operationId": "sign_in_v1_auth_development_sign_in_post",
@@ -963,6 +984,83 @@
           }
         },
         "summary": "Sign In"
+      }
+    },
+    "/v1/auth/github/callback": {
+      "get": {
+        "operationId": "github_callback_v1_auth_github_callback_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 512,
+              "title": "Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 512,
+              "title": "State",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "error",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 128,
+              "title": "Error",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Github Callback"
+      }
+    },
+    "/v1/auth/github/login": {
+      "get": {
+        "operationId": "github_login_v1_auth_github_login_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Github Login"
       }
     },
     "/v1/auth/session": {
