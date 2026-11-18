@@ -17,6 +17,7 @@ import {
   Workflow,
 } from "lucide-react";
 import { Account, api, ApiError, errorMessage, Job, Project } from "@/lib/api";
+import type { AuthProvider } from "@/lib/auth";
 import { AnalysisPanel } from "@/components/analysis-panel";
 import { VideoJobs } from "@/components/video-panel";
 
@@ -72,7 +73,11 @@ function date(value: string) {
   });
 }
 
-export function Workspace() {
+export function Workspace({
+  authProvider = "dev",
+}: {
+  authProvider?: AuthProvider;
+} = {}) {
   const path = usePathname();
   const router = useRouter();
   const [account, setAccount] = useState<Account | null>(null);
@@ -234,49 +239,90 @@ export function Workspace() {
           <small>Bring source code to life visually.</small>
         </div>
         <div className="sign-in-panel">
-          <span className="environment">
-            <span /> LOCAL DEVELOPMENT
-          </span>
-          <h2>Welcome to your workspace</h2>
-          <p>Choose a seeded test identity to explore RepoVox.</p>
-          {expired && (
-            <p role="status">Your session expired. Sign in to continue.</p>
-          )}
-          {error && (
-            <p role="alert" className="error">
-              {error}
-            </p>
-          )}
-          {["alex", "sam"].map((subject, i) => (
-            <button
-              className="identity"
-              disabled={busy}
-              key={subject}
-              onClick={() =>
-                void act(async () => {
-                  await api("/auth/development/sign-in", {
-                    method: "POST",
-                    body: JSON.stringify({ subject }),
-                  });
-                  setExpired(false);
-                  router.replace("/");
-                })
-              }
-            >
-              <span className={`avatar ${i ? "mint" : ""}`}>
-                {i ? "SR" : "AC"}
+          {authProvider === "github" ? (
+            <>
+              <span className="environment">
+                <span /> SECURE SIGN-IN
               </span>
-              <span>
-                <strong>{i ? "Sam Rivera" : "Alex Chen"}</strong>
-                <small>{subject}@example.test</small>
+              <h2>Welcome to your workspace</h2>
+              <p>
+                Sign in with GitHub. Access is limited to accounts an
+                administrator has approved.
+              </p>
+              {expired && (
+                <p role="status">Your session expired. Sign in to continue.</p>
+              )}
+              <a className="identity" href="/api/v1/auth/github/login">
+                <span className="avatar">GH</span>
+                <span>
+                  <strong>Continue with GitHub</strong>
+                  <small>
+                    You return here after GitHub confirms it is you.
+                  </small>
+                </span>
+                <ArrowRight size={18} />
+              </a>
+              <p className="fine-print">
+                RepoVox reads only your public GitHub profile to confirm your
+                account. Your GitHub access token is not stored. Sessions expire
+                after one hour.
+              </p>
+            </>
+          ) : authProvider === "unavailable" ? (
+            <>
+              <h2>Sign-in is unavailable</h2>
+              <p role="alert" className="error">
+                The service could not be reached. Try again in a moment.
+              </p>
+              <Link href="/sign-in">Try again</Link>
+            </>
+          ) : (
+            <>
+              <span className="environment">
+                <span /> LOCAL DEVELOPMENT
               </span>
-              <ArrowRight size={18} />
-            </button>
-          ))}
-          <p className="fine-print">
-            Development identities only. No password or production account is
-            created. Sessions expire after one hour.
-          </p>
+              <h2>Welcome to your workspace</h2>
+              <p>Choose a seeded test identity to explore RepoVox.</p>
+              {expired && (
+                <p role="status">Your session expired. Sign in to continue.</p>
+              )}
+              {error && (
+                <p role="alert" className="error">
+                  {error}
+                </p>
+              )}
+              {["alex", "sam"].map((subject, i) => (
+                <button
+                  className="identity"
+                  disabled={busy}
+                  key={subject}
+                  onClick={() =>
+                    void act(async () => {
+                      await api("/auth/development/sign-in", {
+                        method: "POST",
+                        body: JSON.stringify({ subject }),
+                      });
+                      setExpired(false);
+                      router.replace("/");
+                    })
+                  }
+                >
+                  <span className={`avatar ${i ? "mint" : ""}`}>
+                    {i ? "SR" : "AC"}
+                  </span>
+                  <span>
+                    <strong>{i ? "Sam Rivera" : "Alex Chen"}</strong>
+                    <small>{subject}@example.test</small>
+                  </span>
+                  <ArrowRight size={18} />
+                </button>
+              ))}
+              <p className="fine-print">
+                Development identities only. No password or production account
+                is created. Sessions expire after one hour.
+              </p>
+            </>
+          )}
         </div>
       </main>
     );

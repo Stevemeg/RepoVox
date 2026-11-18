@@ -1,14 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const allowed =
-  /^(auth\/(session|sign-out|development\/sign-in)|projects(\/[a-f0-9-]+(\/(jobs|video-jobs))?)?|jobs(\/[a-f0-9-]+(\/cancel)?)?|video-jobs\/[a-f0-9-]+(\/cancel|\/videos\/[a-f0-9-]+(\/(captions|download))?)?|development\/(projects\/[a-f0-9-]+\/(fixture-jobs|analysis-jobs)|jobs\/[a-f0-9-]+\/(retry|analysis)))$/;
+  /^(auth\/(session|sign-out|config|development\/sign-in|github\/(login|callback))|projects(\/[a-f0-9-]+(\/(jobs|video-jobs))?)?|jobs(\/[a-f0-9-]+(\/cancel)?)?|video-jobs\/[a-f0-9-]+(\/cancel|\/videos\/[a-f0-9-]+(\/(captions|download))?)?|development\/(projects\/[a-f0-9-]+\/(fixture-jobs|analysis-jobs)|jobs\/[a-f0-9-]+\/(retry|analysis)))$/;
+const oauthRoute = /^auth\/github\/(login|callback)$/;
 async function forward(
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> },
 ) {
   const { path } = await context.params;
   const route = path.join("/");
-  if (!allowed.test(route) || request.nextUrl.search)
+  // GitHub sign-in: a GET-only redirect hop each way. Only the callback carries a query
+  // (GitHub's code and state); every other route still refuses one.
+  const oauth = oauthRoute.test(route);
+  const search = request.nextUrl.search;
+  const query =
+    route === "auth/github/callback" && search.length <= 2048 ? search : "";
+  if (
+    !allowed.test(route) ||
+    (search && !query) ||
+    (oauth && request.method !== "GET")
+  )
     return NextResponse.json({ error: { code: "not_found" } }, { status: 404 });
   const headers = new Headers();
   for (const name of [
@@ -47,13 +58,14 @@ async function forward(
   }
   try {
     const upstream = await fetch(
-      `${process.env.REPOVOX_API_URL || "http://localhost:8000"}/v1/${route}`,
+      `${process.env.REPOVOX_API_URL || "http://localhost:8000"}/v1/${route}${query}`,
       {
         method: request.method,
         headers,
         body,
         cache: "no-store",
-        redirect: "error",
+        // The sign-in redirect is handed to the browser, never followed here.
+        redirect: oauth ? "manual" : "error",
         // Resolution has a 10-second aggregate limit; leave bounded DB publication time.
         signal: AbortSignal.timeout(
           media
@@ -70,6 +82,7 @@ async function forward(
     for (const name of [
       "content-type",
       "x-request-id",
+      ...(oauth ? ["location"] : []),
       // Byte-range playback and download of an owner-authorized video only.
       ...(media
         ? [
