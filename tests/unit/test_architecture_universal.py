@@ -15,7 +15,7 @@ from typing import Any
 
 import pytest
 from pydantic import ValidationError
-from repovox.media import archgraph, explainer
+from repovox.media import archgraph, explainer, jsflow
 from repovox.media.architecture import (
     Architecture,
     ArchitectureError,
@@ -30,6 +30,7 @@ from repovox.media.architecture import (
 from repovox.media.diagram import Diagram
 from repovox.media.local import analyze_with_sources
 from repovox.media.narration import FPS
+from repovox.media.pyflow import SourceFile
 from repovox.media.raster import HEIGHT, WIDTH
 from repovox.media.speech import natural
 from test_architecture import (
@@ -845,9 +846,10 @@ def test_express_routes_handlers_and_client_library(loaded: dict[str, Loaded]) -
         ("client library",),
     )
     assert "pool.query(" in parts["pg"].citations[0].quote and parts["pg"].anchors == ("pool",)
-    # Members destructured from `require` are bound by syntax the analyzer does not confirm.
-    assert (parts["listItems"].status, parts["createItem"].status) == ("INFERRED", "VERIFIED")
-    assert "binding strength" in {u.topic for u in service.unresolved}
+    # Members destructured from `require` of a module whose `module.exports` names them, with
+    # a destructuring binding the analyzer confirms, are as strong as a confirmed import.
+    assert (parts["listItems"].status, parts["createItem"].status) == ("VERIFIED", "VERIFIED")
+    assert "binding strength" not in {u.topic for u in service.unresolved}
     assert all(
         (c.basis, c.status) == ("declared_route", "INFERRED")
         for c in service.connections
@@ -1112,6 +1114,562 @@ def test_script_scopes_bind_conservatively(tmp_path: Path) -> None:
     assert "fetch" not in {c.label for c in graph.components}
     assert not any(path.startswith("tests/") for path in graph.scope)
     drawn(graph)
+
+
+def quoted(component: Component) -> list[tuple[str, int, str]]:
+    return [(c.path, c.line, c.quote) for c in component.citations]
+
+
+USERS_DB = (
+    'const { Pool } = require("pg");\n\n'
+    "const pool = new Pool();\n\n"
+    "function listUsers(team) {\n"
+    '  return pool.query("SELECT name FROM users WHERE team = $1", [team]);\n'
+    "}\n\n"
+    "function findUser(id) {\n"
+    '  return pool.query("SELECT name FROM users WHERE id = $1", [id]);\n'
+    "}\n\n"
+    "module.exports = { listUsers, findUser };\n"
+)
+USERS_ROUTER = (
+    'const express = require("express");\n'
+    'const { listUsers, findUser } = require("../db");\n\n'
+    "const router = express.Router();\n\n"
+    'router.get("/", async (req, res) => {\n'
+    "  const rows = await listUsers(req.query.team);\n"
+    "  res.json(rows);\n"
+    "});\n\n"
+    'router.get("/:id", showUser);\n\n'
+    "async function showUser(req, res) {\n"
+    "  const user = await findUser(req.params.id);\n"
+    "  res.json(user);\n"
+    "}\n\n"
+    "module.exports = router;\n"
+)
+USERS_APP = (
+    'const express = require("express");\n'
+    'const users = require("./routes/users");\n\n'
+    "const app = express();\n"
+    "app.use(express.json());\n"
+    'app.use("/api/users", users);\n\n'
+    "app.listen(3000);\n"
+)
+USERS_CLIENT = (
+    "export async function loadUsers() {\n"
+    '  const response = await fetch("/api/users");\n'
+    "  return response.json();\n"
+    "}\n"
+)
+
+
+def test_express_router_routes_take_the_prefix_they_are_mounted_at(tmp_path: Path) -> None:
+    files = {
+        "server/db.js": USERS_DB,
+        "server/routes/users.js": USERS_ROUTER,
+        "server/app.js": USERS_APP,
+        "web/client.js": USERS_CLIENT,
+    }
+    payload, sources, report = load(written(tmp_path / "source", files))
+    validate(report, payload, sources)
+    # The analyzer records routes only on the object bound to `express()`: none here.
+    assert not {
+        c["path"]
+        for c in payload["knowledge"]["entrypoints"]["candidates"]
+        if c["rule"] == "framework-route-v1"
+    }
+    (service,) = by_type(report, "service")
+    assert service.title == "HTTP service in server/routes/users.js"
+    assert edges(service) == {
+        ("GET /api/users", "routes", "GET /api/users handler"),
+        ("GET /api/users handler", "calls", "listUsers"),
+        ("GET /api/users/:id", "routes", "showUser"),
+        ("showUser", "calls", "findUser"),
+        ("listUsers", "uses", "pg"),
+        ("findUser", "uses", "pg"),
+    }
+    parts = labels(service)
+    # A mounted route is cited where it is declared and where the router is mounted, and
+    # anchored on the path part each of those lines shows.
+    endpoint = parts["GET /api/users/:id"]
+    assert quoted(endpoint) == [
+        ("server/routes/users.js", 11, 'router.get("/:id", showUser);'),
+        ("server/app.js", 6, 'app.use("/api/users", users);'),
+    ]
+    assert (endpoint.anchors, endpoint.lines, endpoint.status) == (
+        ("/:id", "/api/users"),
+        ("mounted route",),
+        "INFERRED",
+    )
+    assert cited(parts["GET /api/users handler"]) == (
+        "server/routes/users.js",
+        6,
+        'router.get("/", async (req, res) => {',
+    )
+    # Destructured from a `require` whose module.exports names them: confirmed bindings.
+    assert (parts["listUsers"].status, parts["findUser"].status) == ("VERIFIED", "VERIFIED")
+    assert all(
+        (c.basis, c.status) == ("declared_route", "INFERRED")
+        for c in service.connections
+        if c.kind == "routes"
+    )
+    spoken = " ".join(line.text for line in explainer.narrate(service))
+    assert "The route GET /api/users/:id is declared on showUser." in spoken
+    # The client's path literal matches the combined path, not the router's own `/`.
+    (overview,) = by_type(report, "system_overview")
+    assert ("client.js", "http_request", "users.js") in edges(overview)
+    request = next(c for c in overview.connections if c.kind == "http_request")
+    assert {c.path for c in request.citations} == {
+        "web/client.js",
+        "server/routes/users.js",
+        "server/app.js",
+    }
+    for architecture in report.architectures:
+        drawn(architecture)
+    # Without the mount line, the cited source no longer shows the prefix: rejected.
+    forged = service.model_copy(
+        update={
+            "components": tuple(
+                c.model_copy(update={"citations": c.citations[:1]}) if c.id == endpoint.id else c
+                for c in service.components
+            )
+        }
+    )
+    with pytest.raises(ArchitectureError) as raised:
+        check(rebuilt(report, forged), payload, sources)
+    assert raised.value.code == "unsupported_element"
+
+
+def test_nested_typescript_routers_and_unmounted_or_foreign_routers(tmp_path: Path) -> None:
+    files = {
+        "src/store.ts": (
+            'import Redis from "ioredis";\n\n'
+            "const cache = new Redis();\n\n"
+            "export async function readReport(id: string) {\n  return cache.get(id);\n}\n\n"
+            "export async function purge(id: string) {\n  return cache.del(id);\n}\n"
+        ),
+        "src/admin.ts": (
+            'import { Router } from "express";\n'
+            'import { purge } from "./store";\n\n'
+            "export const admin = Router();\n\n"
+            'admin.delete("/cache/:id", async (req, res) => {\n'
+            "  await purge(req.params.id);\n"
+            "  res.sendStatus(204);\n"
+            "});\n"
+        ),
+        "src/reports.ts": (
+            'import express from "express";\n'
+            'import { admin } from "./admin";\n'
+            'import { readReport } from "./store";\n\n'
+            "const reports = express.Router();\n\n"
+            'reports.use("/admin", admin);\n'
+            'reports.get("/:id", async (req, res) => {\n'
+            "  res.json(await readReport(req.params.id));\n"
+            "});\n\n"
+            "export default reports;\n"
+        ),
+        "src/server.ts": (
+            'import express from "express";\n'
+            'import reports from "./reports";\n\n'
+            "const app = express();\n"
+            'app.use("/r", reports);\n'
+            "app.listen(8080);\n"
+        ),
+        # Declared but never mounted: shown with its own path, and the mount is unresolved.
+        "src/orphan.ts": (
+            'import { Router } from "express";\n'
+            'import { readReport } from "./store";\n\n'
+            "const orphan = Router();\n\n"
+            'orphan.get("/orphan", async (req, res) => {\n'
+            '  res.json(await readReport("x"));\n'
+            "});\n"
+        ),
+        # A `Router` that is not the one from the express package is not a router.
+        "src/fake.js": (
+            'const { Router } = require("./router");\n'
+            'const { purge } = require("./store");\n\n'
+            "const fake = Router();\n\n"
+            'fake.get("/fake", async (req, res) => {\n'
+            '  res.json(await purge("x"));\n'
+            "});\n"
+        ),
+        "src/router.js": "function Router() {\n  return {};\n}\n\nmodule.exports = { Router };\n",
+    }
+    payload, sources, report = load(written(tmp_path / "source", files))
+    validate(report, payload, sources)
+    services = {a.title: a for a in by_type(report, "service")}
+    assert set(services) == {
+        "HTTP service in src/admin.ts",
+        "HTTP service in src/orphan.ts",
+        "HTTP service in src/reports.ts",
+    }
+    admin = services["HTTP service in src/admin.ts"]
+    handler = "DELETE /r/admin/cache/:id handler"[:28]  # Labels are cut to the box width.
+    assert edges(admin) == {
+        ("DELETE /r/admin/cache/:id", "routes", handler),
+        (handler, "calls", "purge"),
+        ("purge", "uses", "ioredis"),
+    }
+    endpoint = labels(admin)["DELETE /r/admin/cache/:id"]
+    # Outermost mount first: the application's `/r`, then the router's `/admin`.
+    assert quoted(endpoint) == [
+        ("src/admin.ts", 6, 'admin.delete("/cache/:id", async (req, res) => {'),
+        ("src/server.ts", 5, 'app.use("/r", reports);'),
+        ("src/reports.ts", 7, 'reports.use("/admin", admin);'),
+    ]
+    assert endpoint.anchors == ("/cache/:id", "/r", "/admin")
+    # The analyzer also records `Router()` from express as an application; its routes are
+    # read once, with their mounts, never again without the prefix.
+    every = {c.label for a in report.architectures for c in a.components if c.kind == "endpoint"}
+    assert every == {"DELETE /r/admin/cache/:id", "GET /r/:id", "GET /orphan"}
+    orphan = services["HTTP service in src/orphan.ts"]
+    assert labels(orphan)["GET /orphan"].lines == ("router route",)
+    assert "router mount" in {u.topic for u in orphan.unresolved}
+    assert "router mount" not in {u.topic for u in admin.unresolved}
+    for architecture in report.architectures:
+        drawn(architecture)
+
+
+def test_nextjs_route_handlers_are_routes_read_from_the_file_location(tmp_path: Path) -> None:
+    orders = (
+        'import { MongoClient } from "mongodb";\n\n'
+        'const client = new MongoClient("mongodb://orders-db:27017");\n\n'
+        "export async function findOrders(customer: string) {\n"
+        '  return client.db("shop").collection("orders").find({ customer }).toArray();\n'
+        "}\n\n"
+        "export async function placeOrder(order: unknown) {\n"
+        '  await client.db("shop").collection("orders").insertOne(order);\n'
+        "  return order;\n"
+        "}\n"
+    )
+    files = {
+        "lib/orders.ts": orders,
+        "app/api/orders/route.ts": (
+            'import { findOrders, placeOrder } from "../../../lib/orders";\n\n'
+            "export async function GET(request: Request) {\n"
+            '  const customer = new URL(request.url).searchParams.get("customer") ?? "";\n'
+            "  const orders = await findOrders(customer);\n"
+            "  return Response.json(orders);\n"
+            "}\n\n"
+            "export async function POST(request: Request) {\n"
+            "  const order = await placeOrder(await request.json());\n"
+            "  return Response.json(order, { status: 201 });\n"
+            "}\n"
+        ),
+        "app/api/orders/[id]/route.ts": (
+            'import { findOrders, placeOrder } from "../../../../lib/orders";\n\n'
+            "export const PATCH = async (request: Request) => {\n"
+            "  const order = await placeOrder(await request.json());\n"
+            "  return Response.json(order);\n"
+            "};\n\n"
+            "async function remove(request: Request) {\n"
+            "  return findOrders(request.url);\n"
+            "}\n\n"
+            "export { remove as DELETE };\n"
+        ),
+        # A route group adds no path segment; a private folder is not routed at all.
+        "app/(admin)/api/stats/route.ts": (
+            'import { findOrders } from "../../../../lib/orders";\n\n'
+            "export async function GET() {\n"
+            '  return Response.json(await findOrders("all"));\n'
+            "}\n"
+        ),
+        "app/_lib/route.ts": (
+            'import { findOrders } from "../../lib/orders";\n\n'
+            "export async function GET() {\n"
+            '  return Response.json(await findOrders("x"));\n'
+            "}\n"
+        ),
+        "app/components/list.ts": (
+            "export async function listOrders() {\n"
+            '  const response = await fetch("/api/orders");\n'
+            "  return response.json();\n"
+            "}\n"
+        ),
+    }
+    # Without evidence of Next.js, a file named route.ts declares no route.
+    payload, sources, report = load(written(tmp_path / "plain", files))
+    validate(report, payload, sources)
+    assert by_type(report, "service") == []
+    files["package.json"] = (
+        '{\n  "name": "shop",\n  "dependencies": {\n    "next": "16.4.6"\n  }\n}\n'
+    )
+    payload, sources, report = load(written(tmp_path / "next", files))
+    validate(report, payload, sources)
+    services = {a.title: a for a in by_type(report, "service")}
+    assert set(services) == {
+        "HTTP service in app/(admin)/api/stats/route.ts",
+        "HTTP service in app/api/orders/[id]/route.ts",
+        "HTTP service in app/api/orders/route.ts",
+    }
+    collection = services["HTTP service in app/api/orders/route.ts"]
+    assert edges(collection) == {
+        ("GET /api/orders", "routes", "GET"),
+        ("GET", "calls", "findOrders"),
+        ("POST /api/orders", "routes", "POST"),
+        ("POST", "calls", "placeOrder"),
+        ("findOrders", "uses", "mongodb"),
+        ("placeOrder", "uses", "mongodb"),
+    }
+    parts = labels(collection)
+    assert quoted(parts["GET /api/orders"]) == [
+        ("app/api/orders/route.ts", 3, "export async function GET(request: Request) {")
+    ]
+    assert (parts["GET /api/orders"].anchors, parts["GET /api/orders"].lines) == (
+        ("GET",),
+        ("file-system route",),
+    )
+    # Platform globals such as URL and Response are not reported as unbound names.
+    assert "unbound calls" not in {u.topic for u in collection.unresolved}
+    item = services["HTTP service in app/api/orders/[id]/route.ts"]
+    assert edges(item) == {
+        ("PATCH /api/orders/[id]", "routes", "PATCH"),
+        ("PATCH", "calls", "placeOrder"),
+        ("DELETE /api/orders/[id]", "routes", "remove"),
+        ("remove", "calls", "findOrders"),
+        ("placeOrder", "uses", "mongodb"),
+        ("findOrders", "uses", "mongodb"),
+    }
+    # `export { remove as DELETE }`: the route is cited where the method name is exported.
+    assert quoted(labels(item)["DELETE /api/orders/[id]"]) == [
+        ("app/api/orders/[id]/route.ts", 12, "export { remove as DELETE };")
+    ]
+    assert {
+        c.label for c in services["HTTP service in app/(admin)/api/stats/route.ts"].components
+    } >= {"GET /api/stats"}
+    (overview,) = by_type(report, "system_overview")
+    assert ("list.ts", "http_request", "route.ts") in edges(overview)
+    request = next(c for c in overview.connections if c.kind == "http_request")
+    assert {c.path for c in request.citations} == {
+        "app/components/list.ts",
+        "app/api/orders/route.ts",
+    }
+    for architecture in report.architectures:
+        drawn(architecture)
+
+
+def test_commonjs_exports_bind_what_require_names(tmp_path: Path) -> None:
+    files = {
+        "lib/store.js": (
+            'const { Pool } = require("pg");\n\n'
+            "const pool = new Pool();\n\n"
+            'function findUser(id) {\n  return pool.query("SELECT 1", [id]);\n}\n\n'
+            'function saveUser(user) {\n  return pool.query("INSERT", [user]);\n}\n\n'
+            "function hidden(user) {\n  return user;\n}\n\n"
+            "module.exports = { findUser, saveUser };\n"
+        ),
+        "lib/format.js": "function format(row) {\n  return row;\n}\n\nmodule.exports = format;\n",
+        "lib/audit.js": "exports.audit = function (entry) {\n  return entry;\n};\n",
+        "lib/job.js": (
+            'const { findUser, saveUser, hidden } = require("./store");\n'
+            'const format = require("./format");\n'
+            'const audit = require("./audit");\n\n'
+            "function run(id) {\n"
+            "  const user = findUser(id);\n"
+            "  const shaped = format(user);\n"
+            "  saveUser(shaped);\n"
+            "  hidden(shaped);\n"
+            "  return audit.audit(shaped);\n"
+            "}\n\n"
+            "module.exports = { run };\n"
+        ),
+        "lib/controller.js": (
+            'const { findUser } = require("./store");\n\n'
+            "module.exports = {\n"
+            "  async show(req, res) {\n"
+            "    const user = await findUser(req.params.id);\n"
+            "    res.json(user);\n"
+            "  },\n"
+            "  list: async (req, res) => {\n"
+            "    res.json(await findUser(req.query.id));\n"
+            "  },\n"
+            "};\n"
+        ),
+        "lib/server.js": (
+            'const express = require("express");\n'
+            'const controller = require("./controller");\n\n'
+            "const app = express();\n"
+            'app.get("/users/:id", controller.show);\n'
+            'app.get("/users", controller.list);\n'
+            "app.listen(3000);\n"
+        ),
+    }
+    payload, sources, report = load(written(tmp_path / "source", files))
+    validate(report, payload, sources)
+    (graph,) = by_type(report, "component_graph")
+    assert graph.title == "run() in lib/job.js"
+    assert {
+        ("id", "data", "findUser"),
+        ("findUser", "data", "format"),
+        ("format", "data", "saveUser"),
+        ("format", "data", "audit"),
+        ("audit", "data", "result"),
+    } <= edges(graph)
+    parts = labels(graph)
+    # `const { a } = require(...)` of names `module.exports = { ... }` gives: confirmed.
+    assert (parts["findUser"].status, parts["saveUser"].status) == ("VERIFIED", "VERIFIED")
+    # `const format = require(...)` of `module.exports = format`: the module value. The
+    # analyzer counts that declaration as a write, so the binding stays inferred.
+    assert (cited(parts["format"]), parts["format"].status) == (
+        ("lib/format.js", 1, "function format(row) {"),
+        "INFERRED",
+    )
+    # A function written in place as `exports.audit = ...` is its own definition.
+    assert (cited(parts["audit"]), parts["audit"].status) == (
+        ("lib/audit.js", 1, "exports.audit = function (entry) {"),
+        "INFERRED",
+    )
+    # `hidden` is declared in store.js but not exported: it stays an unbound name.
+    assert "hidden" not in parts
+    assert "hidden" in " ".join(u.reason for u in graph.unresolved if u.topic == "unbound calls")
+    # Handlers exported as members of an object and reached as `controller.show`.
+    (service,) = by_type(report, "service")
+    assert edges(service) == {
+        ("GET /users/:id", "routes", "show"),
+        ("show", "calls", "findUser"),
+        ("GET /users", "routes", "list"),
+        ("list", "calls", "findUser"),
+        ("findUser", "uses", "pg"),
+    }
+    handlers = labels(service)
+    assert (cited(handlers["show"]), cited(handlers["list"])) == (
+        ("lib/controller.js", 4, "async show(req, res) {"),
+        ("lib/controller.js", 8, "list: async (req, res) => {"),
+    )
+    assert {handlers["show"].status, handlers["list"].status} == {"INFERRED"}
+    for architecture in report.architectures:
+        drawn(architecture)
+
+
+def test_commonjs_exports_are_read_only_when_the_syntax_settles_them() -> None:
+    def exported(source: str) -> list[str | None] | None:
+        file = SourceFile("lib/m.js", source.encode(), "javascript")
+        found = jsflow.commonjs_exports(file.root, file.body)
+        return None if found is None else [item.name for item in found]
+
+    assert exported("module.exports = { a, b: c, d() {}, e: () => 1, f: 2 };") == [
+        "a",
+        "b",
+        "d",
+        "e",
+    ]
+    assert exported("module.exports = handler;\nmodule.exports.extra = other;") == [None, "extra"]
+    # Assigned twice: which value holds is not settled by the syntax.
+    assert exported("module.exports = { a };\nmodule.exports = { b };") is None
+    # Replaced by the later module.exports, or no longer reaching it through `exports`.
+    assert exported("module.exports.a = a;\nmodule.exports = { b };\nexports.c = c;") == ["b"]
+    assert exported("exports.a = a;\nexports.a = b;\nexports.c = function () {};") == ["c"]
+    # Only unconditional statements of the file itself.
+    assert exported("if (x) {\n  module.exports = { a };\n}\nfunction f() { exports.b = b; }") == []
+
+
+@pytest.mark.parametrize(
+    ("path", "route"),
+    [
+        ("app/api/items/route.ts", "/api/items"),
+        ("src/app/api/items/[id]/route.js", "/api/items/[id]"),
+        ("app/(shop)/cart/route.tsx", "/cart"),
+        ("app/route.ts", "/"),
+        ("app/_private/route.ts", None),
+        ("app/@modal/route.ts", None),
+        ("app/(.)photo/route.ts", None),
+        ("app/api/items/handler.ts", None),
+        ("api/items/route.ts", None),
+    ],
+)
+def test_app_router_paths_follow_the_file_location(path: str, route: str | None) -> None:
+    assert jsflow.app_route(path) == route
+
+
+def test_router_paths_join_as_express_mounts_them() -> None:
+    assert jsflow.joined("/api/users", "/") == "/api/users"
+    assert jsflow.joined("/api/", "/users/", "/:id") == "/api/users/:id"
+    assert jsflow.joined("", "/items") == "/items"
+    assert jsflow.joined("/", "/") == "/"
+
+
+def test_destructured_props_are_cited_parameters(tmp_path: Path) -> None:
+    files = {
+        "web/api.ts": (
+            "export async function loadItems(tag: string): Promise<string[]> {\n"
+            "  const response = await fetch(`/api/items?tag=${tag}`);\n"
+            "  return response.json();\n"
+            "}\n"
+        ),
+        "web/rank.ts": (
+            "export function rank(items: string[]): string[] {\n  return [...items].sort();\n}\n"
+        ),
+        "web/Summary.tsx": (
+            "export function Summary({ total, title }: { total: unknown; title: unknown }) {\n"
+            "  return (\n    <p>\n      {String(title)}: {String(total)}\n    </p>\n  );\n}\n"
+        ),
+        "web/Badge.jsx": "export function Badge({ label }) {\n  return <b>{label}</b>;\n}\n",
+        "web/Page.tsx": (
+            'import { loadItems } from "./api";\n'
+            'import { rank } from "./rank";\n'
+            'import { Summary } from "./Summary";\n\n'
+            "export async function Page({\n"
+            "  tag,\n"
+            "  limit,\n"
+            "}: {\n"
+            "  tag: string;\n"
+            "  limit: number;\n"
+            "}) {\n"
+            "  const items = await loadItems(tag);\n"
+            "  const ranked = rank(items);\n"
+            "  return <Summary total={limit} title={ranked} />;\n"
+            "}\n"
+        ),
+        "web/Card.jsx": (
+            'import { rank } from "./rank";\n'
+            'import { Summary } from "./Summary";\n'
+            'import { Badge } from "./Badge";\n\n'
+            "export const Card = ({ rows, heading: title, size = 3 }) => {\n"
+            "  const ranked = rank(rows);\n"
+            "  return (\n"
+            "    <section>\n"
+            "      <Summary total={ranked} title={title} />\n"
+            "      <Badge label={size} />\n"
+            "    </section>\n"
+            "  );\n"
+            "};\n"
+        ),
+    }
+    payload, sources, report = load(written(tmp_path / "source", files))
+    validate(report, payload, sources)
+    graphs = {a.title: a for a in by_type(report, "component_graph")}
+    assert set(graphs) == {"Page() in web/Page.tsx", "Card() in web/Card.jsx"}
+    page, card = graphs["Page() in web/Page.tsx"], graphs["Card() in web/Card.jsx"]
+    # Each destructured prop of a multi-line typed signature is cited where it is declared.
+    inputs = {c.label: cited(c) for c in page.components if c.kind == "input"}
+    assert inputs == {
+        "tag": ("web/Page.tsx", 6, "tag,"),
+        "limit": ("web/Page.tsx", 7, "limit,"),
+    }
+    assert {
+        ("tag", "data", "loadItems"),
+        ("loadItems", "data", "rank"),
+        ("rank", "data", "Summary"),
+        ("limit", "data", "Summary"),
+    } <= edges(page)
+    # A renamed prop is the local name it binds; a default value does not hide the name.
+    line = "export const Card = ({ rows, heading: title, size = 3 }) => {"
+    assert {c.label: cited(c) for c in card.components if c.kind == "input"} == {
+        "rows": ("web/Card.jsx", 5, line),
+        "title": ("web/Card.jsx", 5, line),
+        "size": ("web/Card.jsx", 5, line),
+    }
+    assert {
+        ("rows", "data", "rank"),
+        ("rank", "data", "Summary"),
+        ("title", "data", "Summary"),
+        ("size", "data", "Badge"),
+    } <= edges(card)
+    # The parameters themselves are what the cited line shows; the analyzer treats a file
+    # with destructured parameters as unsafe, so the components they reach are inferred.
+    for graph in (page, card):
+        assert {c.status for c in graph.components if c.kind == "input"} == {"VERIFIED"}
+        assert "binding strength" in {u.topic for u in graph.unresolved}
+        drawn(graph)
 
 
 def test_a_long_multi_language_import_chain_still_fits_the_overview(tmp_path: Path) -> None:

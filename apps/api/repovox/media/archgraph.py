@@ -11,7 +11,7 @@ produce the same scopes, call sites and values. Everything after reading is shar
 """
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from tree_sitter import Node
@@ -89,7 +89,8 @@ SCRIPT_BUILTINS = set(
     "require parseInt parseFloat isNaN isFinite String Number Boolean Array Object Symbol BigInt "
     "Date Promise Error TypeError RangeError Map Set WeakMap WeakSet RegExp setTimeout "
     "setInterval clearTimeout clearInterval queueMicrotask structuredClone encodeURIComponent "
-    "decodeURIComponent encodeURI decodeURI".split()
+    "decodeURIComponent encodeURI decodeURI URL URLSearchParams Request Response Headers "
+    "FormData Blob TextEncoder TextDecoder AbortController".split()
 )
 MUTATORS = {"append", "extend", "add", "update", "put", "send", "insert"}
 SCRIPT_MUTATORS = {"push", "unshift", "add", "set", "append"}
@@ -131,6 +132,28 @@ class Site:
     callee: str
     line: int
     uses: list[tuple[Producer, int]]
+
+
+@dataclass(frozen=True)
+class Route:
+    """One declared route: the lines that together show it, and the handler it names.
+
+    A route declared in one place (`app.get("/items", ...)`, a decorator) is cited on that
+    line. A route on a mounted Express router is cited on its own line and on every mount
+    line that adds a prefix, and anchored on each path part those lines show. A Next.js route
+    handler is cited on the line exporting its method; its path is read from where the file
+    is, as the App Router reads it.
+    """
+
+    method: str
+    path: str
+    cited: tuple[tuple[str, int], ...]
+    anchors: tuple[str, ...]
+    note: str = "declared route"
+    # Whether a request path literal may be matched to it: not when a prefix is unknown.
+    matchable: bool = True
+    handler: str = ""  # The handler's definition id, once resolved.
+    def_line: int = 0
 
 
 @dataclass
@@ -184,18 +207,45 @@ class Repo:
         # definition), aliases bound by `require`, every name a file declares with a count,
         # functions written in place as route handlers, and the routes the analyzer found.
         self.exports: dict[str, dict[str, str]] = {}
+        self.export_lines: dict[str, dict[str, int]] = {}
         self.required: set[tuple[str, str]] = set()
         self.declared: dict[str, dict[str, int]] = {}
         self.inline: dict[tuple[int, int], str] = {}
         self.spans: dict[str, set[tuple[int, int]]] = {}  # Byte ranges of top-level definitions.
-        self.script_routes: dict[str, list[tuple[str, str, int, Node]]] = {}
+        self.script_routes: dict[str, list[tuple[Route, Node | None]]] = {}
+        # CommonJS: the names `module.exports` / `exports.name` give (exported -> local name),
+        # and the local name `module.exports` itself is set to.
+        self.commonjs: dict[str, dict[str, str]] = {}
+        self.module_value: dict[str, str] = {}
+        # What each JavaScript or TypeScript import binds: local -> (module, member, require).
+        self.imported: dict[str, dict[str, tuple[str, str | None, bool]]] = {}
+        # Express: application objects the analyzer bound to `express()`, routers constructed
+        # through the imported `express` package (name -> line), routes declared on a router,
+        # and `use(...)` mounts.
+        self.apps: dict[str, set[str]] = {}
+        self.routers: dict[str, dict[str, int]] = {}
+        self.router_calls: dict[tuple[str, str], list[jsflow.RouteCall]] = {}
+        self.mounts: list[tuple[str, jsflow.RouteCall]] = []
         # Module-level names bound once to a constructed instance or a client handle.
         self.module_instances: dict[str, dict[str, str]] = {}
         self.module_env: dict[str, dict[str, list[Producer]]] = {}
+        symbols = ctx.all_symbols
+        self.by_path: dict[str, list[dict[str, Any]]] = {}
+        for item in symbols.values():
+            self.by_path.setdefault(item["path"], []).append(item)
+        for candidate in ctx.payload["knowledge"]["entrypoints"]["candidates"]:
+            made = symbols[candidate["symbol_id"]]
+            if candidate["rule"] == "framework-construction-v1" and made.get("binding"):
+                self.apps.setdefault(candidate["path"], set()).add(made["binding"])
+        # Resolved imports between files, to tell a cyclic `require` apart as the analyzer does.
+        self.links: dict[str, set[str]] = {}
+        for edge in ctx.payload["knowledge"]["edges"]:
+            if edge["relationship"] == "imports" and edge["classification"] == "resolved_static":
+                source, target = symbols[edge["source"]]["path"], symbols[edge["target"]]["path"]
+                self.links.setdefault(source, set()).add(target)
         for path, file in ctx.files.items():
             if file.valid:
                 (self.index if file.python else self.index_script)(path, file)
-        symbols = ctx.all_symbols
         for edge in ctx.payload["knowledge"]["edges"]:
             if edge["classification"] != "resolved_static":
                 continue
@@ -229,6 +279,7 @@ class Repo:
             for e in ctx.payload["knowledge"]["edges"]
             if e["relationship"] == "imports" and e["classification"] == "resolved_static"
         }
+        self.modules = modules
         for item in symbols.values():
             if item["kind"] in {"function", "class"} and item["syntax"]["unsafe_binding"]:
                 self.weak.add(f"{item['path']}::{item['name']}")
@@ -251,6 +302,7 @@ class Repo:
                 # binding the analyzer did not confirm, so everything through it is inferred.
                 self.bindings.setdefault(item["path"], {})[local] = found
                 self.weak.add(found)
+        self.mount()
         for path, file in ctx.files.items():
             if file.valid:
                 (self.classes if file.python else self.script_classes)(path, file)
@@ -317,27 +369,79 @@ class Repo:
         if module is None or module not in self.exports:
             return
         for name, wanted in pairs:
-            if wanted is None or name in self.bindings.get(path, {}):
-                continue  # A whole module is an alias; a confirmed binding is kept.
-            target = wanted if commonjs else self.exports[module].get(wanted, "")
+            self.imported.setdefault(path, {})[name] = (module, wanted, commonjs)
+            if name in self.bindings.get(path, {}):
+                continue  # A binding the analyzer confirmed is kept.
+            confirmed = False
+            if commonjs:
+                record = self.commonjs.get(module)
+                if wanted is None:
+                    # `const name = require(...)`: the module value. The analyzer counts the
+                    # declaration as a write, so it never confirms this binding.
+                    target = self.module_value.get(module, "")
+                elif record is not None:
+                    # `const { name } = require(...)` of a member `module.exports` names:
+                    # confirmed when the analyzer confirms the destructuring binding, the
+                    # import is not cyclic, and nothing else in this file assigns the name.
+                    target = record.get(wanted, "")
+                    confirmed = (
+                        not syntax["unsafe_binding"]
+                        and self.declared.get(path, {}).get(name) == 1
+                        and not self.cyclic(path, module)
+                    )
+                else:
+                    target = wanted  # No `module.exports` was read: a top-level name only.
+            elif wanted is None:
+                continue  # A namespace import is an alias, read member by member.
+            else:
+                target = self.exported(module, wanted)[0]
             found = f"{module}::{target}"
             if target and found in self.defs and self.defs[found].owner is None:
-                # Exported (or, for `require`, top-level) in a resolved local module, but not
-                # confirmed by the analyzer's stricter rules: inferred.
+                # Exported in a resolved local module. Unless confirmed above, the analyzer's
+                # stricter rules did not confirm the binding: inferred.
                 self.bindings.setdefault(path, {})[name] = found
-                self.weak.add(found)
+                if not confirmed:
+                    self.weak.add(found)
+
+    def exported(self, module: str, name: str) -> tuple[str, bool]:
+        """The local name a module exports as `name`, and whether only CommonJS says so."""
+        if name in self.exports.get(module, {}):
+            return self.exports[module][name], False
+        if name == "default" and module in self.module_value:
+            return self.module_value[module], True  # `import x from` a CommonJS module.
+        return self.commonjs.get(module, {}).get(name, ""), True
+
+    def cyclic(self, source: str, target: str) -> bool:
+        """Whether `target` reaches `source` again through resolved imports."""
+        seen: set[str] = set()
+        pending = [target]
+        while pending:
+            current = pending.pop()
+            if current == source or len(seen) > 1024:
+                return True
+            if current not in seen:
+                seen.add(current)
+                pending.extend(self.links.get(current, set()) - seen)
+        return False
 
     def member(self, path: str, alias: str, module: str, name: str) -> str | None:
         """The definition `alias.name` reaches through a namespace import or a `require`."""
         if (path, alias) in self.required:
-            found = f"{module}::{name}"
-            if found in self.defs and self.defs[found].owner is None:
-                self.weak.add(found)  # What module.exports holds is not declared syntax.
+            record = self.commonjs.get(module)
+            target = record.get(name, "") if record is not None else name
+            found = f"{module}::{target}"
+            if target and found in self.defs and self.defs[found].owner is None:
+                # Through a whole-module `require`, which the analyzer never confirms.
+                self.weak.add(found)
                 return found
             return None
-        target = self.exports.get(module, {}).get(name)
+        target, commonjs = self.exported(module, name)
         found = f"{module}::{target}"
-        return found if target and found in self.defs else None
+        if not target or found not in self.defs:
+            return None
+        if commonjs:
+            self.weak.add(found)  # A CommonJS member reached through an ESM namespace.
+        return found
 
     def module_level(self, path: str, reader: "Reader") -> None:
         """Module names bound once to an instance or a client handle, visible to functions."""
@@ -415,12 +519,14 @@ class Repo:
         body = file.body
         local: dict[str, str] = {}
         exports: dict[str, str] = {}
+        lines = self.export_lines.setdefault(path, {})
         self.declared[path] = jsflow.declared_names(file.root, body)
         for item in jsflow.declarations(file.root):
             name = text(item.name, body)
             identity = f"{path}::{name}"
             if item.exported:
                 exports[name] = name
+                lines.setdefault(name, line(item.name))
             if item.default:
                 exports["default"] = name
             self.spans.setdefault(path, set()).add((item.node.start_byte, item.node.end_byte))
@@ -447,23 +553,8 @@ class Repo:
                 default=item.default,
             )
             local[name] = identity
-            for member, label in jsflow.methods(item.node) if item.kind == "class" else []:
-                method = text(label, body)
-                key = f"{identity}.{method}"
-                if key in self.defs:
-                    continue  # An accessor pair or a repeated name: the first is kept.
-                self.defs[key] = Definition(
-                    key,
-                    path,
-                    f"{name}.{method}",
-                    "method",
-                    line(label),
-                    member,
-                    jsflow.parameter_names(member, body),
-                    identity,
-                    jsflow.parameter_positions(member, body),
-                    anchor=method,
-                )
+            if item.kind == "class":
+                self.methods(path, body, identity, name, item.node)
         for child in file.root.named_children:
             if child.type != "export_statement" or child.child_by_field_name("source"):
                 continue
@@ -473,18 +564,144 @@ class Repo:
                     exported = text(specifier.child_by_field_name("alias"), body) or original
                     if original:
                         exports[exported] = original
+                        lines.setdefault(exported, line(specifier))
             value = child.child_by_field_name("value")
             if value is not None and value.type == "identifier":
                 exports["default"] = text(value, body)  # `export default name;`
         self.exports[path] = exports
         self.bindings.setdefault(path, {}).update(local)
+        self.common(path, file)
+        self.find_routers(path, file, exports)
         self.handlers(path, file)
+        self.next_routes(path)
+
+    def methods(self, path: str, body: bytes, identity: str, name: str, cls: Node) -> None:
+        """The methods one JavaScript or TypeScript class declares, each its own definition."""
+        for member, label in jsflow.methods(cls):
+            method = text(label, body)
+            key = f"{identity}.{method}"
+            if key in self.defs:
+                continue  # An accessor pair or a repeated name: the first is kept.
+            self.defs[key] = Definition(
+                key,
+                path,
+                f"{name}.{method}",
+                "method",
+                line(label),
+                member,
+                jsflow.parameter_names(member, body),
+                identity,
+                jsflow.parameter_positions(member, body),
+                anchor=method,
+            )
+
+    def common(self, path: str, file: SourceFile) -> None:
+        """What `module.exports` and `exports.name` give, read as declared syntax.
+
+        A name exported through an identifier refers to the file's own declaration of it. A
+        function or class written in place becomes its own definition, named after what it
+        is exported as; the analyzer binds no declaration to it, so it is always inferred.
+        A file that rebinds `module` or `exports`, or assigns `module.exports` twice, is not
+        read: what it exports is then not settled by its syntax.
+        """
+        body, counts = file.body, self.declared[path]
+        if counts.get("module") or counts.get("exports"):
+            return
+        found = jsflow.commonjs_exports(file.root, body)
+        if not found:
+            return
+        record: dict[str, str] = {}
+        for item in found:
+            if item.value.type in {"identifier", "shorthand_property_identifier"}:
+                target = text(item.value, body)
+            else:
+                target = self.placed(path, body, item)
+            if not target:
+                continue
+            if item.name is None:
+                self.module_value[path] = target
+            else:
+                record[item.name] = target
+        self.commonjs[path] = record
+
+    def placed(self, path: str, body: bytes, item: jsflow.CommonExport) -> str:
+        """A definition for a function or class written in place as a CommonJS export."""
+        value = item.value
+        own = value.child_by_field_name("name") if value.type != "method_definition" else None
+        name = item.name or (text(own, body) if own is not None else "")
+        identity = f"{path}::{name}"
+        if not jsflow.IDENTIFIER.fullmatch(name) or identity in self.defs:
+            return ""  # Unnamed, or a second definition of a name: not a unique binding.
+        kind = "class" if value.type == "class" else "function"
+        functional = kind == "function"
+        self.defs[identity] = Definition(
+            identity,
+            path,
+            name,
+            kind,
+            line(item.key) if item.name else line(own or value),
+            value,
+            jsflow.parameter_names(value, body) if functional else [],
+            param_lines=jsflow.parameter_positions(value, body) if functional else {},
+            anchor=name,
+            exported=True,
+        )
+        self.spans.setdefault(path, set()).add((value.start_byte, value.end_byte))
+        self.weak.add(identity)
+        if kind == "class":
+            self.methods(path, body, identity, name, value)
+        return name
+
+    def find_routers(self, path: str, file: SourceFile, exports: dict[str, str]) -> None:
+        """Express routers this file constructs, the routes declared on them, and its mounts.
+
+        A router is a top-level name, declared once, set to `Router()` reached through the
+        `express` package as the analyzer recorded its import: `express.Router()` for the
+        module, or `Router()` imported or destructured from it. Only statements written
+        directly in the file are read.
+        """
+        body = file.body
+        factories: set[str] = set()
+        for item in self.by_path.get(path, []):
+            syntax = item.get("syntax", {})
+            if item["kind"] != "import" or item["name"] != "express" or syntax["type_only"]:
+                continue
+            local, member = syntax["local_binding"] or "", syntax["imported_member"]
+            node = self.node(item)
+            if jsflow.IDENTIFIER.fullmatch(local) and member in {None, "default"}:
+                factories.add(f"{local}.Router")
+            elif jsflow.IDENTIFIER.fullmatch(local) and member == "Router":
+                factories.add(local)
+            elif node is not None and node.type == "call_expression":
+                factories |= {n for n, m in jsflow.destructured(node, body) if m == "Router"}
+        counts = self.declared[path]
+        mine: dict[str, int] = {}
+        for name, value, exported in jsflow.top_level_values(file.root) if factories else []:
+            inner = jsflow.unwrap(value)
+            made = jsflow.callee(inner) if inner.type in jsflow.CALLS else None
+            label = text(name, body)
+            if made is None or re.sub(r"\s+", "", text(made, body)) not in factories:
+                continue
+            if counts.get(label) == 1:
+                mine[label] = line(name)
+                if exported:
+                    exports.setdefault(label, label)
+                    self.export_lines[path].setdefault(label, line(name))
+        self.routers[path] = mine
+        for call in jsflow.top_level_calls(file.root):
+            found = jsflow.route_call(call, body)
+            if found is not None and found.method == "use":
+                self.mounts.append((path, found))
+            elif found is not None and found.owner in mine:
+                self.router_calls.setdefault((path, found.owner), []).append(found)
 
     def handlers(self, path: str, file: SourceFile) -> None:
         """Route declarations the analyzer found here; functions written in place get a name.
 
         Only calls the analyzer recorded as framework routes count, matched by byte range, so
-        the application object they are declared on is the one it bound.
+        the application object they are declared on is the one it bound. The analyzer also
+        records a `Router()` imported from `express` as an application; a route on a router
+        is read once, by `mount()`, with the prefixes its mounts add.
         """
         wanted = {
             (s["start_byte"], s["end_byte"])
@@ -507,29 +724,172 @@ class Repo:
             route = jsflow.string_value(values[0], body) if len(values) >= 2 else None
             if method not in ROUTE_METHODS or route is None or not route.startswith("/"):
                 continue
+            if text(function.child_by_field_name("object"), body) in self.routers.get(path, {}):
+                continue
             handler = values[-1]  # Express runs any middleware first; the last is the handler.
             number = line(values[0])
-            self.script_routes.setdefault(path, []).append((method.upper(), route, number, handler))
-            if handler.type not in {"arrow_function", "function_expression"}:
+            declared = Route(method.upper(), route, ((path, number),), (route,))
+            self.script_routes.setdefault(path, []).append((declared, handler))
+            self.written(path, body, handler, f"{method.upper()} {route} handler")
+
+    def written(self, path: str, body: bytes, handler: Node, name: str) -> None:
+        """A route handler written in place is its own definition, named after its route."""
+        if handler.type not in {"arrow_function", "function_expression"}:
+            return
+        if (handler.start_byte, handler.end_byte) in self.inline:
+            return  # One handler on a router mounted twice: named after its first route.
+        identity = f"{path}::{name}"
+        if identity in self.defs:
+            identity += f" L{line(handler)}"
+        first = jsflow.head(handler, body)
+        self.defs[identity] = Definition(
+            identity,
+            path,
+            name,
+            "function",
+            line(handler),
+            handler,
+            jsflow.parameter_names(handler, body),
+            param_lines=jsflow.parameter_positions(handler, body),
+            anchor="=>" if "=>" in first else first[:40],
+            inline=True,
+        )
+        self.inline[(handler.start_byte, handler.end_byte)] = identity
+
+    def next_routes(self, path: str) -> None:
+        """Next.js App Router route handlers: `export async function GET(...)` in `route.ts`.
+
+        The file must sit inside an `app` directory and the repository must show it is a
+        Next.js application: the file imports `next`, or a `package.json` above it declares
+        the `next` dependency. Its path is read from its location, as the App Router reads it.
+        """
+        route = jsflow.app_route(path)
+        if route is None or not self.uses_next(path):
+            return
+        for method in jsflow.HTTP_METHODS:
+            exported = method.upper()
+            local = self.exports.get(path, {}).get(exported, "")
+            identity = f"{path}::{local}"
+            if not local or identity not in self.defs or self.defs[identity].kind != "function":
                 continue
-            name = f"{method.upper()} {route} handler"
-            identity = f"{path}::{name}"
-            if identity in self.defs:
-                identity += f" L{line(handler)}"
-            first = jsflow.head(handler, body)
-            self.defs[identity] = Definition(
-                identity,
-                path,
-                name,
-                "function",
-                line(handler),
-                handler,
-                jsflow.parameter_names(handler, body),
-                param_lines=jsflow.parameter_positions(handler, body),
-                anchor="=>" if "=>" in first else first[:40],
-                inline=True,
+            number = self.export_lines[path].get(exported, self.defs[identity].line)
+            declared = Route(
+                exported,
+                route,
+                ((path, number),),
+                (exported,),
+                "file-system route",
+                handler=identity,
             )
-            self.inline[(handler.start_byte, handler.end_byte)] = identity
+            self.script_routes.setdefault(path, []).append((declared, None))
+
+    def uses_next(self, path: str) -> bool:
+        for item in self.by_path.get(path, []):
+            if item["kind"] == "import" and (
+                item["name"] == "next" or item["name"].startswith("next/")
+            ):
+                return True
+        for item in self.ctx.all_symbols.values():
+            if (
+                item["kind"] == "declared_dependency"
+                and item["path"].endswith("package.json")
+                and item.get("syntax", {}).get("qualified_name") == "dependencies.next"
+            ):
+                folder = item["path"].rpartition("/")[0]
+                if not folder or path.startswith(folder + "/"):
+                    return True
+        return False
+
+    def mount(self) -> None:
+        """Routes declared on Express routers, with the prefix each chain of mounts adds.
+
+        `app.use("/users", users)` mounts a router on the application object the analyzer
+        bound; `router.use("/admin", admin)` mounts one router on another. The router mounted
+        is a router of this file, or one a resolved import names: the module value of a
+        `require`, a default or named export, or a member of a required module. A router no
+        mount reaches keeps its own paths and is not matched to request literals.
+        """
+        Mount = tuple[str, jsflow.RouteCall]  # The file of a `use(...)` call, and the call.
+        parents: dict[tuple[str, str], list[tuple[tuple[str, str] | None, Mount]]] = {}
+        tests = {p for p, e in self.ctx.manifest.items() if e.get("classification") == "test"}
+        for path, call in self.mounts:
+            if path in tests:
+                continue
+            parent: tuple[str, str] | None
+            if call.owner in self.routers.get(path, {}):
+                parent = (path, call.owner)
+            elif call.owner in self.apps.get(path, set()):
+                parent = None
+            else:
+                continue
+            target = self.router_ref(path, call.target)
+            if target is not None and target != parent:
+                parents.setdefault(target, []).append((parent, (path, call)))
+
+        def chains(ref: tuple[str, str], seen: frozenset[tuple[str, str]]) -> list[list[Mount]]:
+            """Mounts from the application down to `ref`, outermost first; at most four."""
+            found: list[list[Mount]] = []
+            for parent, mount in parents.get(ref, []):
+                if parent is None:
+                    found.append([mount])
+                elif parent not in seen and len(seen) < 4:
+                    found += [[*chain, mount] for chain in chains(parent, seen | {parent})]
+            return found[:4]
+
+        for (path, router), calls in self.router_calls.items():
+            mounted = chains((path, router), frozenset({(path, router)}))
+            for call in calls:
+                for chain in mounted or [[]]:
+                    full = jsflow.joined(*(c.path for _, c in chain), call.path)
+                    declared = Route(
+                        call.method.upper(),
+                        full,
+                        ((path, call.line), *((where, c.line) for where, c in chain)),
+                        (call.path, *(c.path for _, c in chain if c.path)),
+                        "mounted route" if chain else "router route",
+                        matchable=bool(chain),
+                    )
+                    self.script_routes.setdefault(path, []).append((declared, call.target))
+                    name = f"{call.method.upper()} {full} handler"
+                    self.written(path, self.ctx.files[path].body, call.target, name)
+
+    def router_ref(self, path: str, node: Node) -> tuple[str, str] | None:
+        """The router (file, name) a mounted value names, if the source binds one."""
+        body = self.ctx.files[path].body
+        node = jsflow.unwrap(node)
+        if node.type == "identifier":
+            name = text(node, body)
+            if name in self.routers.get(path, {}):
+                return path, name
+            found = self.imported.get(path, {}).get(name)
+            if found is None:
+                return None
+            module, member, commonjs = found
+            wanted = "default" if member is None and commonjs else member
+            return self.exported_router(module, wanted) if wanted else None
+        if node.type == "member_expression":
+            owner = node.child_by_field_name("object")
+            found = (
+                self.imported.get(path, {}).get(text(owner, body))
+                if owner is not None and owner.type == "identifier"
+                else None
+            )
+            if found is None or found[1] is not None:
+                return None  # Only a member of a whole module or a namespace.
+            return self.exported_router(found[0], text(node.child_by_field_name("property"), body))
+        if node.type == "call_expression":  # `require("./routes")` written in place.
+            for item in self.by_path.get(path, []):
+                if item["kind"] == "import" and (item["start_byte"], item["end_byte"]) == (
+                    node.start_byte,
+                    node.end_byte,
+                ):
+                    required = self.modules.get((path, item["name"]))
+                    return self.exported_router(required, "default") if required else None
+        return None
+
+    def exported_router(self, module: str, name: str) -> tuple[str, str] | None:
+        local = self.exported(module, name)[0]
+        return (module, local) if local and local in self.routers.get(module, {}) else None
 
     def script_classes(self, path: str, file: SourceFile) -> None:
         """Parts a class constructs in its constructor: `this.x = new Something(...)`."""
@@ -1096,8 +1456,9 @@ class ScriptReader(Reader):
             self.scope.sites.append(Site(found[0], text(function, body), line(call), uses))
 
     def nested(self, function: Node) -> None:
-        if (function.start_byte, function.end_byte) in self.repo.inline:
-            return  # A route handler written in place is its own definition.
+        key = (function.start_byte, function.end_byte)
+        if key in self.repo.inline or key in self.repo.spans.get(self.file.path, set()):
+            return  # A route handler or an export written in place is its own definition.
         if function.type not in {"arrow_function", "function_expression", "method_definition"}:
             return
         block = function.child_by_field_name("body")
@@ -1683,31 +2044,36 @@ def handler_of(repo: Repo, path: str, node: Node) -> str | None:
     return found
 
 
-def routes(repo: Repo) -> dict[str, list[tuple[str, str, int, str, int]]]:
-    """Declared routes per file: (method, path, route line, handler definition id, def line).
+def routes(repo: Repo) -> dict[str, list[Route]]:
+    """Declared routes per file, each with its handler's definition id and line.
 
-    Python routes are decorators; JavaScript and TypeScript routes are calls such as
-    `app.get("/items", handler)` on the application object the analyzer bound. Routes in test
-    files are not the repository's service.
+    Python routes are decorators. JavaScript and TypeScript routes are calls such as
+    `app.get("/items", handler)` on the application object the analyzer bound, routes on an
+    Express router with the prefixes its mounts add, and Next.js route handlers. Routes in
+    test files are not the repository's service.
     """
     allowed = {
         c["path"]
         for c in repo.ctx.payload["knowledge"]["entrypoints"]["candidates"]
         if c["rule"] == "framework-route-v1"
     }
-    found: dict[str, list[tuple[str, str, int, str, int]]] = {}
+    found: dict[str, list[Route]] = {}
     for path, file in repo.ctx.files.items():
-        if path not in allowed or not file.valid:
-            continue
-        if repo.ctx.manifest.get(path, {}).get("classification") == "test":
+        if not file.valid or repo.ctx.manifest.get(path, {}).get("classification") == "test":
             continue
         if not file.python:
-            for method, route, number, written in repo.script_routes.get(path, []):
-                handler = handler_of(repo, path, written)
-                if handler is not None:
+            # Each kind of route was gated where it was read: analyzer-recorded application
+            # routes, routers constructed from `express`, and Next.js route files.
+            for declared, written in repo.script_routes.get(path, []):
+                handler = declared.handler or (
+                    handler_of(repo, path, written) if written is not None else None
+                )
+                if handler is not None and handler in repo.scopes:
                     found.setdefault(path, []).append(
-                        (method, route, number, handler, repo.defs[handler].line)
+                        replace(declared, handler=handler, def_line=repo.defs[handler].line)
                     )
+            continue
+        if path not in allowed:
             continue
         for child in file.root.named_children:
             node = (
@@ -1722,36 +2088,43 @@ def routes(repo: Repo) -> dict[str, list[tuple[str, str, int, str, int]]]:
             if match and handler in repo.defs:
                 number = line(child) + text(child, file.body)[: match.start()].count("\n")
                 found.setdefault(path, []).append(
-                    (match.group(2).upper(), match.group(3), number, handler, line(node))
+                    Route(
+                        match.group(2).upper(),
+                        match.group(3),
+                        ((path, number),),
+                        (match.group(3),),
+                        handler=handler,
+                        def_line=line(node),
+                    )
                 )
     return found
 
 
-def services(
-    repo: Repo, declared: dict[str, list[tuple[str, str, int, str, int]]], start: int
-) -> list[Architecture]:
+def services(repo: Repo, declared: dict[str, list[Route]], start: int) -> list[Architecture]:
     found: list[Architecture] = []
     for path, items in sorted(declared.items()):
         graph = Graph(repo)
         unresolved: list[Unresolved] = []
-        for method, route, number, handler, def_line in items[:4]:
-            citation = repo.ctx.cite(path, number)
+        unmounted = False
+        for route in items[:4]:
+            handler, def_line = route.handler, route.def_line
+            citations = [repo.ctx.cite(where, number) for where, number in route.cited]
             scope = repo.scopes[handler]
             before = graph.snapshot()
             target = graph.add(handler, scope, def_line)
-            if citation is None or target is None or route not in citation.quote:
+            if target is None or not all(citations) or not shown(citations, route.anchors):
                 graph.components, graph.connections, graph.ids, graph.order = before
                 continue
-            endpoint = slug(f"{method} {route}") or "route"
+            endpoint = slug(f"{route.method} {route.path}") or "route"
             graph.components[endpoint] = Component(
                 id=endpoint,
                 role="endpoint",
                 kind="endpoint",
-                label=f"{method} {route}"[:28],
-                lines=("declared route",),
+                label=f"{route.method} {route.path}"[:28],
+                lines=(route.note,),
                 status="INFERRED",
-                anchors=(route,),
-                citations=(citation,),
+                anchors=route.anchors,
+                citations=tuple(c for c in citations if c is not None),
                 group=path[:60],
             )
             graph.link(
@@ -1761,11 +2134,12 @@ def services(
                 "declared on",
                 "declared_route",
                 "INFERRED",
-                [(path, number), (repo.defs[handler].path, def_line)],
-                (route, repo.defs[handler].anchor),
+                [*route.cited, (repo.defs[handler].path, def_line)],
+                (*route.anchors, repo.defs[handler].anchor),
             )
             if not graph.fits(None, before):
                 continue
+            unmounted |= route.note == "router route"
             for site in scope.sites:
                 # Bounded before adding, as in Graph.flow: a callee past the limit is never
                 # added, so no unlinked component is left behind.
@@ -1794,6 +2168,16 @@ def services(
                 if graph.fits(None, before) and site.target in repo.defs:
                     graph.uses(site.target, callee)
             unresolved += unknown_callees(scope)
+        if unmounted:
+            unresolved.append(
+                Unresolved(
+                    topic="router mount",
+                    reason=(
+                        "No mount of a router declared here was found, so its routes are shown "
+                        "with their own paths. The prefix a mount would add is not known."
+                    ),
+                )
+            )
         unresolved.append(
             Unresolved(
                 topic="request handling",
@@ -1815,9 +2199,7 @@ def services(
     return found
 
 
-def overview(
-    repo: Repo, declared: dict[str, list[tuple[str, str, int, str, int]]], subsystems: int
-) -> Architecture | None:
+def overview(repo: Repo, declared: dict[str, list[Route]], subsystems: int) -> Architecture | None:
     """File-level system view: resolved imports, client-to-route path matches and resources.
 
     Test files are not the repository's system: as in `orchestrations()` and `routes()`, they
@@ -1868,15 +2250,20 @@ def overview(
             continue
         wanted = literal.group(1).rstrip("/")
         for target, items in declared.items():
-            for _, route, where, _, _ in items:
-                if target != path and route != "/" and wanted.endswith(route.rstrip("/")):
+            for route in items:
+                if (
+                    target != path
+                    and route.matchable
+                    and route.path != "/"
+                    and wanted.endswith(route.path.rstrip("/"))
+                ):
                     edges.append(
                         (
                             path,
                             target,
                             "http_request",
-                            [(path, number), (target, where)],
-                            (route.rstrip("/"),),
+                            [(path, number), *route.cited],
+                            (route.path.rstrip("/"),),
                             "literal_match",
                             "INFERRED",
                         )
@@ -1985,7 +2372,9 @@ def build(
     declared = routes(repo)
     found = services(repo, declared, 1)
     handlers = {
-        (repo.defs[h].path, repo.defs[h].name) for items in declared.values() for *_, h, _ in items
+        (repo.defs[r.handler].path, repo.defs[r.handler].name)
+        for items in declared.values()
+        for r in items
     }
     found += orchestrations(repo, claimed | handlers, classes, 1)
     top = overview(repo, declared, existing + len(found))
