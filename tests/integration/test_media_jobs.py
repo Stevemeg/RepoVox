@@ -260,6 +260,18 @@ def test_submission_to_playback_publishes_both_video_categories(
     assert explainer["title"] == "cycle() in cycle.py"
     assert explainer["metadata"]["type"] == "component_graph"
     assert explainer["metadata"]["status"] == "VERIFIED"
+    # The repository video is the problem-to-solution story, extracted inside the parser
+    # sandbox; the fixture has no README, so its problem statement is explicitly insufficient.
+    with media_admin.connect() as c:
+        key = c.scalar(
+            text("SELECT object_key FROM media_artifacts WHERE job_id=:id AND ordinal=10"),
+            {"id": job["id"]},
+        )
+    storyboard = json.loads(worker.storage.read(A, key))
+    assert storyboard["version"] == "problem-to-solution-storyboard-1.0"
+    assert storyboard["story"]["story"]["problem_statement"]["sufficiency"] == "insufficient"
+    assert [s["type"] for s in storyboard["scenes"]][:2] == ["introduction", "problem"]
+    assert any(s["diagram"] for s in storyboard["scenes"])
 
     for video in done["videos"]:
         base = f"/v1/video-jobs/{job['id']}/videos/{video['id']}"
