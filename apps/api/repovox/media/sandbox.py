@@ -65,12 +65,13 @@ def story_isolated(
 
 
 def contained(
-    root: Path, body: dict[str, Any], checkpoint: Callable[[], None], timeout: float
+    root: Path, instruction: dict[str, Any], checkpoint: Callable[[], None], timeout: float
 ) -> Any:
+    """Run one request in the contained subprocess; return its decoded, still untrusted output."""
     if sys.platform != "linux":
         raise ArchitectureError("parser_isolation_unavailable")
     request = root.parent / "architecture-request.json"
-    request.write_bytes(canonical(body))
+    request.write_bytes(canonical(instruction))
     env = {
         "PYTHONPATH": str(Path(__file__).resolve().parents[2]),
         "PYTHONDONTWRITEBYTECODE": "1",
