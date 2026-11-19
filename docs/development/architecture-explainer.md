@@ -26,6 +26,8 @@ relationships found in the code, not on recognising a named pattern.
 | `architecture.py` | Architecture IR `architecture-ir-1.0`, the GAN and supervised-network enrichers, and the independent validator. |
 | `diagram.py` | One renderer: automatic layered layout, boundary lanes, routing, animation frames. |
 | `explainer.py` | Narration generated from the IR, synchronised animation, video bundle. |
+| `story.py`, `story_extract.py` | Problem-to-solution schema, evidence-first extraction and the fail-closed citation verifier ([ADR-0025](../adr/0025-problem-to-solution-engineering-story.md)). |
+| `story_board.py`, `refiner.py` | Adaptive eleven-scene engineering story storyboard and the narration refinement seam. |
 
 ## Generic extraction
 

@@ -35,3 +35,4 @@ All proposed for Phase 0 review, dated 2026-10-08. Acceptance follows independen
 | [022](0022-aws-retention-integration.md) | Deployment-disabled AWS adapters, conditional registry and independent service verification |
 | [023](0023-sdk-certificate-trust-boundary.md) | Upstream CA removal and fail-closed, explicitly selected SDK trust |
 | [024](0024-github-oauth-allowlist-identity.md) | GitHub OAuth sign-in for operator-provisioned accounts; production fails closed without it |
+| [025](0025-problem-to-solution-engineering-story.md) | Verified problem-to-solution engineering story and its adaptive eleven-scene video |

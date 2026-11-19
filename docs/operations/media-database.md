@@ -86,6 +86,12 @@ Six stage rows per job: the reserved `storyboard`, `narration`, `tts`, `render`,
 - The reconciler turns an expired lease into a retry with backoff, or ends the job
   `attempt_limit` after two attempts.
 - Cancellation ends the job and fences every stage.
+- Stage 10 builds the problem-to-solution engineering story from the pinned archive inside
+  the parser sandbox and stores it, verified, in the storyboard artifact; when no story holds
+  it stores the grounded walkthrough storyboard instead. Stage 11 re-verifies the story
+  against the archive. See [ADR-0025](../adr/0025-problem-to-solution-engineering-story.md).
+  The published video row keeps the category `walkthrough` and its fixed title; no schema
+  changed.
 - Stage 14 publishes the walkthrough; the job can only become `succeeded` when stages 10–14
   succeeded and the walkthrough row exists.
 - Stage 15 records the architecture outcome separately from the walkthrough:

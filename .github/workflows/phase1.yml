@@ -3,7 +3,7 @@ on:
   pull_request:
     branches: [main, phase0/foundation, phase1/saas-foundation, phase2/repository-intelligence, phase2/eval-entry, phase2/ai-audited-pilot, phase2/canonical-fact-remediation, phase2/source-fact-v2-evaluation, phase2/pilot-control-plane-safety, phase2/retention-runtime-verification, phase2/aws-retention-integration, experiment/offline-source-to-video, security/python-ca-bootstrap, security/node-next-remediation]
   push:
-    branches: [phase1/saas-foundation, phase2/repository-intelligence, phase2/eval-entry, phase2/ai-audited-pilot, phase2/canonical-fact-remediation, phase2/source-fact-v2-evaluation, phase2/pilot-control-plane-safety, phase2/retention-runtime-verification, phase2/aws-retention-integration, feature/repository-to-video, feat/js-ts-frameworks-and-deploy-readiness]
+    branches: [phase1/saas-foundation, phase2/repository-intelligence, phase2/eval-entry, phase2/ai-audited-pilot, phase2/canonical-fact-remediation, phase2/source-fact-v2-evaluation, phase2/pilot-control-plane-safety, phase2/retention-runtime-verification, phase2/aws-retention-integration, feature/repository-to-video, feat/js-ts-frameworks-and-deploy-readiness, feat/problem-to-solution-story]
 permissions:
   contents: read
 concurrency:
