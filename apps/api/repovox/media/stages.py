@@ -3,11 +3,15 @@
 Each function re-validates its upstream artifacts instead of trusting them, so a worker can run
 one stage per lease from stored objects. Nothing here touches the database or object storage.
 
-  10 storyboard  verified analysis payload            -> storyboard JSON
+  10 storyboard  verified payload (+ verified story)  -> storyboard JSON
   11 narration   payload + storyboard (re-verified)   -> narration script JSON
   12 tts         storyboard + script                  -> bundle {narration.wav, timings.json}
-  13 render      storyboard + script + speech bundle  -> bundle {frameNNN.png..., captions.vtt}
+  13 render      storyboard + script + speech bundle  -> bundle {frameNNN[-MMM].png, captions.vtt}
   14 encode      speech bundle + frame bundle         -> validated video.mp4 + probe summary
+
+A problem-to-solution storyboard also needs the pinned source files at Stage 11, where the
+story's citations are re-verified. Its workflow scene is animated: a sentence is then drawn as
+frameNNN-MMM.png, one image per ANIMATION_STEP video frames, instead of one frameNNN.png.
 """
 
 import io
@@ -25,13 +29,34 @@ from typing import Any
 from pydantic import ValidationError
 
 from repovox.media import raster
-from repovox.media.narration import FPS, Engine, Timing, assemble, synthesize
-from repovox.media.storyboard import GroundingError, Storyboard, build, validate
+from repovox.media.architecture import Citation, Report
+from repovox.media.diagram import Diagram
+from repovox.media.narration import FPS, Timing, Voice, assemble, synthesize
+from repovox.media.story import EngineeringStory
+from repovox.media.story_board import build_story_board, check_story_board
+from repovox.media.storyboard import (
+    STORY_VERSION,
+    GroundingError,
+    Sentence,
+    Storyboard,
+    build,
+    validate,
+)
 
 Checkpoint = Callable[[], None]
 MEMBER = re.compile(r"[a-z0-9][a-z0-9_.-]{0,63}")
 BUNDLE_LIMIT = 96 * 1024**2
 MAX_FRAMES = FPS * 600  # Ten minutes; a resource bound, not a duration target.
+ANIMATION_STEP = 6  # Video frames per animation image: five diagram updates per second.
+PULSE_SECONDS = 1.6
+ANIMATION_LIMIT = 240  # Animation images per video; later workflow sentences are drawn still.
+BADGES = {
+    "verified": "VERIFIED",
+    "inferred": "INFERRED",
+    "documentation": "AUTHOR-STATED",
+    "unverified": "UNVERIFIED",
+    "none": "CONTEXT",
+}
 
 
 class RenderError(Exception):
@@ -114,14 +139,32 @@ def checked_script(board: Storyboard, script: bytes) -> list[dict[str, Any]]:
     return expected
 
 
-def storyboard_stage(payload: dict[str, Any]) -> bytes:
-    return encoded(build(payload).model_dump(mode="json"))
+def storyboard_stage(
+    payload: dict[str, Any],
+    story: EngineeringStory | None = None,
+    report: Report | None = None,
+) -> bytes:
+    """The walkthrough from the payload alone, or the engineering story for a verified story."""
+    if story is None:
+        return encoded(build(payload).model_dump(mode="json"))
+    return encoded(build_story_board(payload, story, report).model_dump(mode="json"))
 
 
-def narration_stage(payload: dict[str, Any], storyboard: bytes) -> bytes:
-    """Independent gate before speech: grounding and exact reproducibility from the payload."""
+def is_story(storyboard: bytes) -> bool:
+    return load_board(storyboard).version == STORY_VERSION
+
+
+def narration_stage(
+    payload: dict[str, Any], storyboard: bytes, sources: dict[str, bytes] | None = None
+) -> bytes:
+    """Independent gate before speech: grounding and exact reproducibility from the inputs."""
     board = load_board(storyboard)
-    validate(board, payload)
+    if board.version == STORY_VERSION:
+        if sources is None:
+            raise GroundingError("story_sources_required")
+        check_story_board(board, payload, sources)
+    else:
+        validate(board, payload)
     return encoded(script_for(board))
 
 
@@ -153,7 +196,7 @@ def timings_of(speech: dict[str, bytes], sentences: int) -> list[Timing]:
 def tts_stage(
     storyboard: bytes,
     script: bytes,
-    engine: Engine,
+    engine: Voice,
     scratch: Path,
     checkpoint: Checkpoint = noop,
 ) -> bytes:
@@ -189,21 +232,82 @@ def timestamp(frame: int) -> str:
     return f"{hours:02d}:{minutes:02d}:{rest // 1000:02d}.{rest % 1000:03d}"
 
 
+def story_diagram(board: Storyboard) -> Diagram | None:
+    """The diagram of a story's primary architecture, in the view its claims were drawn from."""
+    attachment = board.story
+    if attachment is None or attachment.architecture is None:
+        return None
+    description = attachment.story.architecture
+    primary = next(
+        (a for a in attachment.architecture.architectures if a.id == description.primary), None
+    )
+    if primary is None:
+        return None
+    view = next((v for v in primary.views if v.id == description.view), None)
+    return Diagram(primary, board.repository, board.commit_sha, view)
+
+
+def citation_for(diagram: Diagram, sentence: Sentence) -> Citation | None:
+    connections = {c.id: c for c in diagram.architecture.connections}
+    components = {c.id: c for c in diagram.architecture.components}
+    for identity in sentence.connection_ids:
+        if identity in connections:
+            return connections[identity].citations[0]
+    for identity in sentence.component_ids:
+        if identity in components:
+            return components[identity].citations[0]
+    return None
+
+
+def animation_count(frames: int) -> int:
+    return -(-frames // ANIMATION_STEP)
+
+
 def render_stage(
     storyboard: bytes, script: bytes, speech: bytes, checkpoint: Checkpoint = noop
 ) -> bytes:
     board = load_board(storyboard)
     sentences = checked_script(board, script)
     timings = timings_of(unbundle(speech), len(sentences))
+    diagram = story_diagram(board) if any(scene.diagram for scene in board.scenes) else None
     files: dict[str, bytes] = {}
     cues = ["WEBVTT", ""]
-    index = 0
+    index = animated = 0
     for position, scene in enumerate(board.scenes):
-        canvas = raster.base(board, scene, position)
+        drawn = diagram if scene.diagram else None
+        canvas = raster.base(board, scene, position) if drawn is None else None
         for sentence in scene.sentences:
             checkpoint()
             timing = timings[index]
-            files[f"frame{index:03d}.png"] = raster.frame(canvas, sentence)
+            if drawn is not None:
+                base = drawn.base(
+                    sentence.component_ids,
+                    sentence.connection_ids,
+                    BADGES[sentence.uncertainty],
+                    sentence.text,
+                    citation_for(drawn, sentence),
+                    index,
+                    len(sentences),
+                )
+                count = animation_count(timing.frames)
+                if (
+                    scene.type == "workflow"
+                    and sentence.connection_ids
+                    and animated + count <= ANIMATION_LIMIT
+                ):
+                    for j in range(count):
+                        checkpoint()
+                        phase = (j * ANIMATION_STEP / FPS) / PULSE_SECONDS
+                        files[f"frame{index:03d}-{j:03d}.png"] = drawn.animate(
+                            base, sentence.connection_ids, phase
+                        )
+                    animated += count
+                else:
+                    files[f"frame{index:03d}.png"] = base.png()
+            elif canvas is not None:
+                files[f"frame{index:03d}.png"] = raster.frame(canvas, sentence)
+            else:
+                raise GroundingError("invalid_storyboard")
             end = timing.start_frame + timing.frames
             cues += [f"{timestamp(timing.start_frame)} --> {timestamp(end)}", sentence.text, ""]
             index += 1
@@ -404,17 +508,34 @@ def encode_stage(
     tool("ffmpeg"), tool("ffprobe")
     audio, images = unbundle(speech), unbundle(frames)
     captions = images.pop("captions.vtt", None)
-    timings = timings_of(audio, len(images))
-    if captions is None or set(images) != {f"frame{i:03d}.png" for i in range(len(timings))}:
+    sentences = len({name.split("-")[0].removesuffix(".png") for name in images})
+    timings = timings_of(audio, sentences)
+    # Each sentence is exactly one still image or exactly one complete animation sequence.
+    entries: list[tuple[str, int]] = []
+    for i, timing in enumerate(timings):
+        still = f"frame{i:03d}.png"
+        if still in images:
+            entries.append((still, timing.frames))
+            continue
+        count = animation_count(timing.frames)
+        for j in range(count):
+            last = j == count - 1
+            entries.append(
+                (
+                    f"frame{i:03d}-{j:03d}.png",
+                    timing.frames - ANIMATION_STEP * j if last else ANIMATION_STEP,
+                )
+            )
+    if captions is None or set(images) != {name for name, _ in entries}:
+        raise RenderError("media_bundle_invalid")
+    if len(entries) != len(images):
         raise RenderError("media_bundle_invalid")
     if any(not image.startswith(b"\x89PNG\r\n\x1a\n") for image in images.values()):
         raise RenderError("media_bundle_invalid")
     if any(scratch.iterdir()):
         raise RenderError("media_bundle_invalid")
-    entries = []
-    for i, timing in enumerate(timings):
-        (scratch / f"frame{i:03d}.png").write_bytes(images[f"frame{i:03d}.png"])
-        entries.append((f"frame{i:03d}.png", timing.frames))
+    for name, _ in entries:
+        (scratch / name).write_bytes(images[name])
     video, summary = encode_sequence(scratch, entries, audio["narration.wav"], checkpoint)
     summary["sentences"] = len(timings)
     summary["captions"] = captions.decode("utf-8")

@@ -1,18 +1,23 @@
 """Analysis payload -> narrated video bundle on local disk, by chaining the stage transforms.
 
 This is the same code path a worker runs one stage at a time; here it runs in one process and
-publishes the whole bundle only after the encoded file has been validated.
+publishes the whole bundle only after the encoded file has been validated. Given the pinned
+story sources, the video is the problem-to-solution engineering story; without them it is the
+grounded walkthrough. Like `repovox.media.local`, this path parses in-process and is for the
+operator's own repositories only.
 """
 
 import json
 import os
 import sys
 import time
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
 from repovox.analysis.common import digest
-from repovox.media.narration import Engine, NarrationError, detect
+from repovox.media.architecture import ArchitectureError, Report, discover
+from repovox.media.narration import NarrationError, Voice, detect
 from repovox.media.stages import (
     RenderError,
     encode_stage,
@@ -24,8 +29,24 @@ from repovox.media.stages import (
     tts_stage,
     unbundle,
 )
+from repovox.media.story import EngineeringStory
+from repovox.media.story_extract import extract_story
 
 VERSION = "grounded-media-run-1.0"
+
+
+def engineering_story(
+    payload: dict[str, Any], sources: dict[str, bytes]
+) -> tuple[EngineeringStory, Report | None]:
+    """Architecture IR and the verified story from exactly the inventoried story sources."""
+    manifest = {f["path"]: f for f in payload["knowledge"]["coverage"]["files"]}
+    parsed = {p: b for p, b in sources.items() if manifest[p]["status"] in {"parsed", "context"}}
+    report: Report | None
+    try:
+        report, missing = discover(payload, parsed), None
+    except ArchitectureError as error:
+        report, missing = None, error.code
+    return extract_story(payload, sources, report, missing), report
 
 
 def exclusive(path: Path, body: bytes) -> None:
@@ -40,13 +61,19 @@ def produce(
     payload: dict[str, Any],
     output: Path,
     *,
-    engine: Engine | None = None,
+    engine: Voice | None = None,
     source_note: str = "analysis-payload",
+    sources: dict[str, bytes] | None = None,
 ) -> Path:
     """Render into a new directory; publish the whole bundle only after media validation."""
     started = time.perf_counter()
-    storyboard = storyboard_stage(payload)  # Raises before any output if grounding fails.
-    script = narration_stage(payload, storyboard)
+    story: EngineeringStory | None = None
+    if sources is not None:
+        story, report = engineering_story(payload, sources)
+        storyboard = storyboard_stage(payload, story, report)
+    else:
+        storyboard = storyboard_stage(payload)  # Raises before any output if grounding fails.
+    script = narration_stage(payload, storyboard, sources)
     tool("ffmpeg"), tool("ffprobe")
     engine = engine or detect()
     if not output.is_absolute() or not output.parent.is_dir() or output.exists():
@@ -86,6 +113,18 @@ def produce(
         "sentences": len(sentences),
         "technical_sentences": sum(s["technical"] for s in sentences),
         "cited_claims": len({c for scene in board["scenes"] for c in scene["claim_ids"]}),
+        "scene_types": [scene["type"] for scene in board["scenes"]],
+        "story": None
+        if story is None
+        else {
+            "schema_version": story.schema_version,
+            "problem_statement": story.problem_statement.sufficiency,
+            "architecture": story.architecture.explanation,
+            "claims": dict(sorted(Counter(c.status for c in story.claims().values()).items())),
+            "mismatches": sorted(m.kind for m in story.mismatches),
+            "instruction_like_lines": story.instruction_like_lines,
+        },
+        "uncertainty_labels": dict(sorted(Counter(s["uncertainty"] for s in sentences).items())),
         "narration_engine": engine.name,
         "model_inference": "none",
         "paid_services": "none",

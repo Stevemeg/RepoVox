@@ -279,7 +279,12 @@ def base(board: Storyboard, scene: Scene, position: int) -> Canvas:
             c.text(64, y + 48, link.label, 2, MUTED)
             y += 76
     c.rect(0, 664, WIDTH, 56, CARD)
-    c.text(64, 684, "STATIC ANALYSIS / CITED SOURCE EVIDENCE / LOCAL SYNTHETIC VOICE", 2, ACCENT)
+    footer = (
+        "ENGINEERING STORY / CITED EVIDENCE / LOCAL SYNTHETIC VOICE"
+        if board.story is not None
+        else "STATIC ANALYSIS / CITED SOURCE EVIDENCE / LOCAL SYNTHETIC VOICE"
+    )
+    c.text(64, 684, footer, 2, ACCENT)
     label = f"{position + 1}/{len(board.scenes)}"
     c.text(WIDTH - 64 - len(label) * 12, 684, label, 2, MUTED)
     return c
@@ -289,10 +294,20 @@ def frame(canvas: Canvas, sentence: Sentence) -> bytes:
     """Caption one sentence onto a copy of its scene; the caption is the narrated text."""
     c = canvas.copy()
     c.rect(0, 548, WIDTH, 116, BAND)
-    badge = {"verified": "VERIFIED", "inferred": "INFERRED", "none": "CONTEXT"}[
-        sentence.uncertainty
-    ]
-    color = {"verified": ACCENT, "inferred": WARN, "none": MUTED}[sentence.uncertainty]
+    badge = {
+        "verified": "VERIFIED",
+        "inferred": "INFERRED",
+        "none": "CONTEXT",
+        "documentation": "AUTHOR-STATED / NOT VERIFIED BY CODE",
+        "unverified": "UNVERIFIED",
+    }[sentence.uncertainty]
+    color = {
+        "verified": ACCENT,
+        "inferred": WARN,
+        "none": MUTED,
+        "documentation": WARN,
+        "unverified": WARN,
+    }[sentence.uncertainty]
     c.text(64, 558, badge, 2, color)
     if sentence.claim_ids:
         cited = f"{len(sentence.claim_ids)} claim(s) / {len(sentence.evidence_ids)} evidence"

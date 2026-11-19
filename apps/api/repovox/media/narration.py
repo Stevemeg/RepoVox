@@ -2,6 +2,10 @@
 
 Narration text reaches the engine through a file; it is never part of a command line. There is
 no hosted speech API and no fallback tone: without a local engine, narration fails.
+
+`Voice` is the seam for a local neural voice (Milestone 3). It receives only approved spoken
+text, already checked against the storyboard, and returns PCM that passes the same format and
+silence checks as the operating-system engines.
 """
 
 import io
@@ -14,6 +18,7 @@ import sys
 import wave
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol, runtime_checkable
 
 FPS = 30
 PAUSE_SECONDS = 0.35
@@ -57,6 +62,18 @@ class Timing:
     speech_seconds: float
 
 
+@runtime_checkable
+class Synthesizer(Protocol):
+    """A local voice: approved printable-ASCII text in, 16-bit mono PCM out. No network."""
+
+    name: str
+
+    def speak(self, text: str, scratch: Path, stem: str) -> Speech: ...
+
+
+Voice = Engine | Synthesizer
+
+
 def detect() -> Engine:
     """Operating-system voice on Windows, espeak-ng elsewhere. Nothing is downloaded."""
     name, binary = (
@@ -95,9 +112,27 @@ def read_wave(body: bytes) -> Speech:
     return Speech(rate, frames)
 
 
-def synthesize(engine: Engine, text: str, scratch: Path, stem: str) -> Speech:
+def audible(speech: Speech) -> Speech:
+    """Reject a silent, empty or malformed result from any voice."""
+    if not 8000 <= speech.rate <= 48000 or len(speech.samples) % 2:
+        raise NarrationError("speech_format_unsupported")
+    count = len(speech.samples) // 2
+    peak = max(map(abs, struct.unpack(f"<{count}h", speech.samples)), default=0)
+    if speech.seconds < 0.2 or peak < 500:
+        raise NarrationError("speech_silent")
+    return speech
+
+
+def synthesize(engine: Voice, text: str, scratch: Path, stem: str) -> Speech:
     if not text or len(text) > 600 or any(ord(c) < 32 or ord(c) > 126 for c in text):
         raise NarrationError("narration_text_rejected")
+    if not isinstance(engine, Engine):
+        if not isinstance(engine, Synthesizer):
+            raise NarrationError("narration_engine_unavailable")
+        found = engine.speak(text, scratch, stem)
+        if not isinstance(found, Speech):
+            raise NarrationError("speech_format_unsupported")
+        return audible(found)
     source, target = scratch / f"{stem}.txt", scratch / f"{stem}.wav"
     source.write_text(text, encoding="utf-8", newline="\n")
     if engine.name == "windows-sapi":
@@ -127,11 +162,7 @@ def synthesize(engine: Engine, text: str, scratch: Path, stem: str) -> Speech:
         raise NarrationError("speech_synthesis_failed") from None
     if result.returncode != 0 or not target.is_file():
         raise NarrationError("speech_synthesis_failed")
-    speech = read_wave(target.read_bytes())
-    count = len(speech.samples) // 2
-    peak = max(map(abs, struct.unpack(f"<{count}h", speech.samples)), default=0)
-    if speech.seconds < 0.2 or peak < 500:
-        raise NarrationError("speech_silent")  # A silent or empty file is not narration.
+    speech = audible(read_wave(target.read_bytes()))  # A silent or empty file is not narration.
     source.unlink()
     target.unlink()
     return speech

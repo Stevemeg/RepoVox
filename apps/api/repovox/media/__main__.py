@@ -1,4 +1,8 @@
-"""python -m repovox.media: local repository commit -> narrated explanation videos."""
+"""python -m repovox.media: local repository commit -> narrated explanation videos.
+
+The repository video is the problem-to-solution engineering story; --walkthrough produces the
+earlier grounded walkthrough from the analysis payload alone instead.
+"""
 
 import argparse
 import sys
@@ -7,10 +11,11 @@ from pathlib import Path
 from repovox.analysis.common import AnalysisError
 from repovox.media.architecture import ArchitectureError, discover
 from repovox.media.explainer import explain
-from repovox.media.local import analyze_with_sources
+from repovox.media.local import analyze_for_story
 from repovox.media.narration import NarrationError
 from repovox.media.raster import LayoutError
 from repovox.media.render import RenderError, produce
+from repovox.media.story import StoryError
 from repovox.media.storyboard import GroundingError
 
 
@@ -22,11 +27,16 @@ def main() -> None:
     parser.add_argument("--path", action="append", default=[], help="limit to a subdirectory")
     parser.add_argument("--output", required=True, type=Path, help="new absolute directory")
     parser.add_argument(
-        "--architecture-only", action="store_true", help="skip the repository walkthrough video"
+        "--architecture-only", action="store_true", help="skip the repository video"
+    )
+    parser.add_argument(
+        "--walkthrough",
+        action="store_true",
+        help="the grounded walkthrough instead of the engineering story",
     )
     args = parser.parse_args()
     try:
-        payload, sources = analyze_with_sources(
+        payload, sources, story_sources = analyze_for_story(
             args.git_repository.resolve(), args.repository_url, args.revision, tuple(args.path)
         )
         report = discover(payload, sources)
@@ -35,7 +45,14 @@ def main() -> None:
                 raise RenderError("output_must_be_new_absolute_directory")
             args.output.mkdir(mode=0o700)
         else:
-            print(produce(payload, args.output, source_note="local-git-archive"))
+            print(
+                produce(
+                    payload,
+                    args.output,
+                    source_note="local-git-archive",
+                    sources=None if args.walkthrough else story_sources,
+                )
+            )
         manifest = explain(report, payload, sources, args.output / "architecture")
     except (
         AnalysisError,
@@ -44,6 +61,7 @@ def main() -> None:
         NarrationError,
         RenderError,
         LayoutError,
+        StoryError,
         FileExistsError,
     ) as error:
         code = getattr(error, "code", "output_must_be_new_absolute_directory")

@@ -47,6 +47,16 @@ def analyze_with_sources(
     repository: Path, url: str, revision: str = "HEAD", paths: tuple[str, ...] = ()
 ) -> tuple[dict[str, Any], dict[str, bytes]]:
     """Verified payload plus the exact parsed and context file bytes it was derived from."""
+    payload, sources, _ = analyze_for_story(repository, url, revision, paths)
+    return payload, sources
+
+
+def analyze_for_story(
+    repository: Path, url: str, revision: str = "HEAD", paths: tuple[str, ...] = ()
+) -> tuple[dict[str, Any], dict[str, bytes], dict[str, bytes]]:
+    """Also the story sources: README, documentation, manifests, tests and examples."""
+    from repovox.media.story_extract import story_sources
+
     identity = repository_url(url)
     if not repository.is_dir() or not re.fullmatch(r"[A-Za-z0-9._/~^-]{1,200}", revision):
         raise AnalysisError("invalid_local_repository")
@@ -93,4 +103,5 @@ def analyze_with_sources(
                 if digest(body) != entry["file_sha256"]:
                     raise AnalysisError("source_changed")
                 sources[entry["path"]] = body
-    return payload, sources
+        story = story_sources(root, payload)
+    return payload, sources, story

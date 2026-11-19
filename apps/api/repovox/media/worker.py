@@ -1,6 +1,8 @@
 """Media worker: claims one fenced stage at a time from the media database and runs it.
 
-Stages 10-14 produce the repository walkthrough; stage 15 produces architecture explainers
+Stages 10-14 produce the repository video: the problem-to-solution engineering story, built
+from the pinned source archive, or the grounded walkthrough when no story can be established
+(for example where parser isolation is unavailable). Stage 15 produces architecture explainers
 when the evidence supports them. Every stage re-validates its inputs, publishes its output to
 object storage, then commits the pointer under its lease. A worker that loses its lease stops
 and commits nothing; the reconciler retries the stage under a new fence.
@@ -21,20 +23,26 @@ from uuid import uuid4
 from sqlalchemy import Engine, text
 
 from repovox.analysis.archive import extract
+from repovox.analysis.common import AnalysisError
 from repovox.analysis.contracts import validate_envelope
 from repovox.core.config import Settings
 from repovox.core.errors import DomainError
 from repovox.db.database import make_engine, rows
 from repovox.media import stages
-from repovox.media.architecture import Report, check
+from repovox.media.architecture import ArchitectureError, Report, check
 from repovox.media.explainer import render_architecture
 from repovox.media.narration import Engine as SpeechEngine
 from repovox.media.narration import detect
-from repovox.media.sandbox import discover_isolated, sources_from
+from repovox.media.sandbox import discover_isolated, sources_from, story_isolated
 from repovox.media.store import MediaStorage, media_key
+from repovox.media.story import StoryError
+from repovox.media.story_extract import story_sources, verify_story
+from repovox.media.storyboard import GroundingError
 
 logger = logging.getLogger("repovox.media")
 TRANSIENT = {"object_unavailable", "dependency_unavailable"}
+# Deterministic reasons a story cannot be told; the grounded walkthrough is published instead.
+NO_STORY = (StoryError, ArchitectureError, GroundingError, AnalysisError)
 
 
 class Lost(Exception):
@@ -202,9 +210,14 @@ class MediaWorker:
             return body
 
         if ordinal == 10:
-            return stages.storyboard_stage(self.payload(reference)), {}
+            return self.storyboard(reference, scratch, checkpoint)
         if ordinal == 11:
-            return stages.narration_stage(self.payload(reference), prior(10)), {}
+            payload, board = self.payload(reference), prior(10)
+            if not stages.is_story(board):
+                return stages.narration_stage(payload, board), {}
+            # The story's citations are re-verified against the pinned archive, not trusted.
+            root = self.unpacked(reference, scratch, checkpoint)
+            return stages.narration_stage(payload, board, story_sources(root, payload)), {}
         speech = self.speech or detect()
         if ordinal == 12:
             return stages.tts_stage(prior(10), prior(11), speech, scratch, checkpoint), {}
@@ -214,6 +227,38 @@ class MediaWorker:
             video, media = stages.encode_stage(prior(12), prior(13), scratch, checkpoint)
             return video, {"video": media}
         return self.architecture(scope, scratch, checkpoint, uploaded, speech)
+
+    def unpacked(
+        self, reference: dict[str, Any], scratch: Path, checkpoint: stages.Checkpoint
+    ) -> Path:
+        archive = scratch / "source.tar.gz"
+        archive.write_bytes(self.storage.analysis(reference, "archive"))
+        root = scratch / "source"
+        extract(archive, root, checkpoint=checkpoint)
+        archive.unlink()
+        return root
+
+    def storyboard(
+        self, reference: dict[str, Any], scratch: Path, checkpoint: stages.Checkpoint
+    ) -> tuple[bytes, dict[str, Any]]:
+        """Stage 10: the engineering story, or the walkthrough when no story can be told."""
+        payload = self.payload(reference)
+        try:
+            root = self.unpacked(reference, scratch, checkpoint)
+            report, story = story_isolated(root, payload, checkpoint)
+            # The subprocess result is untrusted: every citation is re-checked against the
+            # hash-pinned source bytes before anything is narrated.
+            if report is not None:
+                check(report, payload, sources_from(root, payload))
+            verify_story(story, payload, story_sources(root, payload), report)
+            body = stages.storyboard_stage(payload, story, report)
+        except Lost:
+            raise
+        except NO_STORY as error:
+            code = getattr(error, "code", "story_failure")
+            logger.warning(json.dumps({"event": "media_story_unavailable", "code": code}))
+            return stages.storyboard_stage(payload), {"storyboard": "walkthrough", "reason": code}
+        return body, {"storyboard": "engineering_story"}
 
     def architecture(
         self,

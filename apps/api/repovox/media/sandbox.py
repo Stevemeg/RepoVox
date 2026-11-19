@@ -1,8 +1,10 @@
-"""Contained architecture discovery. Submitted source is parsed only inside this subprocess.
+"""Contained architecture discovery and story extraction. Submitted source is read only here.
 
 Uses the same Linux controls as the analysis parser (resource limits, no-new-privileges,
 Landlock read-only access to the assigned source, seccomp denial of network, exec and fork).
-The worker never parses submitted source in its own process.
+The worker never parses submitted source in its own process. In story mode the subprocess
+also extracts the problem-to-solution story from the archived documentation, manifests,
+tests and source; the worker then re-verifies both results by text comparison.
 """
 
 import json
@@ -17,6 +19,7 @@ from typing import Any
 
 from repovox.analysis.common import AnalysisError, canonical, digest
 from repovox.media.architecture import ArchitectureError, Report, discover
+from repovox.media.story import EngineeringStory, StoryError
 
 LIMIT = 16 * 1024**2
 
@@ -42,10 +45,32 @@ def discover_isolated(
     root: Path, payload: dict[str, Any], checkpoint: Callable[[], None], timeout: float = 150
 ) -> Report:
     """Run discovery in the contained subprocess and return its (still untrusted) report."""
+    value = contained(root, {"payload": payload}, checkpoint, timeout)
+    try:
+        return Report.model_validate(value)
+    except ValueError:
+        raise ArchitectureError("architecture_failure") from None
+
+
+def story_isolated(
+    root: Path, payload: dict[str, Any], checkpoint: Callable[[], None], timeout: float = 150
+) -> tuple[Report | None, EngineeringStory]:
+    """Discovery plus story extraction in the contained subprocess; both still untrusted."""
+    value = contained(root, {"mode": "story", "payload": payload}, checkpoint, timeout)
+    try:
+        report = None if value["report"] is None else Report.model_validate(value["report"])
+        return report, EngineeringStory.model_validate(value["story"])
+    except (ValueError, KeyError, TypeError):
+        raise StoryError("story_failure") from None
+
+
+def contained(
+    root: Path, body: dict[str, Any], checkpoint: Callable[[], None], timeout: float
+) -> Any:
     if sys.platform != "linux":
         raise ArchitectureError("parser_isolation_unavailable")
     request = root.parent / "architecture-request.json"
-    request.write_bytes(canonical({"payload": payload}))
+    request.write_bytes(canonical(body))
     env = {
         "PYTHONPATH": str(Path(__file__).resolve().parents[2]),
         "PYTHONDONTWRITEBYTECODE": "1",
@@ -84,10 +109,7 @@ def discover_isolated(
         if not isinstance(code, str) or not code.replace("_", "").isalnum():
             code = "architecture_failure"
         raise ArchitectureError(code)
-    try:
-        return Report.model_validate(value)
-    except ValueError:
-        raise ArchitectureError("architecture_failure") from None
+    return value
 
 
 def main() -> None:
@@ -96,10 +118,30 @@ def main() -> None:
     root, request_path = Path(sys.argv[1]), Path(sys.argv[2])
     try:
         contain(root, request_path)
-        payload = json.loads(request_path.read_bytes())["payload"]
+        request = json.loads(request_path.read_bytes())
+        payload = request["payload"]
+        if request.get("mode") == "story":
+            from repovox.media.story_extract import extract_story, story_sources
+
+            found: Report | None
+            try:
+                found = discover(payload, sources_from(root, payload))
+                missing = None
+            except ArchitectureError as error:
+                found, missing = None, error.code
+            story = extract_story(payload, story_sources(root, payload), found, missing)
+            print(
+                json.dumps(
+                    {
+                        "report": None if found is None else found.model_dump(mode="json"),
+                        "story": story.model_dump(mode="json"),
+                    }
+                )
+            )
+            return
         report = discover(payload, sources_from(root, payload))
         print(report.model_dump_json())
-    except (AnalysisError, ArchitectureError) as error:
+    except (AnalysisError, ArchitectureError, StoryError) as error:
         print(canonical({"error": error.code}).decode())
         raise SystemExit(2) from None
     except (OSError, ValueError, KeyError, TypeError):

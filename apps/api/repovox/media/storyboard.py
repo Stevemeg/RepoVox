@@ -8,17 +8,41 @@ import re
 from collections import Counter
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from repovox.analysis.common import canonical, digest
 from repovox.analysis.contracts import PAYLOADS
+from repovox.media.architecture import Report
+from repovox.media.story import EngineeringStory
 
 VERSION: Literal["grounded-storyboard-1.0"] = "grounded-storyboard-1.0"
+# The problem-to-solution engineering story (repovox.media.story_board). The walkthrough
+# above stays readable and reproducible for every artifact produced before it.
+STORY_VERSION: Literal["problem-to-solution-storyboard-1.0"] = "problem-to-solution-storyboard-1.0"
 CITABLE = {"verified", "inferred"}
 EXCERPT_LINES = 12
 EXCERPT_WIDTH = 86
-Uncertainty = Literal["verified", "inferred", "none"]
-SceneType = Literal["title", "stack", "architecture", "flow", "code", "summary"]
+Uncertainty = Literal["verified", "inferred", "none", "documentation", "unverified"]
+LEGACY_UNCERTAINTY = {"verified", "inferred", "none"}
+SceneType = Literal[
+    "title",
+    "stack",
+    "architecture",
+    "flow",
+    "code",
+    "summary",
+    "introduction",
+    "problem",
+    "context",
+    "solution",
+    "approach",
+    "workflow",
+    "decisions",
+    "results",
+    "limitations",
+    "conclusion",
+]
+LEGACY_SCENES = {"title", "stack", "architecture", "flow", "code", "summary"}
 
 
 class GroundingError(Exception):
@@ -62,27 +86,62 @@ class Sentence(Closed):
     uncertainty: Uncertainty
     claim_ids: tuple[str, ...] = Field(max_length=256)
     evidence_ids: tuple[str, ...] = Field(max_length=256)
+    # Architecture IR elements lit while the sentence is narrated (story diagram scenes only).
+    component_ids: tuple[str, ...] = Field(default=(), max_length=16)
+    connection_ids: tuple[str, ...] = Field(default=(), max_length=16)
 
 
 class Scene(Closed):
     id: str
     type: SceneType
     title: str = Field(min_length=1, max_length=44)
-    claim_ids: tuple[str, ...] = Field(min_length=1, max_length=256)
-    evidence_ids: tuple[str, ...] = Field(min_length=1, max_length=256)
+    claim_ids: tuple[str, ...] = Field(max_length=256)
+    evidence_ids: tuple[str, ...] = Field(max_length=256)
     rows: tuple[Row, ...] = Field(default=(), max_length=8)
     links: tuple[Link, ...] = Field(default=(), max_length=4)
     excerpt: Excerpt | None = None
     sentences: tuple[Sentence, ...] = Field(min_length=1, max_length=6)
+    # Drawn with the Architecture IR diagram instead of the text layout (story scenes only).
+    diagram: bool = False
+
+
+class StoryAttachment(Closed):
+    """The verified story and architecture report a problem-to-solution storyboard narrates."""
+
+    story: EngineeringStory
+    architecture: Report | None
+    narrator: str = Field(min_length=1, max_length=64)
 
 
 class Storyboard(Closed):
-    version: Literal["grounded-storyboard-1.0"]
+    version: Literal["grounded-storyboard-1.0", "problem-to-solution-storyboard-1.0"]
     repository: str
     commit_sha: str = Field(pattern=r"^[a-f0-9]{40}$")
     pipeline_version: str
     analysis_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     scenes: tuple[Scene, ...] = Field(min_length=4, max_length=24)
+    story: StoryAttachment | None = None
+
+    @model_validator(mode="after")
+    def versioned(self) -> "Storyboard":
+        if (self.version == STORY_VERSION) != (self.story is not None):
+            raise ValueError("only a problem-to-solution storyboard carries a story")
+        if self.version == VERSION:
+            for scene in self.scenes:
+                if (
+                    scene.type not in LEGACY_SCENES
+                    or scene.diagram
+                    or not scene.claim_ids
+                    or not scene.evidence_ids
+                    or any(
+                        s.uncertainty not in LEGACY_UNCERTAINTY
+                        or s.component_ids
+                        or s.connection_ids
+                        for s in scene.sentences
+                    )
+                ):
+                    raise ValueError("walkthrough scenes keep the grounded-storyboard-1.0 rules")
+        return self
 
 
 def display(value: object, limit: int) -> str:
