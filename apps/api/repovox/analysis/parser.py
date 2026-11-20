@@ -32,6 +32,18 @@ DECLARATIONS = {
     "arrow_function": "function",
     "function_expression": "function",
 }
+# No emitted syntax fact carries a text longer than this, after redaction.
+FACT_CHARACTERS = 1024
+
+
+class OversizedFact(AnalysisError):
+    """One syntax fact over FACT_CHARACTERS. `parse_file` drops that fact and keeps the file.
+
+    It is still `analysis_fact_limit`, so any other caller of `text` fails closed as before.
+    """
+
+    def __init__(self) -> None:
+        super().__init__("analysis_fact_limit")
 
 
 def walk(root: Node) -> Iterator[Node]:
@@ -47,8 +59,8 @@ def text(node: Node | None, body: bytes) -> str:
         return ""
     value = body[node.start_byte : node.end_byte].decode("utf-8")
     safe = redact(value)[0]
-    if len(safe) > 1024:
-        raise AnalysisError("analysis_fact_limit")
+    if len(safe) > FACT_CHARACTERS:
+        raise OversizedFact()
     return safe
 
 
@@ -120,8 +132,14 @@ def parse_file(
         for key, value in extra.items():
             if isinstance(value, str):
                 extra[key] = redact(value)[0]
-        if len(name) > 1024:
-            raise AnalysisError("analysis_fact_limit")
+        # The cap holds for every emitted text: the name and each string field or list item.
+        if len(name) > FACT_CHARACTERS or any(
+            len(item) > FACT_CHARACTERS
+            for value in extra.values()
+            for item in (value if isinstance(value, list) else [value])
+            if isinstance(item, str)
+        ):
+            raise OversizedFact()
         redacted_name = "[REDACTED]" in name or "[REDACTED]" in str(extra)
         start, end = locations(node)
         item = {
@@ -144,12 +162,8 @@ def parse_file(
         return item
 
     record(root, "module", path, "module-v1")
-    deadline = time.monotonic() + 2
-    nodes = 0
-    for node in walk(root):
-        nodes += 1
-        if nodes > 200_000 or time.monotonic() >= deadline:
-            raise AnalysisError("parser_resource_limit")
+
+    def visit(node: Node) -> None:
         if node.type in DECLARATIONS:
             name = text(node.child_by_field_name("name"), body)
             if not name and node.parent and node.parent.type == "variable_declarator":
@@ -303,6 +317,19 @@ def parse_file(
             condition = text(node.child_by_field_name("condition"), body)
             if re.fullmatch(r"__name__\s*==\s*['\"]__main__['\"]", condition):
                 record(node, "entrypoint", "__main__", "python-main-v1")
+
+    deadline = time.monotonic() + 2
+    nodes = 0
+    for node in walk(root):
+        nodes += 1
+        if nodes > 200_000 or time.monotonic() >= deadline:
+            raise AnalysisError("parser_resource_limit")
+        try:
+            visit(node)
+        except OversizedFact:
+            # Only this node's fact is dropped, together with any fact the same node would
+            # have recorded after it. No oversized text is ever emitted.
+            continue
     annotate(root, body, lang, symbols)
     return symbols, []
 
