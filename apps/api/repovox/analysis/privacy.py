@@ -18,6 +18,8 @@ ASSIGNMENT = re.compile(
 )
 ENTROPY = re.compile(r"[A-Za-z0-9_+/=-]{24,}")
 SAFE_VALUES = {"example", "placeholder", "changeme", "redacted"}
+# One plain word of a file or directory name: lowercase, Capitalised, an ACRONYM or a number.
+WORD = re.compile(r"[A-Z]?[a-z]+|[A-Z]+|[0-9]+")
 
 
 def entropy(value: str) -> float:
@@ -64,6 +66,23 @@ def scan(text: str) -> list[tuple[int, int]]:
         if entropy(value) >= 4.4 and not re.fullmatch(r"[a-fA-F0-9]+", value):
             spans.append(match.span())
     return spans
+
+
+def prose_name(value: str) -> bool:
+    """Two or more plain words joined by `/`, `-` or `_`, none as long as a token run."""
+    words = [word for word in re.split(r"[/_-]", value) if word]
+    return len(words) > 1 and all(len(w) < 24 and WORD.fullmatch(w) for w in words)
+
+
+def path_spans(path: str) -> list[tuple[int, int]]:
+    """Suspicious-entropy spans of a repository path; any span fails `secret_detected`.
+
+    `scan` runs on the whole path unchanged, so credential patterns and assignments raise and
+    every entropy span is found as before. Only a span made of plain words (such as
+    `docs/adr/ADR-0019-production-observability`) is then set aside as a name. A span with a
+    mixed-case, letter-and-digit, `+` or `=` word, or a single unsegmented run, still counts.
+    """
+    return [(start, end) for start, end in scan(path) if not prose_name(path[start:end])]
 
 
 def redact(text: str) -> tuple[str, list[dict[str, int | str]]]:

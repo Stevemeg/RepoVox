@@ -14,7 +14,7 @@ from repovox.analysis.common import (
     AnalysisError,
     Limits,
 )
-from repovox.analysis.privacy import scan, screen_bytes, sensitive_path
+from repovox.analysis.privacy import path_spans, screen_bytes, sensitive_path
 
 LANGUAGES = {
     ".py": "python",
@@ -58,7 +58,7 @@ def weight_record(root: Path, item: Mapping[str, Any]) -> dict[str, Any]:
     ):
         raise AnalysisError("artifact_corrupt")
     safe_path(path)
-    if scan(path):
+    if path_spans(path):
         raise AnalysisError("secret_detected")
     if (root / path).exists() or (root / path).is_symlink():
         raise AnalysisError("archive_duplicate")
@@ -90,7 +90,7 @@ def filter_sources(
         if not path.is_file() or path.is_symlink():
             continue
         relative = path.relative_to(root).as_posix()
-        if scan(relative):
+        if path_spans(relative):
             raise AnalysisError("secret_detected")
         size = path.stat().st_size
         file_hash = hashlib.sha256()
