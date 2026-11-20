@@ -240,6 +240,44 @@ file sets them in the shared `x-api` block.
 | `REPOVOX_MEDIA_HANDOFF_SECONDS` | `3` | not set | `3` | `0` turns the API's pass off; the dispatcher still runs it every 5 seconds |
 | `REPOVOX_SYNTHETIC_SOURCE_DIR` | unset | `${SYNTHETIC_SOURCE_DIR:-}` | unset | Development only |
 | `REPOVOX_API_URL` (web) | `http://localhost:8000` | `http://api:8000` | `http://api:8000` | Read by `apps/web/src/app/api/v1/[...path]/route.ts` |
+| `REPOVOX_LLM_PROVIDER` | `deterministic` | not set | `deterministic` unless you opt in | `ollama`, `openai_compatible` or `anthropic`; see [below](#optional-grounded-narration-model) |
+| `REPOVOX_LLM_MODEL` | unset | not set | with a provider | Required by every model provider |
+| `REPOVOX_LLM_BASE_URL` | per provider | not set | optional | `https://`; `http://` only on `127.0.0.1`, `localhost` or `host.docker.internal` |
+| `REPOVOX_LLM_API_KEY` | unset | not set | hosted providers only | A secret: store it like `.env`; never logged or written to an artifact |
+| `REPOVOX_LLM_TIMEOUT_SECONDS` | `20` | not set | `20` | 1 to 120 |
+
+### Optional grounded narration model
+
+By default the media worker narrates the engineering story in fixed template wording and
+makes no network call. Setting `REPOVOX_LLM_PROVIDER` lets one language-model request per
+video reword that narration ([ADR-0026](../adr/0026-grounded-llm-narration-refiner.md)).
+
+- **Input.** The model receives only the verified scene plan and the claims each sentence
+  cites, never a repository file.
+- **Checking.** Each scene it returns must pass a claim-by-claim grounding check, or it keeps
+  its template wording.
+- **Failures.** A timeout, an error or a malformed answer keeps the template wording for
+  every scene.
+- **Provenance.** The provider, model, refined and fallback scene counts and the exact
+  rejection reasons are recorded in the storyboard and in the published video's
+  `metadata.narration`. Stage 11 re-checks the wording without calling the model.
+
+Only the `media-worker` service reads these settings. `docker-compose.yml` does not set them,
+so add them to that service in a `docker-compose.override.yml`, or to the production overlay
+for a production host:
+
+| Provider | Settings | Notes |
+| --- | --- | --- |
+| Local Ollama (self-hosted, no API key) | `REPOVOX_LLM_PROVIDER=ollama`, `REPOVOX_LLM_MODEL=<a model you pulled, for example llama3.1:8b>`, `REPOVOX_LLM_BASE_URL=http://host.docker.internal:11434` | From a container, add `extra_hosts: ["host.docker.internal:host-gateway"]` to `media-worker`, and make Ollama listen on an address the bridge reaches. The default `http://127.0.0.1:11434` is the container itself. |
+| OpenAI-compatible (hosted, or a local server) | `REPOVOX_LLM_PROVIDER=openai_compatible`, `REPOVOX_LLM_MODEL=<model>`, `REPOVOX_LLM_API_KEY=<key>`, optional `REPOVOX_LLM_BASE_URL=https://...` | Calls `<base>/v1/chat/completions` with `temperature: 0` and JSON object output. Reasoning models that reject `temperature` fall back with `llm_http_status`. |
+| Anthropic (hosted) | `REPOVOX_LLM_PROVIDER=anthropic`, `REPOVOX_LLM_MODEL=<model>`, `REPOVOX_LLM_API_KEY=<key>` | Calls `<base>/v1/messages` with `anthropic-version: 2023-06-01` and `temperature: 0`. Current Claude models that reject `temperature` fall back with `llm_http_status`. |
+
+The worker refuses to start if a provider is set without its model, if a hosted provider has
+no key, or if the URL is plain HTTP to any other host, or carries user info, a query or a
+fragment. Hosted providers receive the story blueprint (verified claim text, file paths and
+the repository name) and bill your account. Choose one only where that provider's terms
+permit the data ([model policy](../../AGENTS.md#model-policy)). To turn the feature off, set
+`REPOVOX_LLM_PROVIDER=deterministic` or remove the variables and restart `media-worker`.
 
 ### TLS reverse proxy
 
