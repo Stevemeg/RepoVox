@@ -252,6 +252,9 @@ file sets them in the shared `x-api` block.
 | `REPOVOX_TTS_MODEL_PATH`, `REPOVOX_TTS_VOICES_PATH` | unset | not set | optional | Absolute `.onnx` and `.bin` paths, both or neither |
 | `REPOVOX_TTS_VOICE` | `af_heart` | not set | optional | A Kokoro voice id, `^[a-z0-9_-]{2,32}$` |
 | `REPOVOX_TTS_SPEED` | `1.0` | not set | `1.0` | 0.5 to 2.0 |
+| `REPOVOX_TTS_THREADS` | unset | not set | optional | Neural voice inference threads, 1 to 64; match the media worker's CPUs |
+| `REPOVOX_MEDIA_SPEECH_PREWARM_SECONDS` | `240` | not set | `240` | 0 to 300; how long the narration stage may speak ahead for a neural voice; 0 turns it off |
+| `REPOVOX_MEDIA_ENCODE_BASE_SECONDS`, `..._SECONDS_PER_MINUTE`, `..._MAX_SECONDS` | `170`, `30`, `900` | not set | defaults | Encoder and probe time limit per video: base plus a share per minute of video, capped. A stage's own deadline still bounds it |
 
 ### Optional grounded narration model
 
@@ -289,17 +292,35 @@ permit the data ([model policy](../../AGENTS.md#model-policy)). To turn the feat
 ### Optional local neural voice
 
 By default the media worker speaks narration with the operating-system voice (`espeak-ng` in
-the images). A local Kokoro ONNX voice can replace it
-([ADR-0027](../adr/0027-neural-tts-and-story-api-contract.md)):
+the images). A local Kokoro-82M v1.0 ONNX voice can replace it
+([ADR-0027](../adr/0027-neural-tts-and-story-api-contract.md),
+[ADR-0031](../adr/0031-neural-voice-and-animated-architecture.md)). Two commands enable it on a
+self-hosted stack:
 
-1. Install the optional extra into the media worker's environment: `uv sync --extra
-   neural-tts`. A custom image is needed; the provided images and CI do not install it.
-2. Obtain `kokoro-v1.0.onnx` and `voices-v1.0.bin` yourself, check their licence and
-   checksums, and mount them read-only into `media-worker`, for example at `/models`.
-   RepoVox never downloads them.
-3. Set `REPOVOX_TTS_MODEL_PATH=/models/kokoro-v1.0.onnx`,
-   `REPOVOX_TTS_VOICES_PATH=/models/voices-v1.0.bin` and optionally `REPOVOX_TTS_VOICE` and
-   `REPOVOX_TTS_SPEED` on `media-worker`.
+```sh
+bash scripts/setup_kokoro_voice.sh
+docker compose -f docker-compose.yml -f infrastructure/local/docker-compose.prod.yml   -f infrastructure/local/docker-compose.neural-tts.yml up -d --build --wait
+```
+
+- **Model files.** `scripts/setup_kokoro_voice.sh` downloads `kokoro-v1.0.onnx` and
+  `voices-v1.0.bin` from the official `thewh1teagle/kokoro-onnx` release `model-files-v1.0`
+  into the git-ignored `.models/kokoro/`. It checks each file's exact size and SHA-256 and is
+  idempotent; `--check` verifies without downloading. kokoro-onnx is MIT and the Kokoro-82M
+  weights are Apache-2.0. The application itself never downloads a model.
+- **Image.** The overlay builds `media-worker` with `INSTALL_NEURAL_TTS=true`, which installs
+  the `neural-tts` extra. The default build argument is `false`, so CI and the standard images
+  do not change.
+- **Settings.** The overlay sets `REPOVOX_TTS_PROVIDER=kokoro_onnx`, the two model paths under
+  `/models/kokoro` (mounted read-only), `REPOVOX_TTS_VOICE=af_heart`, `REPOVOX_TTS_SPEED=1.0`
+  and `REPOVOX_TTS_THREADS=4`.
+- **Resources.** Neural speech and encoding are CPU-bound and every media stage keeps its fixed
+  deadline (speech 240 s, encode 180 s, architecture 600 s). The overlay gives `media-worker` 4
+  CPUs and 3 GiB instead of 1 CPU and 2 GiB, and inherits every other limit. The narration stage
+  speaks the approved script ahead within its own lease
+  (`REPOVOX_MEDIA_SPEECH_PREWARM_SECONDS`), so the speech stage only finishes the rest.
+
+To use your own files instead, mount them read-only and set `REPOVOX_TTS_MODEL_PATH` and
+`REPOVOX_TTS_VOICES_PATH` (absolute `.onnx` and `.bin` paths) on `media-worker`.
 
 With `REPOVOX_TTS_PROVIDER=auto` (the default), the worker uses the neural voice when the
 package and both files load, and the operating-system voice otherwise.
@@ -307,6 +328,11 @@ package and both files load, and the operating-system voice otherwise.
 With `kokoro_onnx`, the worker requires the neural voice. Without it, the speech stage fails
 with a fixed code (`neural_tts_unavailable`, `neural_tts_files_missing` or
 `neural_tts_load_failed`) and never falls back.
+
+Every voice is given the sentence's technical pronunciation: `FastAPI` is said as "Fast"
+and the letters A, P, I, and `backend/app/services/inputs.py` as "inputs dot py in backend app
+services" (`apps/api/repovox/media/pronunciation.py`). Captions, subtitles, the storyboard and
+every citation keep the exact text.
 
 Which voice spoke is recorded by name, never by path, in the published video's
 `metadata.narration.tts_provider`, `tts_engine` and `tts_voice`.
