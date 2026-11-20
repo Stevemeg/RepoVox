@@ -49,7 +49,10 @@ Phase 2 development analysis adds conservative local safety ceilings without cha
 the approved archive/source/90% coverage caps: path depth 32, 280 MiB decompressed tar
 including headers/padding, 20,032 archive members, 10,000 structural/context facts,
 20,000 atomic claims, 64 MiB parser JSON output and 100 MiB immutable object bodies.
-These internal limits reject excess rather than truncate evidence. Native parsing has
+These internal limits reject excess rather than truncate evidence. The one bounded exception
+is the fact cap. Above it, test-file facts are dropped in fixed tiers, and non-test facts never
+are. The omission is verified and stated in the analysis, story and video
+([ADR-0030](../adr/0030-deterministic-test-fact-budget.md)). Native parsing has
 a one-second/file watchdog and traversal bounds; parent stage/lease deadlines remain
 authoritative. No video admission or production-readiness claim follows from analysis.
 See [implementation boundaries](../development/analysis.md).

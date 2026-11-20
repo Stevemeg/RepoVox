@@ -40,3 +40,4 @@ All proposed for Phase 0 review, dated 2026-10-08. Acceptance follows independen
 | [027](0027-neural-tts-and-story-api-contract.md) | Optional local neural voice, sampling sent only when configured, and the read-only story API contract |
 | [028](0028-sha-only-commit-resolution-and-weight-containers.md) | SHA-only commit resolution under the unchanged metadata cap, and recorded, never-written model-weight containers |
 | [029](0029-prose-path-names-and-oversized-syntax-facts.md) | Plain-word path spans are names, not tokens; an oversized syntax fact is dropped instead of the repository |
+| [030](0030-deterministic-test-fact-budget.md) | Above the unchanged 10,000-fact cap, test-file facts are dropped in fixed, verified and disclosed tiers; non-test facts never are |

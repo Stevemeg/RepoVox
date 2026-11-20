@@ -83,8 +83,13 @@ generated/build/minified/binary/invalid UTF-8/unsupported/oversized/sensitive pa
 excluded or failed explicitly. Tests are included in byte coverage but deprioritized
 for primary entry selection. Whole-file parser errors contribute zero parsed bytes.
 No emitted syntax fact has a text over 1,024 characters. An oversized expression drops only
-that node's fact, while the 10,000-fact repository cap still fails closed
-([ADR-0029](../adr/0029-prose-path-names-and-oversized-syntax-facts.md)).
+that node's fact ([ADR-0029](../adr/0029-prose-path-names-and-oversized-syntax-facts.md)).
+Above the 10,000-fact repository cap, test-file facts are dropped in fixed tiers: calls,
+then imports, then the rest. This continues only while the total still exceeds the cap.
+Non-test facts are never dropped, and if they alone exceed the cap the repository still fails
+closed. The verifier re-applies the rule. The manifest reasons, the knowledge limitations and
+the story all state the omission
+([ADR-0030](../adr/0030-deterministic-test-fact-budget.md)).
 At least one supported non-test file and 90% eligible supported bytes must parse.
 Eligible overflow fails; exclusions never secretly alter the threshold.
 
