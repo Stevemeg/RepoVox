@@ -2,11 +2,18 @@
 
 Narration is generated from the validated IR only. Each technical line names the diagram
 elements it lights up and carries their citations; nothing is said that the IR does not hold.
+
+Frames. The first line reveals the diagram tier by tier. A line about relationships draws each
+one from its source to its target and then sends a packet along it, with a step bar; a line
+about components spotlights them and holds; any other line is one still image. A still is
+encoded once and held, so only moving lines cost animation images (at most EXPLAINER_LIMIT).
+Every voice is given the technical pronunciation of the line (`speech.audio_text`).
 """
 
 import os
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal
 
@@ -23,14 +30,22 @@ from repovox.media.architecture import (
     validate,
 )
 from repovox.media.diagram import Diagram
-from repovox.media.narration import FPS, Voice, assemble, detect, synthesize
-from repovox.media.speech import natural, vocabulary
-from repovox.media.stages import Checkpoint, RenderError, encode_sequence, encoded, noop, timestamp
+from repovox.media.narration import FPS, Voice, assemble, detect
+from repovox.media.speech import SpeechCache, audio_text, natural, speak, vocabulary
+from repovox.media.stages import (
+    Checkpoint,
+    RenderError,
+    diagram_frames,
+    encode_sequence,
+    encoded,
+    noop,
+    timestamp,
+)
 from repovox.media.storyboard import display
 
 VERSION = "architecture-explainer-1.0"
 ANIMATION_STEP = 6  # Video frames per animation frame: five diagram updates per second.
-PULSE_SECONDS = 1.6
+EXPLAINER_LIMIT = 360  # Animation images per explainer; later moving lines are drawn still.
 LineStatus = Literal["VERIFIED", "INFERRED", "UNRESOLVED", "CONTEXT"]
 DESCRIPTIONS = {
     "noise": "random noise tensor",
@@ -412,12 +427,22 @@ def exclusive(path: Path, body: bytes) -> None:
         handle.write(body)
 
 
+def line_mode(index: int, line: Line) -> str:
+    if line.connection_ids:
+        return "flow"
+    if index == 0:
+        return "reveal"
+    return "spotlight" if line.component_ids else "still"
+
+
 def render_architecture(
     report: Report,
     architecture: Architecture,
     work: Path,
     engine: Voice,
     checkpoint: Checkpoint = noop,
+    cache: SpeechCache | None = None,
+    encode_limit: Callable[[float], float] | None = None,
 ) -> dict[str, Any]:
     """Write one architecture's validated video bundle into an empty directory."""
     lines = narrate(architecture)
@@ -431,16 +456,28 @@ def render_architecture(
     speech = []
     for i, line in enumerate(lines):
         checkpoint()
-        speech.append(synthesize(engine, line.spoken, scratch, f"speech{i:03d}"))
+        said = audio_text(line.text, line.spoken)
+        speech.append(speak(engine, said, scratch, f"speech{i:03d}", cache))
     audio, timings = assemble(speech)
 
     entries: list[tuple[str, int]] = []
     cues = ["WEBVTT", ""]
     narration = []
+    animated = 0
     for i, (line, timing) in enumerate(zip(lines, timings, strict=True)):
         checkpoint()
-        diagram = diagrams[line.view]
-        base = diagram.base(
+        steps = [
+            x.id
+            for x in lines
+            if x.section == line.section and x.connection_ids and x.view == line.view
+        ]
+        bar = (
+            (steps.index(line.id) + 1, len(steps))
+            if line.connection_ids and line.section in {"flow", "zoom", "inputs and outputs"}
+            else None
+        )
+        images = diagram_frames(
+            diagrams[line.view],
             line.component_ids,
             line.connection_ids,
             line.status,
@@ -448,14 +485,19 @@ def render_architecture(
             line.citations[0] if line.citations else None,
             i,
             len(lines),
+            timing.frames,
+            mode=line_mode(i, line),
+            step=bar,
+            budget=EXPLAINER_LIMIT - animated,
+            checkpoint=checkpoint,
         )
-        exclusive(work / f"key{i:03d}.png", base.png())
-        count = -(-timing.frames // ANIMATION_STEP)
-        for j in range(count):
+        if len(images) > 1:
+            animated += len(images)
+        exclusive(work / f"key{i:03d}.png", images[-1])
+        for j, image in enumerate(images):
             name = f"a{i:03d}_{j:03d}.png"
-            phase = (j * ANIMATION_STEP / FPS) / PULSE_SECONDS
-            (scratch / name).write_bytes(diagram.animate(base, line.connection_ids, phase))
-            last = j == count - 1
+            (scratch / name).write_bytes(image)
+            last = j == len(images) - 1
             entries.append((name, timing.frames - ANIMATION_STEP * j if last else ANIMATION_STEP))
         end = timing.start_frame + timing.frames
         cues += [f"{timestamp(timing.start_frame)} --> {timestamp(end)}", line.text, ""]
@@ -467,7 +509,9 @@ def render_architecture(
                 "speech_seconds": round(timing.speech_seconds, 6),
             }
         )
-    video, media = encode_sequence(scratch, entries, audio, checkpoint)
+    seconds = sum(frames for _, frames in entries) / FPS
+    limit = encode_limit(seconds) if encode_limit is not None else None
+    video, media = encode_sequence(scratch, entries, audio, checkpoint, limit)
     for leftover in scratch.iterdir():
         leftover.unlink()
     scratch.rmdir()

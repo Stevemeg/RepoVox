@@ -32,7 +32,8 @@ from repovox.db.database import make_engine, rows
 from repovox.media import stages
 from repovox.media.architecture import ArchitectureError, Report, check
 from repovox.media.explainer import render_architecture
-from repovox.media.narration import Voice, detect
+from repovox.media.narration import Engine as SpeechEngine
+from repovox.media.narration import NarrationError, Voice, detect
 from repovox.media.refiner import (
     DETERMINISTIC,
     GroundedLLMRefiner,
@@ -40,7 +41,7 @@ from repovox.media.refiner import (
     refiner_from_settings,
 )
 from repovox.media.sandbox import discover_isolated, sources_from, story_isolated
-from repovox.media.speech import voice_from_settings, voice_record
+from repovox.media.speech import SpeechCache, voice_from_settings, voice_record
 from repovox.media.store import MediaStorage, media_key
 from repovox.media.story import StoryError
 from repovox.media.story_extract import story_sources, verify_story
@@ -76,6 +77,8 @@ class MediaWorker:
         speech: Voice | None = None,
         refiner: NarrativeRefiner = DETERMINISTIC,
         voices: Callable[[], Voice] = detect,
+        prewarm_seconds: float = 0.0,
+        encode_limit: Callable[[float], float] = stages.encode_timeout,
     ) -> None:
         self.engine, self.storage, self.name, self.speech = engine, storage, name, speech
         # Chooses the narration voice the first time a stage needs one. A demanded neural
@@ -83,6 +86,13 @@ class MediaWorker:
         self.voices = voices
         # Rewords the verified story plan only; Stage 11 re-checks whatever it wrote.
         self.refiner = refiner
+        # Sentences already spoken by this process's voice. Stage 11 may speak the approved
+        # script ahead into it, within its own lease, for at most `prewarm_seconds`; Stages
+        # 12 and 15 reuse whatever is there. Bounded, in memory, never persisted.
+        self.speech_cache = SpeechCache()
+        self.prewarm_seconds = prewarm_seconds
+        # Encoder and probe time limit for a video of the given length, in seconds.
+        self.encode_limit = encode_limit
 
     def reconcile(self) -> int:
         with self.engine.begin() as c:
@@ -213,6 +223,7 @@ class MediaWorker:
     ) -> tuple[bytes, dict[str, Any]]:
         ordinal, owner, reference = scope["ordinal"], scope["owner_id"], scope["analysis"]
         outputs = {item["ordinal"]: item for item in scope["outputs"]}
+        started = time.monotonic()
 
         def prior(number: int) -> bytes:
             item = outputs.get(number)
@@ -228,16 +239,26 @@ class MediaWorker:
         if ordinal == 11:
             payload, board = self.payload(reference), prior(10)
             if not stages.is_story(board):
-                return stages.narration_stage(payload, board), {}
-            # The story's citations are re-verified against the pinned archive, not trusted.
-            root = self.unpacked(reference, scratch, checkpoint)
-            return stages.narration_stage(payload, board, story_sources(root, payload)), {}
+                script = stages.narration_stage(payload, board)
+            else:
+                # The story's citations are re-verified against the pinned archive, not trusted.
+                root = self.unpacked(reference, scratch, checkpoint)
+                script = stages.narration_stage(payload, board, story_sources(root, payload))
+            spoken = self.warm(board, script, scratch, checkpoint, started)
+            return script, ({"speech_prewarmed": spoken} if spoken else {})
         if ordinal == 12:
-            return stages.tts_stage(prior(10), prior(11), self.voice(), scratch, checkpoint), {}
+            return (
+                stages.tts_stage(
+                    prior(10), prior(11), self.voice(), scratch, checkpoint, self.speech_cache
+                ),
+                {},
+            )
         if ordinal == 13:
             return stages.render_stage(prior(10), prior(11), prior(12), checkpoint), {}
         if ordinal == 14:
-            video, media = stages.encode_stage(prior(12), prior(13), scratch, checkpoint)
+            video, media = stages.encode_stage(
+                prior(12), prior(13), scratch, checkpoint, self.encode_limit
+            )
             # Stage summaries before 14 are not stored, so the published video's metadata
             # carries how it was worded and voiced, and the bounded story view the API serves.
             storyboard, speech = prior(10), prior(12)
@@ -252,6 +273,32 @@ class MediaWorker:
         if self.speech is None:
             self.speech = self.voices()
         return self.speech
+
+    def warm(
+        self,
+        board: bytes,
+        script: bytes,
+        scratch: Path,
+        checkpoint: stages.Checkpoint,
+        started: float,
+    ) -> int:
+        """Speak the approved script ahead with a neural voice, within this stage's budget.
+
+        Only after Stage 11 has approved the script, and only for a voice slower than the
+        operating-system engine. Any voice failure is left for Stage 12 to report.
+        """
+        budget = self.prewarm_seconds - (time.monotonic() - started)
+        if budget <= 0:
+            return 0
+        try:
+            voice = self.voice()
+        except NarrationError:
+            return 0
+        if isinstance(voice, SpeechEngine):
+            return 0
+        warm = scratch / "warm"
+        warm.mkdir(mode=0o700, exist_ok=True)
+        return stages.prewarm(board, script, voice, warm, self.speech_cache, budget, checkpoint)
 
     def unpacked(
         self, reference: dict[str, Any], scratch: Path, checkpoint: stages.Checkpoint
@@ -351,7 +398,15 @@ class MediaWorker:
             checkpoint()
             work = scratch / f"render-{len(videos)}"
             work.mkdir(mode=0o700)
-            item = render_architecture(report, architecture, work, speech, checkpoint)
+            item = render_architecture(
+                report,
+                architecture,
+                work,
+                speech,
+                checkpoint,
+                self.speech_cache,
+                self.encode_limit,
+            )
             body = (work / "video.mp4").read_bytes()
             artifact, checksum = uuid4(), hashlib.sha256(body).hexdigest()
             key = media_key(scope["owner_id"], scope["job_id"], 15, artifact, checksum)
@@ -395,6 +450,13 @@ def main() -> None:
         f"media-{os.getpid()}",
         refiner=refiner_from_settings(settings),
         voices=lambda: voice_from_settings(settings),
+        prewarm_seconds=settings.media_speech_prewarm_seconds,
+        encode_limit=lambda seconds: stages.encode_timeout(
+            seconds,
+            settings.media_encode_base_seconds,
+            settings.media_encode_seconds_per_minute,
+            settings.media_encode_max_seconds,
+        ),
     )
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: stop.set())

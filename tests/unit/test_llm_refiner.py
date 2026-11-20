@@ -1121,8 +1121,9 @@ def test_worker_stage_14_keeps_provenance_with_the_published_video(
     )
     store.objects["speech"], store.objects["frames"] = speech, b"frames"
 
-    def encode(sent: bytes, frames: bytes, scratch: Path, checkpoint: Any) -> Any:
+    def encode(sent: bytes, frames: bytes, scratch: Path, checkpoint: Any, limit: Any) -> Any:
         assert (sent, frames) == (speech, b"frames")
+        assert limit(540) == stages.encode_timeout(540)  # The worker's scaled encode limit.
         return b"video", {"video_frames": 30, "full_decode": "passed", "captions": "WEBVTT"}
 
     monkeypatch.setattr("repovox.media.worker.stages.encode_stage", encode)
