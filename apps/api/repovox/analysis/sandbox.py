@@ -9,7 +9,9 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from repovox.analysis.common import AnalysisError, canonical
+from repovox.analysis.budget import FactBudget
+from repovox.analysis.budget import record as record_budget
+from repovox.analysis.common import DEFAULT_LIMITS, AnalysisError, canonical
 from repovox.analysis.documentation import context_symbols
 from repovox.analysis.filtering import filter_sources
 from repovox.analysis.graph import configuration, entrypoints, infer
@@ -138,8 +140,12 @@ def execute(stage: int, root: Path, request: dict[str, Any]) -> dict[str, Any]:
         )
     if stage == 4:
         manifest = inputs["3"]
-        structural = structure(root, manifest)
-        structural["symbols"].extend(context_symbols(root, manifest))
+        budget = FactBudget(DEFAULT_LIMITS.facts)
+        structural = structure(root, manifest, budget=budget)
+        # Context facts are non-test facts: the budget never drops them (ADR-0030).
+        budget.add("", context_symbols(root, manifest), test=False)
+        structural["symbols"] = budget.kept()
+        record_budget(manifest, budget.omitted())
         if len(structural["symbols"]) > 10_000:
             raise AnalysisError("analysis_fact_limit")
         structural["symbols"].sort(key=lambda s: s["id"])

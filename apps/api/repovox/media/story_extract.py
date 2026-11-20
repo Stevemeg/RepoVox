@@ -27,7 +27,9 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from repovox.analysis.common import canonical, digest
+from repovox.analysis.budget import BUDGET_REASONS
+from repovox.analysis.budget import REASONS as BUDGET_TIERS
+from repovox.analysis.common import DEFAULT_LIMITS, canonical, digest
 from repovox.analysis.contracts import PAYLOADS
 from repovox.analysis.privacy import redact
 from repovox.media.archgraph import sentence
@@ -246,6 +248,19 @@ TEMPLATES = {
         "source without running it."
     ),
     "no_tests": "No test files were found, so no behaviour is demonstrated by tests.",
+    # The deterministic test-fact budget of a repository over the fact cap (ADR-0030).
+    "fact_budget_1": (
+        "The analysis exceeded its {limit}-fact cap, so call facts from {files} were omitted; "
+        "their test definitions and imports were kept."
+    ),
+    "fact_budget_2": (
+        "The analysis exceeded its {limit}-fact cap, so call and import facts from {files} "
+        "were omitted; their test definitions were kept."
+    ),
+    "fact_budget_3": (
+        "The analysis exceeded its {limit}-fact cap, so every fact from {files} was omitted, "
+        "and those tests are not described."
+    ),
     "feature_unbacked": (
         'Whether the documented feature "{feature}" is implemented is not established.'
     ),
@@ -338,6 +353,25 @@ def checked_words(text: str) -> set[str]:
 
 def plural(count: int, noun: str, many: str | None = None) -> str:
     return f"{count} {noun}" if count == 1 else f"{count} {many or noun + 's'}"
+
+
+BUDGET_OPENING = "The analysis exceeded its "
+
+
+def fact_budget(payload: dict[str, Any]) -> tuple[int, str | None]:
+    """The test-fact budget tier the verified manifest records, and the story's statement."""
+    reasons = [
+        f["reason"]
+        for f in payload["knowledge"]["coverage"]["files"]
+        if f["reason"] in BUDGET_REASONS
+    ]
+    if not reasons:
+        return 0, None
+    tier = max(level for level, reason in BUDGET_TIERS.items() if reason in reasons)
+    text = TEMPLATES[f"fact_budget_{tier}"].format(
+        limit=f"{DEFAULT_LIMITS.facts:,}", files=plural(len(reasons), "test file")
+    )
+    return tier, clip(display(text, 4000), 300)
 
 
 def variants(word: str) -> set[str]:
@@ -747,6 +781,10 @@ def extract_story(
     facts = Facts(payload, sources, report)
     builder = Builder(facts)
     knowledge = payload["knowledge"]
+    # Stated first, so no cap on open questions can drop it.
+    budget_tier, budget_text = fact_budget(payload)
+    if budget_text is not None:
+        builder.claim("unresolved_questions", "unresolved", "UNVERIFIED", budget_text, [])
 
     # 1. Documentation: what the authors state. Never VERIFIED.
     readmes = sorted(
@@ -1255,7 +1293,8 @@ def extract_story(
             )
 
     # 6. What remains open.
-    if not test_modules:
+    # When the budget omitted every test fact, test files exist and the budget says so.
+    if not test_modules and budget_tier < 3:
         builder.claim("unresolved_questions", "unresolved", "UNVERIFIED", TEMPLATES["no_tests"], [])
     if report is not None and report.architectures:
         for item in report.architectures[0].unresolved[:3]:
@@ -1616,6 +1655,12 @@ def verify_story(
                     raise StoryError("story_architecture_mismatch")
             elif claim.component_ids or claim.connection_ids:
                 raise StoryError("story_architecture_mismatch")
+    budget = fact_budget(payload)[1]
+    budget_said = [
+        c.text for c in story.unresolved_questions.claims if c.text.startswith(BUDGET_OPENING)
+    ]
+    if budget_said != ([budget] if budget else []):
+        raise StoryError("story_budget_mismatch")
     problem = story.problem_statement
     unresolved = [c.text for c in problem.claims if c.evidence_type == "unresolved"]
     expected = [TEMPLATES["problem_insufficient"]] if problem.sufficiency == "insufficient" else []
@@ -1696,6 +1741,7 @@ def verify_claim(facts: Facts, claim: Claim, verdicts: dict[str, str], known: se
 
 
 __all__ = [
+    "BUDGET_OPENING",
     "TEMPLATES",
     "extract_story",
     "inventory",

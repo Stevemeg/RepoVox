@@ -28,7 +28,7 @@ from repovox.media.refiner import (
     verify_refined_scene,
 )
 from repovox.media.story import Claim, EngineeringStory, StoryError
-from repovox.media.story_extract import TEMPLATES, clip, plural, verify_story
+from repovox.media.story_extract import BUDGET_OPENING, TEMPLATES, clip, plural, verify_story
 from repovox.media.storyboard import (
     STORY_VERSION,
     GroundingError,
@@ -250,8 +250,11 @@ def plan(story: EngineeringStory) -> list[ScenePlan]:
     ]
     add("results", "Demonstrated results", results, rows_of(shown + claimed))
     limits = list(story.limitations.claims)
-    questions = [c for c in story.unresolved_questions.claims if c.text != TEMPLATES["runtime"]]
-    runtime = [c for c in story.unresolved_questions.claims if c.text == TEMPLATES["runtime"]]
+    unresolved = story.unresolved_questions.claims
+    # A test-fact budget statement (ADR-0030) is always said, like the runtime scope.
+    budget = [c for c in unresolved if c.text.startswith(BUDGET_OPENING)][:1]
+    questions = [c for c in unresolved if c.text != TEMPLATES["runtime"] and c not in budget]
+    runtime = [c for c in unresolved if c.text == TEMPLATES["runtime"]]
     closing: list[PlannedSentence] = []
     for claim in limits[:2]:
         prefix = "Documented limitation: " if claim.status == "DOCUMENTATION_ONLY" else ""
@@ -259,9 +262,9 @@ def plan(story: EngineeringStory) -> list[ScenePlan]:
     for mismatch in story.mismatches[:2]:
         named = [claims[i] for i in mismatch.stated_claim_ids + mismatch.evidence_claim_ids]
         closing.append(say(f"Mismatch: {mismatch.detail}", *named))
-    for claim in questions[: 5 - len(closing)]:
+    for claim in questions[: 5 - len(closing) - len(budget)]:
         closing.append(say(f"Open question: {claim.text}", claim))
-    closing += [say(c.text, c) for c in runtime[:1]]
+    closing += [say(c.text, c) for c in budget + runtime[:1]]
     add("limitations", "Limitations and open questions", closing, rows_of(limits + questions))
     tally = {status: sum(c.status == status for c in claims.values()) for status in RANK}
     add(

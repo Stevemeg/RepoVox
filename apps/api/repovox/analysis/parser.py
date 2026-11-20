@@ -11,6 +11,8 @@ import tree_sitter_typescript
 from tree_sitter import Language, Node, Parser
 
 from repovox.analysis.bindings import annotate
+from repovox.analysis.budget import PARSED, FactBudget
+from repovox.analysis.budget import record as record_budget
 from repovox.analysis.common import (
     DEFAULT_LIMITS,
     PARSER_VERSION,
@@ -339,8 +341,14 @@ def structure(
     manifest: dict[str, Any],
     limits: Limits = DEFAULT_LIMITS,
     checkpoint: Callable[[], None] = lambda: None,
+    budget: FactBudget | None = None,
 ) -> dict[str, Any]:
-    symbols: list[dict[str, Any]] = []
+    """Parse every eligible file. Facts go through the test-fact budget (ADR-0030).
+
+    The returned symbols are those the budget keeps so far. A caller that adds more facts
+    to the same `budget` (Stage 4 adds context facts) settles it again afterwards.
+    """
+    facts = FactBudget(limits.facts) if budget is None else budget
     errors: list[dict[str, Any]] = []
     parsed = non_test = 0
     for file in manifest["files"]:
@@ -355,11 +363,12 @@ def structure(
         if failures:
             file.update(status="failed", reason="parse_error")
         else:
-            file.update(status="parsed", reason="parsed_without_errors", parsed_bytes=len(body))
+            file.update(status="parsed", reason=PARSED, parsed_bytes=len(body))
             parsed += len(body)
             non_test += int(file["classification"] == "source")
-            symbols.extend(found)
-        if len(symbols) > limits.facts or len(errors) > limits.facts:
+            # Fails closed here, as before, once non-test facts alone exceed the cap.
+            facts.add(file["path"], found, file["classification"] == "test")
+        if len(errors) > limits.facts:
             raise AnalysisError("analysis_fact_limit")
     manifest["parsed_bytes"] = parsed
     manifest["coverage"] = parsed / manifest["eligible_bytes"] if manifest["eligible_bytes"] else 0
@@ -379,8 +388,9 @@ def structure(
         or parsed * 10 < manifest["eligible_bytes"] * 9
     ):
         raise AnalysisError("insufficient_evidence")
+    record_budget(manifest, facts.omitted())
     return {
-        "symbols": sorted(symbols, key=lambda s: s["id"]),
+        "symbols": sorted(facts.kept(), key=lambda s: s["id"]),
         "parse_errors": errors,
         "parser_version": PARSER_VERSION,
         "rule_version": RULES,

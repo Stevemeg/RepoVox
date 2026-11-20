@@ -7,7 +7,18 @@ from typing import Any
 from urllib.parse import quote
 
 from repovox.analysis.archive import WEIGHT_REASON
-from repovox.analysis.common import PARSER_VERSION, PIPELINE, RULES, AnalysisError, digest, stable
+from repovox.analysis.budget import PREFIX as BUDGET_PREFIX
+from repovox.analysis.budget import FactBudget, disclosure
+from repovox.analysis.budget import consistent as budget_consistent
+from repovox.analysis.common import (
+    DEFAULT_LIMITS,
+    PARSER_VERSION,
+    PIPELINE,
+    RULES,
+    AnalysisError,
+    digest,
+    stable,
+)
 from repovox.analysis.documentation import context_symbols
 from repovox.analysis.facts import project
 from repovox.analysis.graph import configuration, entrypoints, infer, qualified_flows
@@ -112,7 +123,8 @@ def knowledge(
             "Project purpose requires independent semantic review; no purpose is invented.",
             "Whole-file parse errors are excluded from verified evidence and coverage.",
             "Documentation assertions cannot establish runtime or implementation behavior.",
-        ],
+        ]
+        + disclosure(manifest, DEFAULT_LIMITS.facts),
         "versions": {
             "parser": PARSER_VERSION,
             "pipeline": PIPELINE,
@@ -183,7 +195,8 @@ def verify(
     skipped: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     # Re-extract original bytes; candidate symbols/edges/status/confidence are never authority.
-    actual: dict[str, dict[str, Any]] = {}
+    # The same test-fact budget as Stage 4 is applied to the re-extracted facts (ADR-0030).
+    budget = FactBudget(DEFAULT_LIMITS.facts)
     if (
         pkm["repository"] != snapshot
         or pkm["coverage"] != manifest
@@ -219,11 +232,17 @@ def verify(
         found, errors = parse_file(file["path"], path.read_bytes(), file["language"])
         if errors:
             raise AnalysisError("insufficient_evidence")
-        actual.update((s["id"], s) for s in found)
+        budget.add(file["path"], found, file["classification"] == "test")
     if unwritten:
         raise AnalysisError("source_changed")
-    actual.update((s["id"], s) for s in context_symbols(root, manifest))
+    budget.add("", context_symbols(root, manifest), test=False)
+    actual = {s["id"]: s for s in budget.kept()}
     if {s["id"]: s for s in pkm["symbols"]} != actual:
+        raise AnalysisError("insufficient_evidence")
+    # The manifest and the limitations record exactly the omission this re-extraction makes.
+    if not budget_consistent(manifest, budget.omitted()) or [
+        line for line in pkm["limitations"] if line.startswith(BUDGET_PREFIX)
+    ] != disclosure(manifest, DEFAULT_LIMITS.facts):
         raise AnalysisError("insufficient_evidence")
     expected_config = configuration(root, manifest)
     expected_entries = entrypoints({"symbols": list(actual.values())}, expected_config, manifest)
