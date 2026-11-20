@@ -10,7 +10,9 @@ or `EVAL-ENTRY: UNFROZEN`. Related: [production deployment design](deployment.md
 [parser process isolation](../adr/0011-parser-process-isolation.md),
 [local object storage](../adr/0009-local-object-storage.md),
 [Node/Next remediation](../security/node-next-remediation.md),
-[sole-contributor policy and phase authority](../../AGENTS.md).
+[sole-contributor policy and phase authority](../../AGENTS.md). Frontend developers start with
+the [frontend handoff](../development/frontend-handoff.md): local stack behind
+`npm --prefix apps/web run dev`, the frozen API contract, truthfulness rules and quality gates.
 
 The guide covers one Linux host running the repository's `docker-compose.yml`. It names every
 service, the order they start in, how each is checked, which identity each runs as, and every
@@ -245,6 +247,11 @@ file sets them in the shared `x-api` block.
 | `REPOVOX_LLM_BASE_URL` | per provider | not set | optional | `https://`; `http://` only on `127.0.0.1`, `localhost` or `host.docker.internal` |
 | `REPOVOX_LLM_API_KEY` | unset | not set | hosted providers only | A secret: store it like `.env`; never logged or written to an artifact |
 | `REPOVOX_LLM_TIMEOUT_SECONDS` | `20` | not set | `20` | 1 to 120 |
+| `REPOVOX_LLM_TEMPERATURE` | unset | not set | unset | `0.0` to `1.0`; unset sends no sampling parameter to hosted providers, and `0` to Ollama |
+| `REPOVOX_TTS_PROVIDER` | `auto` | not set | `auto` | `deterministic`, `auto` or `kokoro_onnx`; see [below](#optional-local-neural-voice) |
+| `REPOVOX_TTS_MODEL_PATH`, `REPOVOX_TTS_VOICES_PATH` | unset | not set | optional | Absolute `.onnx` and `.bin` paths, both or neither |
+| `REPOVOX_TTS_VOICE` | `af_heart` | not set | optional | A Kokoro voice id, `^[a-z0-9_-]{2,32}$` |
+| `REPOVOX_TTS_SPEED` | `1.0` | not set | `1.0` | 0.5 to 2.0 |
 
 ### Optional grounded narration model
 
@@ -269,8 +276,8 @@ for a production host:
 | Provider | Settings | Notes |
 | --- | --- | --- |
 | Local Ollama (self-hosted, no API key) | `REPOVOX_LLM_PROVIDER=ollama`, `REPOVOX_LLM_MODEL=<a model you pulled, for example llama3.1:8b>`, `REPOVOX_LLM_BASE_URL=http://host.docker.internal:11434` | From a container, add `extra_hosts: ["host.docker.internal:host-gateway"]` to `media-worker`, and make Ollama listen on an address the bridge reaches. The default `http://127.0.0.1:11434` is the container itself. |
-| OpenAI-compatible (hosted, or a local server) | `REPOVOX_LLM_PROVIDER=openai_compatible`, `REPOVOX_LLM_MODEL=<model>`, `REPOVOX_LLM_API_KEY=<key>`, optional `REPOVOX_LLM_BASE_URL=https://...` | Calls `<base>/v1/chat/completions` with `temperature: 0` and JSON object output. Reasoning models that reject `temperature` fall back with `llm_http_status`. |
-| Anthropic (hosted) | `REPOVOX_LLM_PROVIDER=anthropic`, `REPOVOX_LLM_MODEL=<model>`, `REPOVOX_LLM_API_KEY=<key>` | Calls `<base>/v1/messages` with `anthropic-version: 2023-06-01` and `temperature: 0`. Current Claude models that reject `temperature` fall back with `llm_http_status`. |
+| OpenAI-compatible (hosted, or a local server) | `REPOVOX_LLM_PROVIDER=openai_compatible`, `REPOVOX_LLM_MODEL=<model>`, `REPOVOX_LLM_API_KEY=<key>`, optional `REPOVOX_LLM_BASE_URL=https://...` | Calls `<base>/v1/chat/completions` with JSON object output. Sends `temperature` only when `REPOVOX_LLM_TEMPERATURE` is set; leave it unset for reasoning models, which reject it. |
+| Anthropic (hosted) | `REPOVOX_LLM_PROVIDER=anthropic`, `REPOVOX_LLM_MODEL=<model>`, `REPOVOX_LLM_API_KEY=<key>` | Calls `<base>/v1/messages` with `anthropic-version: 2023-06-01`. Sends `temperature` only when `REPOVOX_LLM_TEMPERATURE` is set; current Claude models (Opus 4.7 and later, Sonnet 5 and later) reject it, so leave it unset. |
 
 The worker refuses to start if a provider is set without its model, if a hosted provider has
 no key, or if the URL is plain HTTP to any other host, or carries user info, a query or a
@@ -278,6 +285,31 @@ fragment. Hosted providers receive the story blueprint (verified claim text, fil
 the repository name) and bill your account. Choose one only where that provider's terms
 permit the data ([model policy](../../AGENTS.md#model-policy)). To turn the feature off, set
 `REPOVOX_LLM_PROVIDER=deterministic` or remove the variables and restart `media-worker`.
+
+### Optional local neural voice
+
+By default the media worker speaks narration with the operating-system voice (`espeak-ng` in
+the images). A local Kokoro ONNX voice can replace it
+([ADR-0027](../adr/0027-neural-tts-and-story-api-contract.md)):
+
+1. Install the optional extra into the media worker's environment: `uv sync --extra
+   neural-tts`. A custom image is needed; the provided images and CI do not install it.
+2. Obtain `kokoro-v1.0.onnx` and `voices-v1.0.bin` yourself, check their licence and
+   checksums, and mount them read-only into `media-worker`, for example at `/models`.
+   RepoVox never downloads them.
+3. Set `REPOVOX_TTS_MODEL_PATH=/models/kokoro-v1.0.onnx`,
+   `REPOVOX_TTS_VOICES_PATH=/models/voices-v1.0.bin` and optionally `REPOVOX_TTS_VOICE` and
+   `REPOVOX_TTS_SPEED` on `media-worker`.
+
+With `REPOVOX_TTS_PROVIDER=auto` (the default), the worker uses the neural voice when the
+package and both files load, and the operating-system voice otherwise.
+
+With `kokoro_onnx`, the worker requires the neural voice. Without it, the speech stage fails
+with a fixed code (`neural_tts_unavailable`, `neural_tts_files_missing` or
+`neural_tts_load_failed`) and never falls back.
+
+Which voice spoke is recorded by name, never by path, in the published video's
+`metadata.narration.tts_provider`, `tts_engine` and `tts_voice`.
 
 ### TLS reverse proxy
 

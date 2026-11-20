@@ -2,7 +2,9 @@
 
 Status: proposed; implementation output, not independently reviewed or accepted. Date:
 2026-11-20. Branch `feat/grounded-llm-narration`, stacked on `feat/problem-to-solution-story`
-at `f059157`. Milestone 2 of the problem-to-solution track. Related:
+at `f059157`. Milestone 2 of the problem-to-solution track. Amended by
+[ADR-0027](0027-neural-tts-and-story-api-contract.md): hosted adapters now send `temperature`
+only when `REPOVOX_LLM_TEMPERATURE` is set. Related:
 [ADR-0025 engineering story](0025-problem-to-solution-engineering-story.md),
 [ADR-0005 provider and render boundaries](0005-provider-and-render-boundaries.md),
 [ADR-0011 parser isolation](0011-parser-process-isolation.md),
