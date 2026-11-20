@@ -58,7 +58,10 @@ Scratch is removed on handled exit. Worker container tmpfs
 bounds interrupted scratch; abnormal container death clears it on container removal.
 
 All bytes are screened before original archives are published. Known credential/key
-patterns fail `secret_detected`, including secret-looking fixtures. Suspicious entropy
+patterns fail `secret_detected`, including secret-looking fixtures. A suspicious-entropy
+span in a file path also fails, unless it is only plain words joined by `/`, `-` or `_`
+(such as `ADR-0019-production-observability`); token-like spans still fail
+([ADR-0029](../adr/0029-prose-path-names-and-oversized-syntax-facts.md)). Suspicious entropy
 is redacted in excerpts while preserving original LF line numbers and redaction spans.
 `.env`/key/credential paths never produce display evidence. Scanners have false
 positives and false negatives; there is no user override or perfect-detection claim.
@@ -79,6 +82,9 @@ Every regular file has a manifest hash/size/classification/decision/reason. Vend
 generated/build/minified/binary/invalid UTF-8/unsupported/oversized/sensitive paths are
 excluded or failed explicitly. Tests are included in byte coverage but deprioritized
 for primary entry selection. Whole-file parser errors contribute zero parsed bytes.
+No emitted syntax fact has a text over 1,024 characters. An oversized expression drops only
+that node's fact, while the 10,000-fact repository cap still fails closed
+([ADR-0029](../adr/0029-prose-path-names-and-oversized-syntax-facts.md)).
 At least one supported non-test file and 90% eligible supported bytes must parse.
 Eligible overflow fails; exclusions never secretly alter the threshold.
 
