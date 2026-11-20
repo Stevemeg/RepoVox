@@ -23,7 +23,7 @@ from repovox.media.architecture import (
     validate,
 )
 from repovox.media.diagram import Diagram
-from repovox.media.narration import FPS, Engine, assemble, detect, synthesize
+from repovox.media.narration import FPS, Voice, assemble, detect, synthesize
 from repovox.media.speech import natural, vocabulary
 from repovox.media.stages import Checkpoint, RenderError, encode_sequence, encoded, noop, timestamp
 from repovox.media.storyboard import display
@@ -416,7 +416,7 @@ def render_architecture(
     report: Report,
     architecture: Architecture,
     work: Path,
-    engine: Engine,
+    engine: Voice,
     checkpoint: Checkpoint = noop,
 ) -> dict[str, Any]:
     """Write one architecture's validated video bundle into an empty directory."""
@@ -531,7 +531,7 @@ def explain(
     sources: dict[str, bytes],
     output: Path,
     *,
-    engine: Engine | None = None,
+    engine: Voice | None = None,
     limit: int = 3,
 ) -> dict[str, Any]:
     """Publish architecture explainers, or an explicit unsupported record. Never a generic video."""

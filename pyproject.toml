@@ -23,6 +23,11 @@ dependencies = [
   "jsonschema==4.26.0",
 ]
 
+[project.optional-dependencies]
+# Local neural narration voice (REPOVOX_TTS_PROVIDER=kokoro_onnx). Never installed by default,
+# in CI or in the images; model and voice files are operator-supplied, never downloaded.
+neural-tts = ["kokoro-onnx>=0.4.0"]
+
 [dependency-groups]
 dev = [
     "pip>=26.2.2", # pip-api's separately vendored CA bundle also needs remediation.

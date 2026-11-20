@@ -1,4 +1,6 @@
+import os
 import re
+from pathlib import PurePath
 from typing import Literal
 from urllib.parse import urlsplit
 
@@ -19,6 +21,18 @@ LLM_BASE_URLS: dict[str, str] = {
 LLM_PLAIN_HTTP_HOSTS = frozenset({"127.0.0.1", "localhost", "host.docker.internal"})
 LLM_MODEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}")
 LLM_KEY = re.compile(r"[\x21-\x7e]{8,512}")
+
+
+TTSProvider = Literal["auto", "deterministic", "kokoro_onnx"]
+TTS_VOICE = r"^[a-z0-9_-]{2,32}$"
+
+
+def neural_asset(value: str, suffix: str) -> bool:
+    """An absolute local file path with the expected suffix: no NUL byte or `..` component."""
+    if any(ord(c) < 32 for c in value) or not os.path.isabs(value):
+        return False
+    path = PurePath(value)
+    return ".." not in path.parts and path.suffix.lower() == suffix
 
 
 def llm_endpoint(value: str) -> bool:
@@ -102,6 +116,30 @@ class Settings(BaseSettings):
     # Unset: hosted providers receive no sampling parameter, which current reasoning and
     # Claude models require; Ollama keeps temperature 0. Set only to send an explicit value.
     llm_temperature: float | None = Field(default=None, ge=0.0, le=1.0)
+    # Narration voice. "auto" uses the local Kokoro ONNX voice only when its package and both
+    # operator-supplied files are present, and the operating-system voice otherwise;
+    # "kokoro_onnx" requires it and fails the speech stage without it. Nothing is downloaded.
+    tts_provider: TTSProvider = "auto"
+    tts_model_path: str | None = None
+    tts_voices_path: str | None = None
+    tts_voice: str = Field(default="af_heart", pattern=TTS_VOICE)
+    tts_speed: float = Field(default=1.0, ge=0.5, le=2.0)
+
+    @model_validator(mode="after")
+    def tts_fail_closed(self) -> "Settings":
+        """Refuse an explicitly demanded neural voice without its files, or unsafe file paths."""
+        self.tts_model_path = (self.tts_model_path or "").strip() or None
+        self.tts_voices_path = (self.tts_voices_path or "").strip() or None
+        model, voices = self.tts_model_path, self.tts_voices_path
+        if model is not None and not neural_asset(model, ".onnx"):
+            raise ValueError("The neural voice model path must be an absolute .onnx file path")
+        if voices is not None and not neural_asset(voices, ".bin"):
+            raise ValueError("The neural voice file path must be an absolute .bin file path")
+        if (model is None) != (voices is None):
+            raise ValueError("The neural voice needs both its model and its voices file")
+        if self.tts_provider == "kokoro_onnx" and model is None:
+            raise ValueError("The kokoro_onnx voice requires its model and voices files")
+        return self
 
     @property
     def llm_endpoint(self) -> str | None:
