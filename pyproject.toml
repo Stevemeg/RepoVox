@@ -24,8 +24,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Local neural narration voice (REPOVOX_TTS_PROVIDER=kokoro_onnx). Never installed by default,
-# in CI or in the images; model and voice files are operator-supplied, never downloaded.
+# Local neural narration voice (REPOVOX_TTS_PROVIDER=kokoro_onnx). Never installed by default
+# or in CI; infrastructure/local/docker-compose.neural-tts.yml installs it in media-worker only.
+# Model files come from scripts/setup_kokoro_voice.sh; the application never downloads them.
 neural-tts = ["kokoro-onnx>=0.4.0"]
 
 [dependency-groups]

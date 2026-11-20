@@ -5,6 +5,11 @@ said. Rules are fixed and ordered. They may rename an identifier to the role the
 IR already assigned to it, expand a small set of code idioms, and split identifiers into
 words. They never add a fact: every spoken sentence is a function of its caption and the IR.
 
+Audio. `audio_text` gives every voice the technical pronunciation of an approved sentence
+(`pronunciation.pronounce`). Only the synthesis input changes: captions, storyboards and Stage 11
+citations are never rewritten. `SpeechCache` keeps synthesized sentences in memory, bounded, so
+work done within one stage's lease is not repeated by the next.
+
 Voice. `KokoroOnnxSynthesizer` is an optional local neural voice on the `narration.Synthesizer`
 seam. Its package (`neural-tts` extra) is imported only when it first speaks, and its model and
 voice files are supplied by the operator; nothing is downloaded. Its PCM is converted to one
@@ -18,6 +23,8 @@ import math
 import os
 import re
 import struct
+import threading
+from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -25,7 +32,16 @@ from typing import Any
 
 from repovox.core.config import Settings
 from repovox.media.architecture import Architecture
-from repovox.media.narration import Engine, NarrationError, Speech, Voice, audible, detect
+from repovox.media.narration import (
+    Engine,
+    NarrationError,
+    Speech,
+    Voice,
+    audible,
+    detect,
+    synthesize,
+)
+from repovox.media.pronunciation import LIMIT, pronounce
 from repovox.media.storyboard import speakable
 
 # Spoken names for roles the IR assigns from evidence. Tensors keep their variable names,
@@ -86,6 +102,89 @@ def natural(text: str, names: dict[str, str]) -> str:
     return (spoken[:1].upper() + spoken[1:])[:600]
 
 
+# --------------------------------------------------------------------- what a voice is given
+
+
+def audio_text(text: str, spoken: str) -> str:
+    """The synthesis input for one approved sentence: its technical pronunciation.
+
+    When the approved spoken form is the caption's plain spoken rewrite (`speakable`), the
+    caption is pronounced, so a path is read from the whole path. Otherwise the spoken form
+    carries the IR's role names and is pronounced itself. Falls back to the approved spoken
+    form unchanged if a pronunciation would not be printable ASCII within the length bound.
+    """
+    for source in [text, spoken] if spoken == speakable(text) else [spoken]:
+        said = pronounce(source)
+        if said and len(said) <= LIMIT and all(32 <= ord(c) < 127 for c in said):
+            return said
+    return spoken
+
+
+class SpeechCache:
+    """Synthesized sentences by voice and exact text, least recently used first out.
+
+    A voice says the same text the same way, so a cached sentence is what the voice would
+    produce again. The cache is in memory only, never persisted, and bounded in bytes.
+    """
+
+    def __init__(self, limit_bytes: int = 96 * 1024**2) -> None:
+        self.limit = limit_bytes
+        self.size = 0
+        self.items: OrderedDict[tuple[str, ...], Speech] = OrderedDict()
+        self.lock = threading.Lock()
+
+    @staticmethod
+    def key(engine: Voice, text: str) -> tuple[str, ...]:
+        if isinstance(engine, KokoroOnnxSynthesizer):
+            identity: tuple[str, ...] = (
+                "kokoro",
+                str(engine.model_path),
+                str(engine.voices_path),
+                engine.voice,
+                repr(engine.speed),
+            )
+        elif isinstance(engine, Engine):
+            identity = ("engine", engine.name, str(engine.executable))
+        else:
+            identity = ("voice", type(engine).__qualname__, str(id(engine)))
+        return (*identity, text)
+
+    def get(self, engine: Voice, text: str) -> Speech | None:
+        key = self.key(engine, text)
+        with self.lock:
+            found = self.items.get(key)
+            if found is not None:
+                self.items.move_to_end(key)
+            return found
+
+    def put(self, engine: Voice, text: str, speech: Speech) -> None:
+        cost = len(speech.samples)
+        if cost > self.limit:
+            return
+        key = self.key(engine, text)
+        with self.lock:
+            if key in self.items:
+                return
+            self.items[key] = speech
+            self.size += cost
+            while self.size > self.limit:
+                _, dropped = self.items.popitem(last=False)
+                self.size -= len(dropped.samples)
+
+
+def speak(
+    engine: Voice, text: str, scratch: Path, stem: str, cache: SpeechCache | None = None
+) -> Speech:
+    """One sentence through `narration.synthesize`, reusing a cached result when there is one."""
+    found = cache.get(engine, text) if cache is not None else None
+    if found is not None:
+        return found
+    speech = synthesize(engine, text, scratch, stem)
+    if cache is not None:
+        cache.put(engine, text, speech)
+    return speech
+
+
 # ----------------------------------------------------------------------- local neural voice
 
 NEURAL_RATE = 24000  # Every neural segment is delivered at exactly this rate, mono, 16-bit.
@@ -143,6 +242,10 @@ def kokoro_module() -> Any:
     return importlib.import_module("kokoro_onnx")
 
 
+def onnxruntime_module() -> Any:
+    return importlib.import_module("onnxruntime")
+
+
 @dataclass(frozen=True, repr=False)
 class KokoroOnnxSynthesizer:
     """A local Kokoro ONNX voice. Approved printable-ASCII text in, validated PCM out."""
@@ -152,6 +255,10 @@ class KokoroOnnxSynthesizer:
     voice: str = "af_heart"
     speed: float = 1.0
     loader: Callable[[], Any] = kokoro_module  # Replaced only by tests.
+    # Inference threads. None keeps the runtime's default, which counts every host core even
+    # when the container is given fewer; set it to the container's CPU allocation.
+    threads: int | None = None
+    runtime: Callable[[], Any] = onnxruntime_module  # Replaced only by tests.
     _loaded: dict[str, Any] = field(default_factory=dict, compare=False)
 
     name = "kokoro-onnx"
@@ -169,7 +276,18 @@ class KokoroOnnxSynthesizer:
             except ImportError:
                 raise SpeechError("neural_tts_unavailable") from None
             try:
-                self._loaded["engine"] = module.Kokoro(str(self.model_path), str(self.voices_path))
+                if self.threads is None:
+                    found = module.Kokoro(str(self.model_path), str(self.voices_path))
+                else:
+                    runtime = self.runtime()
+                    options = runtime.SessionOptions()
+                    options.intra_op_num_threads = self.threads
+                    options.inter_op_num_threads = 1
+                    session = runtime.InferenceSession(
+                        str(self.model_path), options, providers=["CPUExecutionProvider"]
+                    )
+                    found = module.Kokoro.from_session(session, str(self.voices_path))
+                self._loaded["engine"] = found
             except Exception:
                 raise SpeechError("neural_tts_load_failed") from None
         return self._loaded["engine"]
@@ -212,6 +330,7 @@ def voice_from_settings(
             settings.tts_voice,
             settings.tts_speed,
             loader,
+            settings.tts_threads,
         )
     if settings.tts_provider == "kokoro_onnx":
         if neural is None:

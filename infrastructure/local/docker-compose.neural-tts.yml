@@ -1,0 +1,35 @@
+# Optional local neural narration voice: Kokoro-82M v1.0 (ONNX) in media-worker only.
+# Additive overlay; the base file, the hardening overlay and CI are unchanged.
+#
+#   bash scripts/setup_kokoro_voice.sh
+#   docker compose -f docker-compose.yml -f infrastructure/local/docker-compose.prod.yml \
+#     -f infrastructure/local/docker-compose.neural-tts.yml up -d --build --wait
+#
+# The image gets the `neural-tts` extra (kokoro-onnx, MIT; the model weights are Apache-2.0).
+# The two model files are mounted read-only from .models/kokoro/ (git-ignored); nothing is
+# downloaded at run time. REPOVOX_TTS_PROVIDER=kokoro_onnx requires the voice: without it the
+# speech stage fails with a fixed code and never falls back to another voice.
+#
+# Resources: neural speech and video encoding are CPU-bound, and each media stage keeps its own
+# fixed deadline (speech 240 s, encode 180 s). media-worker therefore gets 4 CPUs and 3 GiB
+# here instead of 1 CPU and 2 GiB; every other limit (read-only root, tmpfs, pids, dropped
+# capabilities, no-new-privileges) is inherited unchanged. REPOVOX_TTS_THREADS matches `cpus`.
+# The narration stage speaks the approved script ahead within its own lease
+# (REPOVOX_MEDIA_SPEECH_PREWARM_SECONDS), so a long story fits the speech stage's deadline.
+services:
+  media-worker:
+    build:
+      args:
+        INSTALL_NEURAL_TTS: 'true'
+    cpus: 4
+    mem_limit: 3g
+    environment:
+      REPOVOX_TTS_PROVIDER: kokoro_onnx
+      REPOVOX_TTS_MODEL_PATH: /models/kokoro/kokoro-v1.0.onnx
+      REPOVOX_TTS_VOICES_PATH: /models/kokoro/voices-v1.0.bin
+      REPOVOX_TTS_VOICE: af_heart
+      REPOVOX_TTS_SPEED: '1.0'
+      REPOVOX_TTS_THREADS: '4'
+      REPOVOX_MEDIA_SPEECH_PREWARM_SECONDS: '240'
+    volumes:
+      - ./.models/kokoro:/models/kokoro:ro

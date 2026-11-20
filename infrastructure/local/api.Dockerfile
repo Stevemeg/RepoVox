@@ -5,8 +5,12 @@ WORKDIR /workspace
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libseccomp2 ffmpeg espeak-ng && update-ca-certificates --fresh && rm -rf /var/lib/apt/lists/*
 COPY tools/security_bootstrap.py tools/security_trust.py tools/requirements-bootstrap.txt tools/
 RUN python tools/security_bootstrap.py --repair-ensurepip && python tools/security_trust.py --uv --seed
+# Optional local neural voice (kokoro-onnx, the `neural-tts` extra). Off by default, so CI and
+# the standard images are unchanged; infrastructure/local/docker-compose.neural-tts.yml turns
+# it on for media-worker only. Model files are mounted at run time, never baked in.
+ARG INSTALL_NEURAL_TTS=false
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --link-mode copy --no-install-project --no-cache
+RUN uv sync --frozen --link-mode copy --no-install-project --no-cache $([ "$INSTALL_NEURAL_TTS" = true ] && echo --extra neural-tts)
 COPY apps/api apps/api
 COPY tools tools
 COPY docs docs
@@ -14,7 +18,7 @@ COPY tests tests
 COPY infrastructure/retention infrastructure/retention
 COPY infra/aws-retention infra/aws-retention
 COPY README.md AGENTS.md ./
-RUN uv sync --frozen --link-mode copy --no-cache && .venv/bin/python tools/security_trust.py --certifi --seed && .venv/bin/python tools/security_sdk_check.py && useradd --create-home --uid 10001 repovox && mkdir /storage-config && chown repovox /storage-config
+RUN uv sync --frozen --link-mode copy --no-cache $([ "$INSTALL_NEURAL_TTS" = true ] && echo --extra neural-tts) && .venv/bin/python tools/security_trust.py --certifi --seed && .venv/bin/python tools/security_sdk_check.py && useradd --create-home --uid 10001 repovox && mkdir /storage-config && chown repovox /storage-config
 ENV PATH="/workspace/.venv/bin:$PATH" PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTEST_ADDOPTS="-o cache_dir=/tmp/repovox-pytest-cache"

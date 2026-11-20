@@ -124,6 +124,18 @@ class Settings(BaseSettings):
     tts_voices_path: str | None = None
     tts_voice: str = Field(default="af_heart", pattern=TTS_VOICE)
     tts_speed: float = Field(default=1.0, ge=0.5, le=2.0)
+    # Neural voice inference threads; unset keeps the runtime default (every host core). Set
+    # it to the media worker's CPU allocation.
+    tts_threads: int | None = Field(default=None, ge=1, le=64)
+    # Seconds the narration stage may spend, after its own checks, speaking the approved
+    # script ahead into the media worker's in-memory speech cache; 0 turns this off. Every
+    # media stage stays bounded by its own lease and deadline.
+    media_speech_prewarm_seconds: float = Field(default=240, ge=0, le=300)
+    # Encoder and probe time limit for one video: base plus a share per minute of video,
+    # capped. A media stage's own deadline still bounds the whole stage.
+    media_encode_base_seconds: float = Field(default=170, ge=30, le=1800)
+    media_encode_seconds_per_minute: float = Field(default=30, ge=0, le=600)
+    media_encode_max_seconds: float = Field(default=900, ge=30, le=3600)
 
     @model_validator(mode="after")
     def tts_fail_closed(self) -> "Settings":
