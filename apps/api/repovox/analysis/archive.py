@@ -1,15 +1,23 @@
 import gzip
+import hashlib
 import io
 import re
 import tarfile
 import unicodedata
 from collections.abc import Callable
 from pathlib import Path, PurePosixPath
-from typing import Protocol
+from typing import Any, Protocol
 
 from repovox.analysis.common import DEFAULT_LIMITS, AnalysisError, Limits
+from repovox.analysis.privacy import screen_bytes
 
 ARCHIVES = (".tar", ".tgz", ".gz", ".zip", ".7z", ".rar", ".bz2", ".xz")
+# Serialized model weights: PyTorch `.pt`/`.pth` and Keras `.keras` files are ZIP containers.
+# When the caller collects skipped members, a member whose final extension (case-insensitive)
+# is one of these is streamed for its hash and secret screening but never written, parsed or
+# unpacked. Every other ZIP, gzip or 7z payload, whatever its name, is still `archive_nested`.
+WEIGHT_CONTAINERS = frozenset({".pth", ".pt", ".keras"})
+WEIGHT_REASON = "ml_weight_container"
 
 
 class CheckedTarInfo(tarfile.TarInfo):
@@ -61,12 +69,40 @@ class BoundedReader(io.RawIOBase):
         return data
 
 
+def skip_member(
+    source: Readable, path: PurePosixPath, size: int, checkpoint: Callable[[], None]
+) -> dict[str, Any]:
+    """Hash and secret-screen a weight container's bytes without writing or interpreting them."""
+    file_hash = hashlib.sha256()
+    overlap = b""
+    read = 0
+    while chunk := source.read(64 * 1024):
+        checkpoint()
+        read += len(chunk)
+        if read > size:
+            raise AnalysisError("archive_extraction_limit")
+        file_hash.update(chunk)
+        # Same screen as every extracted file: the original archive keeps these bytes.
+        screen_bytes(overlap + chunk)
+        overlap = chunk[-4096:]
+    if read != size:
+        raise AnalysisError("archive_malformed")
+    return {"path": path.as_posix(), "file_sha256": file_hash.hexdigest(), "bytes": size}
+
+
 def extract(
     archive: Path,
     scratch: Path,
     limits: Limits = DEFAULT_LIMITS,
     checkpoint: Callable[[], None] = lambda: None,
+    skipped: list[dict[str, Any]] | None = None,
 ) -> list[Path]:
+    """Extract regular files under a fresh scratch root.
+
+    With `skipped`, weight containers are recorded there (path relative to the archive root,
+    SHA-256, bytes) instead of written. They still count toward the extracted-byte and file
+    quotas. Without it, extraction is unchanged and such a member is checked like any other.
+    """
     if scratch.exists():
         raise AnalysisError("scratch_not_fresh")
     scratch.mkdir(mode=0o700)
@@ -76,7 +112,7 @@ def extract(
     seen: set[str] = set()
     normalized: dict[str, str] = {}
     files: list[Path] = []
-    total = members = 0
+    total = members = regular = 0
     archive_root: str | None = None
     try:
         with archive.open("rb") as raw, gzip.GzipFile(fileobj=raw) as gz:
@@ -118,10 +154,20 @@ def extract(
                         destination.mkdir(parents=True, exist_ok=True, mode=0o700)
                         continue
                     total += member.size
-                    if member.size < 0 or total > limits.extracted or len(files) >= limits.files:
+                    # Skipped members count toward the same file quota as written ones.
+                    if member.size < 0 or total > limits.extracted or regular >= limits.files:
                         raise AnalysisError("archive_extraction_limit")
+                    regular += 1
                     if name.lower().endswith(ARCHIVES):
                         raise AnalysisError("archive_nested")
+                    if skipped is not None and relative.suffix.lower() in WEIGHT_CONTAINERS:
+                        # Nothing is created on disk for it, not even its parent directory.
+                        source = tar.extractfile(member)
+                        if source is None:
+                            raise AnalysisError("archive_malformed")
+                        with source:
+                            skipped.append(skip_member(source, relative, member.size, checkpoint))
+                        continue
                     destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
                     source = tar.extractfile(member)
                     if source is None:

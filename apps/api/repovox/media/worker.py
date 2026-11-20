@@ -259,7 +259,8 @@ class MediaWorker:
         archive = scratch / "source.tar.gz"
         archive.write_bytes(self.storage.analysis(reference, "archive"))
         root = scratch / "source"
-        extract(archive, root, checkpoint=checkpoint)
+        # Weight containers are skipped as the analysis skipped them; media never reads them.
+        extract(archive, root, checkpoint=checkpoint, skipped=[])
         archive.unlink()
         return root
 
@@ -318,7 +319,7 @@ class MediaWorker:
             archive = scratch / "source.tar.gz"
             archive.write_bytes(self.storage.analysis(reference, "archive"))
             root = scratch / "source"
-            extract(archive, root, checkpoint=checkpoint)
+            extract(archive, root, checkpoint=checkpoint, skipped=[])
             report = discover_isolated(root, payload, checkpoint)
             # The subprocess result is untrusted: re-check every citation against the
             # source bytes.

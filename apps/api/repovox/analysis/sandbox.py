@@ -126,9 +126,15 @@ def contain(root: Path, request: Path) -> None:
 def execute(stage: int, root: Path, request: dict[str, Any]) -> dict[str, Any]:
     snapshot = request["snapshot"]
     inputs = request["inputs"]
+    # Weight containers the trusted worker's extraction of `root` skipped instead of writing.
+    skipped = request.get("skipped_members", [])
     if stage == 3:
         return filter_sources(
-            root, snapshot["repository"], snapshot["commit_sha"], request["archive_hash"]
+            root,
+            snapshot["repository"],
+            snapshot["commit_sha"],
+            request["archive_hash"],
+            skipped=skipped,
         )
     if stage == 4:
         manifest = inputs["3"]
@@ -165,6 +171,7 @@ def execute(stage: int, root: Path, request: dict[str, Any]) -> dict[str, Any]:
             inputs["4"]["manifest"],
             bundle["knowledge"],
             bundle["evidence"],
+            skipped,
         )
         return {**bundle, "verification": ledger}
     raise AnalysisError("phase2_pipeline_boundary")

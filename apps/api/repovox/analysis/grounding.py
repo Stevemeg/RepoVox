@@ -1,10 +1,12 @@
 import hashlib
+from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
+from repovox.analysis.archive import WEIGHT_REASON
 from repovox.analysis.common import PARSER_VERSION, PIPELINE, RULES, AnalysisError, digest, stable
 from repovox.analysis.documentation import context_symbols
 from repovox.analysis.facts import project
@@ -178,6 +180,7 @@ def verify(
     manifest: dict[str, Any],
     pkm: dict[str, Any],
     evidence: dict[str, Any],
+    skipped: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     # Re-extract original bytes; candidate symbols/edges/status/confidence are never authority.
     actual: dict[str, dict[str, Any]] = {}
@@ -187,7 +190,22 @@ def verify(
         or manifest["commit_sha"] != snapshot["commit_sha"]
     ):
         raise AnalysisError("insufficient_evidence")
+    # Weight containers this re-extraction hashed without writing them: each must match one
+    # manifest entry exactly, and no other entry may claim to be one.
+    unwritten = {item["path"]: dict(item) for item in skipped}
+    if len(unwritten) != len(skipped):
+        raise AnalysisError("source_changed")
     for file in manifest["files"]:
+        if file["status"] == "skipped" and file["reason"] == WEIGHT_REASON:
+            item = unwritten.pop(file["path"], None)
+            candidate = root / file["path"]
+            if (
+                item != {k: file[k] for k in ("path", "file_sha256", "bytes")}
+                or candidate.exists()
+                or candidate.is_symlink()
+            ):
+                raise AnalysisError("source_changed")
+            continue
         path = (root / file["path"]).resolve()
         if not path.is_relative_to(root.resolve()) or not path.is_file() or path.is_symlink():
             raise AnalysisError("source_changed")
@@ -202,6 +220,8 @@ def verify(
         if errors:
             raise AnalysisError("insufficient_evidence")
         actual.update((s["id"], s) for s in found)
+    if unwritten:
+        raise AnalysisError("source_changed")
     actual.update((s["id"], s) for s in context_symbols(root, manifest))
     if {s["id"]: s for s in pkm["symbols"]} != actual:
         raise AnalysisError("insufficient_evidence")

@@ -161,6 +161,8 @@ class AnalysisRunner:
             with tempfile.TemporaryDirectory(prefix=f"repovox-{lease['job_id']}-") as temporary:
                 archive = Path(temporary) / "source.tar.gz"
                 root = Path(temporary) / "source"
+                # Weight containers this extraction hashed and screened but did not write.
+                skipped: list[dict[str, Any]] = []
                 if ordinal == 2:
                     with archive.open("xb") as target:
                         self.http.download(
@@ -169,20 +171,21 @@ class AnalysisRunner:
                             Limits().compressed,
                             checkpoint,
                         )
-                    extract(archive, root, checkpoint=checkpoint)
+                    extract(archive, root, checkpoint=checkpoint, skipped=skipped)
                     filter_sources(
                         root,
                         snapshot["repository"],
                         snapshot["commit_sha"],
                         digest(archive.read_bytes()),
                         checkpoint=checkpoint,
+                        skipped=skipped,
                     )
                     body = archive.read_bytes()
                 else:
                     if archive_body is None:
                         raise AnalysisError("artifact_corrupt")
                     archive.write_bytes(archive_body)
-                    extract(archive, root, checkpoint=checkpoint)
+                    extract(archive, root, checkpoint=checkpoint, skipped=skipped)
                     import resource
 
                     before_cpu = resource.getrusage(resource.RUSAGE_CHILDREN)
@@ -194,6 +197,7 @@ class AnalysisRunner:
                             "snapshot_id": str(lease["snapshot_id"]),
                             "archive_hash": digest(archive_body),
                             "inputs": inputs,
+                            "skipped_members": skipped,
                         },
                         checkpoint,
                         {3: 25, 4: 110, 5: 25, 6: 80, 7: 25, 8: 25, 9: 80}[ordinal],

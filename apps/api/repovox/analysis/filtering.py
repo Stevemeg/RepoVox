@@ -1,9 +1,11 @@
 import hashlib
-from collections.abc import Callable
+import re
+from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from repovox.analysis.archive import WEIGHT_CONTAINERS, WEIGHT_REASON, safe_path
 from repovox.analysis.common import (
     ACQUISITION,
     DEFAULT_LIMITS,
@@ -41,6 +43,37 @@ EXCLUDED = {
 CONFIG = {"package.json", "pyproject.toml"}
 
 
+def weight_record(root: Path, item: Mapping[str, Any]) -> dict[str, Any]:
+    """Inventory entry for a weight container that extraction skipped instead of writing."""
+    path, file_hash, size = item.get("path"), item.get("file_sha256"), item.get("bytes")
+    if (
+        set(item) != {"path", "file_sha256", "bytes"}
+        or not isinstance(path, str)
+        or PurePosixPath(path).suffix.lower() not in WEIGHT_CONTAINERS
+        or not isinstance(file_hash, str)
+        or not re.fullmatch(r"[a-f0-9]{64}", file_hash)
+        or not isinstance(size, int)
+        or isinstance(size, bool)
+        or size < 0
+    ):
+        raise AnalysisError("artifact_corrupt")
+    safe_path(path)
+    if scan(path):
+        raise AnalysisError("secret_detected")
+    if (root / path).exists() or (root / path).is_symlink():
+        raise AnalysisError("archive_duplicate")
+    return {
+        "path": path,
+        "file_sha256": file_hash,
+        "bytes": size,
+        "language": "unsupported",
+        "classification": "unsupported",
+        "status": "skipped",
+        "reason": WEIGHT_REASON,
+        "parsed_bytes": 0,
+    }
+
+
 def filter_sources(
     root: Path,
     repository: str,
@@ -48,6 +81,7 @@ def filter_sources(
     archive_hash: str,
     limits: Limits = DEFAULT_LIMITS,
     checkpoint: Callable[[], None] = lambda: None,
+    skipped: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     records: list[dict[str, Any]] = []
     eligible = count = excluded = 0
@@ -146,6 +180,15 @@ def filter_sources(
                 "parsed_bytes": 0,
             }
         )
+    if skipped:
+        for item in skipped:
+            record = weight_record(root, item)
+            excluded += record["bytes"]
+            records.append(record)
+        # The order of the walk above: path components, as `sorted(root.rglob("*"))` gives.
+        records.sort(key=lambda r: PurePosixPath(r["path"]).parts)
+        if len({r["path"] for r in records}) != len(records):
+            raise AnalysisError("archive_duplicate")
     return {
         "repository": repository,
         "commit_sha": sha,

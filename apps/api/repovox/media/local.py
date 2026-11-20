@@ -91,7 +91,9 @@ def analyze_for_story(
         archive = Path(temporary) / "source.tar.gz"
         archive.write_bytes(body)
         root = Path(temporary) / "source"
-        extract(archive, root)
+        skipped: list[dict[str, Any]] = []
+        extract(archive, root, skipped=skipped)
+        request["skipped_members"] = skipped
         payload: dict[str, Any] = {}
         for stage in (3, 4, 5, 6, 7, 8, 9):
             payload = execute(stage, root, request)
