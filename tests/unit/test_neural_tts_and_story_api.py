@@ -647,12 +647,17 @@ def contract_app() -> Any:
 
 
 def test_the_frozen_openapi_contract_matches_the_application() -> None:
+    contract = ROOT / "packages/contracts/openapi.json"
+    if not contract.is_file():
+        # The integration job's test image copies apps, tools, docs and tests only; the python
+        # job runs this test and `tools/phase1_contracts.py --check` on the full checkout.
+        pytest.skip("packages/contracts is not in this test image; checked by the python job")
     app = contract_app()
     try:
         live = app.openapi()
     finally:
         app.state.engine.dispose()
-    frozen = json.loads((ROOT / "packages/contracts/openapi.json").read_text(encoding="utf-8"))
+    frozen = json.loads(contract.read_text(encoding="utf-8"))
     assert json.loads(json.dumps(live)) == frozen, "run: uv run python tools/phase1_contracts.py"
     route = frozen["paths"]["/v1/video-jobs/{job_id}/videos/{video_id}/story"]
     assert set(route) == {"get"}
