@@ -14,6 +14,7 @@ Nothing here assumes the two databases commit together.
 from typing import Any
 from uuid import UUID
 
+from pydantic import ValidationError
 from sqlalchemy import Engine, text
 
 from repovox.analysis.common import canonical, digest
@@ -21,6 +22,7 @@ from repovox.core.config import Settings
 from repovox.core.errors import DomainError
 from repovox.db.database import rows, tenant
 from repovox.media.store import MediaStorage
+from repovox.media.story_view import NarrationView, StoryView
 from repovox.services.jobs import Jobs
 from repovox.storage import ObjectRef
 
@@ -153,7 +155,9 @@ class MediaJobs:
                 item["videos"] = (
                     rows(
                         c,
-                        "SELECT id,category,position,title,checksum,byte_count,metadata,"
+                        # The story view is served by its own route; listings stay small.
+                        "SELECT id,category,position,title,checksum,byte_count,"
+                        "metadata - 'story' AS metadata,"
                         "published_at,expires_at FROM media_videos WHERE job_id=:id AND "
                         "owner_id=:owner AND deleted_at IS NULL AND "
                         "expires_at>clock_timestamp() ORDER BY category DESC,position",
@@ -205,6 +209,44 @@ class MediaJobs:
             except Exception:
                 continue  # Left waiting; retried on the next pass or ended at its deadline.
         return advanced
+
+    def story(self, owner: UUID, job: UUID, video: UUID) -> dict[str, Any]:
+        """The bounded story view and narration record of one owned, published video.
+
+        Same tenant scope and visibility rules as `video`. A video that does not exist or
+        belongs to another owner is `not_found`; one without a story is `story_not_available`.
+        """
+        with tenant(self.engine, owner) as c:
+            found = rows(
+                c,
+                "SELECT v.id,v.job_id,v.category,v.metadata->'story' AS story,"
+                "v.metadata->'narration' AS narration FROM media_videos v JOIN media_jobs j "
+                "ON j.id=v.job_id AND j.owner_id=v.owner_id WHERE v.id=:video AND "
+                "v.job_id=:job AND v.owner_id=:owner AND j.state='succeeded' AND "
+                "v.deleted_at IS NULL AND v.expires_at>clock_timestamp()",
+                video=video,
+                job=job,
+                owner=owner,
+            )
+        if not found:
+            raise DomainError("not_found", 404)
+        row = found[0]
+        if row["story"] is None:
+            raise DomainError("story_not_available", 404)
+        try:
+            story = StoryView.model_validate(row["story"])
+            narration = (
+                None if row["narration"] is None else NarrationView.model_validate(row["narration"])
+            )
+        except ValidationError:
+            raise DomainError("story_corrupt", 503) from None
+        return {
+            "video_id": row["id"],
+            "job_id": row["job_id"],
+            "category": row["category"],
+            "narration": narration,
+            "story": story,
+        }
 
     def video(self, owner: UUID, job: UUID, video: UUID) -> dict[str, Any]:
         """One published video's record, after confirming its stored bytes are intact.

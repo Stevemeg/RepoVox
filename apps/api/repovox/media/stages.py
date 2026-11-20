@@ -6,7 +6,8 @@ one stage per lease from stored objects. Nothing here touches the database or ob
   10 storyboard  verified payload (+ verified story)  -> storyboard JSON, optionally worded
                  by the grounded narration model (refiner.GroundedLLMRefiner)
   11 narration   payload + storyboard (re-verified)   -> narration script JSON
-  12 tts         storyboard + script                  -> bundle {narration.wav, timings.json}
+  12 tts         storyboard + script                  -> bundle {narration.wav, timings.json,
+                                                          voice.json}
   13 render      storyboard + script + speech bundle  -> bundle {frameNNN[-MMM].png, captions.vtt}
   14 encode      speech bundle + frame bundle         -> validated video.mp4 + probe summary
 
@@ -34,8 +35,10 @@ from repovox.media.architecture import Citation, Report
 from repovox.media.diagram import Diagram
 from repovox.media.narration import FPS, Timing, Voice, assemble, synthesize
 from repovox.media.refiner import DETERMINISTIC, NarrativeRefiner
+from repovox.media.speech import voice_record
 from repovox.media.story import EngineeringStory
 from repovox.media.story_board import build_story_board, check_story_board
+from repovox.media.story_view import NarrationView, story_view
 from repovox.media.storyboard import (
     STORY_VERSION,
     GroundingError,
@@ -165,6 +168,53 @@ def narration_record(storyboard: bytes) -> dict[str, Any] | None:
     return record
 
 
+UNNAMED_VOICE = {"tts_provider": None, "tts_engine": None, "tts_voice": None}
+
+
+def voice_of(speech: bytes) -> dict[str, Any]:
+    """The voice a Stage 12 bundle names; bundles made before voice.json name none."""
+    raw = unbundle(speech).get("voice.json")
+    if raw is None:
+        return dict(UNNAMED_VOICE)
+    try:
+        found = json.loads(raw)
+    except ValueError:
+        raise RenderError("media_bundle_invalid") from None
+    if not isinstance(found, dict) or set(found) != set(UNNAMED_VOICE):
+        raise RenderError("media_bundle_invalid")
+    return found
+
+
+def video_narration(storyboard: bytes, speech: bytes) -> dict[str, Any]:
+    """How the published walkthrough was worded and voiced, as stored in its metadata."""
+    board = load_board(storyboard)
+    record = narration_record(storyboard) or {
+        "refiner": DETERMINISTIC.name,
+        "provider": "deterministic",
+        "model": None,
+        "blueprint_sha256": None,
+        "scenes_total": len(board.scenes),
+        "scenes_refined": 0,
+        "scenes_fallback": 0,
+        "refined_scene_ids": [],
+        "fallback_reason": None,
+        "rejection_reasons": {},
+    }
+    try:
+        view = NarrationView.model_validate({**record, **voice_of(speech)})
+    except ValidationError:
+        raise RenderError("media_bundle_invalid") from None
+    found: dict[str, Any] = view.model_dump(mode="json")
+    return found
+
+
+def video_story(storyboard: bytes) -> dict[str, Any] | None:
+    """The bounded public story view of a story storyboard; None for the walkthrough."""
+    board = load_board(storyboard)
+    view = story_view(board.story.story) if board.story is not None else None
+    return None if view is None else view.model_dump(mode="json")
+
+
 def is_story(storyboard: bytes) -> bool:
     return load_board(storyboard).version == STORY_VERSION
 
@@ -199,7 +249,7 @@ def timings_of(speech: dict[str, bytes], sentences: int) -> list[Timing]:
             raise RenderError("media_bundle_invalid")
         frame += timing.frames
     if (
-        set(speech) != {"narration.wav", "timings.json"}
+        set(speech) - {"voice.json"} != {"narration.wav", "timings.json"}
         or len(timings) != sentences
         or not 0 < frame <= MAX_FRAMES
         or samples != round(frame * rate / FPS)
@@ -225,6 +275,7 @@ def tts_stage(
     return bundle(
         {
             "narration.wav": audio,
+            "voice.json": encoded(voice_record(engine)),  # Names only; never a file path.
             "timings.json": encoded(
                 [
                     {

@@ -18,7 +18,13 @@ from repovox.schemas.requests import (
     ProjectUpdate,
     SignIn,
 )
-from repovox.schemas.responses import JobSummary, JobView, MediaJobView, ProjectView
+from repovox.schemas.responses import (
+    JobSummary,
+    JobView,
+    MediaJobView,
+    ProjectView,
+    VideoStoryView,
+)
 from repovox.services.media_jobs import MediaJobs
 
 router = APIRouter(prefix="/v1")
@@ -386,6 +392,15 @@ def download_video(
             "content-length": str(size),
         },
     )
+
+
+@router.get("/video-jobs/{job_id}/videos/{video_id}/story", response_model=VideoStoryView)
+def video_story(
+    job_id: UUID, video_id: UUID, request: Request, identity: ReadIdentity
+) -> dict[str, Any]:
+    """The verified engineering story a walkthrough narrates, with every claim's status and
+    citations, and how the narration was worded and voiced. Read-only and owner-scoped."""
+    return media(request).story(identity.owner_id, job_id, video_id)
 
 
 @router.get("/video-jobs/{job_id}/videos/{video_id}/captions")

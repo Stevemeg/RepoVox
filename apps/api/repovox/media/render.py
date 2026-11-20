@@ -19,6 +19,7 @@ from repovox.analysis.common import digest
 from repovox.media.architecture import ArchitectureError, Report, discover
 from repovox.media.narration import NarrationError, Voice, detect
 from repovox.media.refiner import DETERMINISTIC, NarrativeRefiner
+from repovox.media.speech import voice_record
 from repovox.media.stages import (
     RenderError,
     encode_stage,
@@ -130,6 +131,7 @@ def produce(
         },
         "uncertainty_labels": dict(sorted(Counter(s["uncertainty"] for s in sentences).items())),
         "narration_engine": engine.name,
+        "voice": voice_record(engine),  # Provider, engine and voice names; never a file path.
         # A grounded narration model only rewords the verified plan; see `narration`.
         "model_inference": "none" if narration is None else "grounded-narration-refinement",
         "paid_services": "none"

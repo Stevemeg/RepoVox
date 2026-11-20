@@ -16,6 +16,116 @@
         "title": "AnalysisInput",
         "type": "object"
       },
+      "ArchitectureDescription": {
+        "additionalProperties": false,
+        "description": "Linked to one validated Universal Architecture IR report by digest and element ids.",
+        "properties": {
+          "architecture_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 3,
+            "title": "Architecture Ids",
+            "type": "array"
+          },
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/Claim"
+            },
+            "maxItems": 12,
+            "title": "Claims",
+            "type": "array"
+          },
+          "explanation": {
+            "enum": [
+              "supported",
+              "unsupported",
+              "unavailable"
+            ],
+            "title": "Explanation",
+            "type": "string"
+          },
+          "ir_version": {
+            "anyOf": [
+              {
+                "const": "architecture-ir-1.0",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ir Version"
+          },
+          "primary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary"
+          },
+          "report_sha256": {
+            "anyOf": [
+              {
+                "pattern": "^[a-f0-9]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Sha256"
+          },
+          "unavailable_reason": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailable Reason"
+          },
+          "view": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "View"
+          },
+          "workflow": {
+            "items": {
+              "$ref": "#/components/schemas/Claim"
+            },
+            "maxItems": 8,
+            "title": "Workflow",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ir_version",
+          "report_sha256",
+          "explanation",
+          "unavailable_reason",
+          "architecture_ids",
+          "primary",
+          "view",
+          "claims",
+          "workflow"
+        ],
+        "title": "ArchitectureDescription",
+        "type": "object"
+      },
       "AttemptView": {
         "properties": {
           "attempt_no": {
@@ -69,6 +179,210 @@
           "error_code"
         ],
         "title": "AttemptView",
+        "type": "object"
+      },
+      "Claim": {
+        "additionalProperties": false,
+        "description": "The shared atomic unit of every artifact.",
+        "properties": {
+          "analysis_claim_ids": {
+            "default": [],
+            "items": {
+              "pattern": "^[a-z][a-z0-9-]{0,63}$",
+              "type": "string"
+            },
+            "maxItems": 16,
+            "title": "Analysis Claim Ids",
+            "type": "array"
+          },
+          "component_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 16,
+            "title": "Component Ids",
+            "type": "array"
+          },
+          "connection_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 16,
+            "title": "Connection Ids",
+            "type": "array"
+          },
+          "evidence_refs": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceRef"
+            },
+            "maxItems": 8,
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "evidence_type": {
+            "enum": [
+              "author_stated_problem",
+              "inferred_problem_context",
+              "intended_solution",
+              "implemented_solution",
+              "demonstrated_outcome",
+              "unverified_outcome",
+              "limitation",
+              "unresolved"
+            ],
+            "title": "Evidence Type",
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^[a-z][a-z0-9-]{0,63}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "proof": {
+            "anyOf": [
+              {
+                "enum": [
+                  "unit_test",
+                  "integration_test",
+                  "benchmark",
+                  "example"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proof"
+          },
+          "source_location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Location"
+          },
+          "status": {
+            "enum": [
+              "VERIFIED",
+              "INFERRED",
+              "DOCUMENTATION_ONLY",
+              "UNVERIFIED"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "supports": {
+            "default": [],
+            "items": {
+              "pattern": "^[a-z][a-z0-9-]{0,63}$",
+              "type": "string"
+            },
+            "maxItems": 8,
+            "title": "Supports",
+            "type": "array"
+          },
+          "text": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "evidence_type",
+          "status",
+          "evidence_refs",
+          "source_location"
+        ],
+        "title": "Claim",
+        "type": "object"
+      },
+      "DemonstratedOutcomes": {
+        "additionalProperties": false,
+        "properties": {
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/Claim"
+            },
+            "maxItems": 16,
+            "title": "Claims",
+            "type": "array"
+          },
+          "scope": {
+            "const": "Test and example assertions are read from source; RepoVox does not run them. They show behaviour the authors check, not production use or measured performance.",
+            "default": "Test and example assertions are read from source; RepoVox does not run them. They show behaviour the authors check, not production use or measured performance.",
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "claims"
+        ],
+        "title": "DemonstratedOutcomes",
+        "type": "object"
+      },
+      "EvidenceRef": {
+        "additionalProperties": false,
+        "description": "One exact citation: a line range of a hash-pinned file and its quoted text.",
+        "properties": {
+          "end_line": {
+            "minimum": 1.0,
+            "title": "End Line",
+            "type": "integer"
+          },
+          "file_sha256": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "File Sha256",
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^[a-z][a-z0-9-]{0,63}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "path": {
+            "maxLength": 400,
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          },
+          "permalink": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Permalink",
+            "type": "string"
+          },
+          "quote": {
+            "maxLength": 1200,
+            "minLength": 1,
+            "title": "Quote",
+            "type": "string"
+          },
+          "start_line": {
+            "minimum": 1.0,
+            "title": "Start Line",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "path",
+          "file_sha256",
+          "start_line",
+          "end_line",
+          "quote",
+          "permalink"
+        ],
+        "title": "EvidenceRef",
         "type": "object"
       },
       "FixtureInput": {
@@ -135,6 +449,69 @@
           "created_at"
         ],
         "title": "HistoryView",
+        "type": "object"
+      },
+      "ImplementationApproach": {
+        "additionalProperties": false,
+        "properties": {
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/Claim"
+            },
+            "maxItems": 16,
+            "title": "Claims",
+            "type": "array"
+          },
+          "decisions": {
+            "items": {
+              "$ref": "#/components/schemas/Claim"
+            },
+            "maxItems": 8,
+            "title": "Decisions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "claims",
+          "decisions"
+        ],
+        "title": "ImplementationApproach",
+        "type": "object"
+      },
+      "ImplementationEvidence": {
+        "additionalProperties": false,
+        "properties": {
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/Claim"
+            },
+            "maxItems": 16,
+            "title": "Claims",
+            "type": "array"
+          }
+        },
+        "required": [
+          "claims"
+        ],
+        "title": "ImplementationEvidence",
+        "type": "object"
+      },
+      "IntendedSolution": {
+        "additionalProperties": false,
+        "properties": {
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/Claim"
+            },
+            "maxItems": 16,
+            "title": "Claims",
+            "type": "array"
+          }
+        },
+        "required": [
+          "claims"
+        ],
+        "title": "IntendedSolution",
         "type": "object"
       },
       "JobSummary": {
@@ -424,6 +801,24 @@
         "title": "JobView",
         "type": "object"
       },
+      "Limitations": {
+        "additionalProperties": false,
+        "properties": {
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/Claim"
+            },
+            "maxItems": 16,
+            "title": "Claims",
+            "type": "array"
+          }
+        },
+        "required": [
+          "claims"
+        ],
+        "title": "Limitations",
+        "type": "object"
+      },
       "MediaJobView": {
         "properties": {
           "analysis_job_id": {
@@ -589,6 +984,262 @@
         "title": "MediaStageView",
         "type": "object"
       },
+      "Mismatch": {
+        "additionalProperties": false,
+        "description": "A stated intention or claim that the implementation, tests or architecture contradict.",
+        "properties": {
+          "detail": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Detail",
+            "type": "string"
+          },
+          "evidence_claim_ids": {
+            "items": {
+              "pattern": "^[a-z][a-z0-9-]{0,63}$",
+              "type": "string"
+            },
+            "maxItems": 8,
+            "title": "Evidence Claim Ids",
+            "type": "array"
+          },
+          "id": {
+            "pattern": "^[a-z][a-z0-9-]{0,63}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "readme_only_feature",
+              "mention_only_technology",
+              "declared_only_technology",
+              "unstated_implementation",
+              "incomplete_implementation",
+              "unbenchmarked_performance_claim",
+              "unsupported_architecture_claim"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "stated_claim_ids": {
+            "items": {
+              "pattern": "^[a-z][a-z0-9-]{0,63}$",
+              "type": "string"
+            },
+            "maxItems": 8,
+            "title": "Stated Claim Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "detail",
+          "stated_claim_ids",
+          "evidence_claim_ids"
+        ],
+        "title": "Mismatch",
+        "type": "object"
+      },
+      "NarrationView": {
+        "additionalProperties": false,
+        "description": "How the walkthrough was worded and which local voice spoke it. Fixed names only.",
+        "properties": {
+          "blueprint_sha256": {
+            "anyOf": [
+              {
+                "pattern": "^[a-f0-9]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blueprint Sha256"
+          },
+          "fallback_reason": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Reason"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "provider": {
+            "enum": [
+              "deterministic",
+              "ollama",
+              "openai_compatible",
+              "anthropic"
+            ],
+            "title": "Provider",
+            "type": "string"
+          },
+          "refined_scene_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 24,
+            "title": "Refined Scene Ids",
+            "type": "array"
+          },
+          "refiner": {
+            "enum": [
+              "deterministic-template-1.0",
+              "grounded-llm-refiner-1.0"
+            ],
+            "title": "Refiner",
+            "type": "string"
+          },
+          "rejection_reasons": {
+            "additionalProperties": {
+              "items": {
+                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Rejection Reasons",
+            "type": "object"
+          },
+          "scenes_fallback": {
+            "maximum": 24.0,
+            "minimum": 0.0,
+            "title": "Scenes Fallback",
+            "type": "integer"
+          },
+          "scenes_refined": {
+            "maximum": 24.0,
+            "minimum": 0.0,
+            "title": "Scenes Refined",
+            "type": "integer"
+          },
+          "scenes_total": {
+            "maximum": 24.0,
+            "minimum": 1.0,
+            "title": "Scenes Total",
+            "type": "integer"
+          },
+          "tts_engine": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tts Engine"
+          },
+          "tts_provider": {
+            "anyOf": [
+              {
+                "enum": [
+                  "deterministic",
+                  "kokoro_onnx",
+                  "local"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tts Provider"
+          },
+          "tts_voice": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tts Voice"
+          }
+        },
+        "required": [
+          "refiner",
+          "provider",
+          "model",
+          "blueprint_sha256",
+          "scenes_total",
+          "scenes_refined",
+          "scenes_fallback",
+          "refined_scene_ids",
+          "fallback_reason",
+          "rejection_reasons",
+          "tts_provider",
+          "tts_engine",
+          "tts_voice"
+        ],
+        "title": "NarrationView",
+        "type": "object"
+      },
+      "ProblemContext": {
+        "additionalProperties": false,
+        "properties": {
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/Claim"
+            },
+            "maxItems": 12,
+            "title": "Claims",
+            "type": "array"
+          }
+        },
+        "required": [
+          "claims"
+        ],
+        "title": "ProblemContext",
+        "type": "object"
+      },
+      "ProblemStatement": {
+        "additionalProperties": false,
+        "properties": {
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/Claim"
+            },
+            "maxItems": 12,
+            "title": "Claims",
+            "type": "array"
+          },
+          "sufficiency": {
+            "enum": [
+              "documented",
+              "insufficient"
+            ],
+            "title": "Sufficiency",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sufficiency",
+          "claims"
+        ],
+        "title": "ProblemStatement",
+        "type": "object"
+      },
       "ProjectInput": {
         "additionalProperties": false,
         "properties": {
@@ -739,6 +1390,176 @@
         "title": "StageView",
         "type": "object"
       },
+      "StoryView": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis_sha256": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Analysis Sha256",
+            "type": "string"
+          },
+          "architecture": {
+            "$ref": "#/components/schemas/ArchitectureDescription"
+          },
+          "commit_sha": {
+            "pattern": "^[a-f0-9]{40}$",
+            "title": "Commit Sha",
+            "type": "string"
+          },
+          "demonstrated_outcomes": {
+            "$ref": "#/components/schemas/DemonstratedOutcomes"
+          },
+          "evidence_trimmed": {
+            "title": "Evidence Trimmed",
+            "type": "boolean"
+          },
+          "extractor_version": {
+            "const": "problem-to-solution-extractor-1.0",
+            "title": "Extractor Version",
+            "type": "string"
+          },
+          "implementation_approach": {
+            "$ref": "#/components/schemas/ImplementationApproach"
+          },
+          "implementation_evidence": {
+            "$ref": "#/components/schemas/ImplementationEvidence"
+          },
+          "instruction_like_lines": {
+            "minimum": 0.0,
+            "title": "Instruction Like Lines",
+            "type": "integer"
+          },
+          "intended_solution": {
+            "$ref": "#/components/schemas/IntendedSolution"
+          },
+          "limitations": {
+            "$ref": "#/components/schemas/Limitations"
+          },
+          "mismatches": {
+            "items": {
+              "$ref": "#/components/schemas/Mismatch"
+            },
+            "maxItems": 32,
+            "title": "Mismatches",
+            "type": "array"
+          },
+          "problem_context": {
+            "$ref": "#/components/schemas/ProblemContext"
+          },
+          "problem_statement": {
+            "$ref": "#/components/schemas/ProblemStatement"
+          },
+          "repository": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Repository",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "problem-to-solution-1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "source_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "enum": [
+                "readme",
+                "documentation",
+                "manifest",
+                "source",
+                "test",
+                "example"
+              ]
+            },
+            "title": "Source Counts",
+            "type": "object"
+          },
+          "status_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "enum": [
+                "VERIFIED",
+                "INFERRED",
+                "DOCUMENTATION_ONLY",
+                "UNVERIFIED"
+              ]
+            },
+            "title": "Status Counts",
+            "type": "object"
+          },
+          "status_labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "enum": [
+                "VERIFIED",
+                "INFERRED",
+                "DOCUMENTATION_ONLY",
+                "UNVERIFIED"
+              ]
+            },
+            "title": "Status Labels",
+            "type": "object"
+          },
+          "unresolved_questions": {
+            "$ref": "#/components/schemas/UnresolvedQuestions"
+          },
+          "view_version": {
+            "const": "engineering-story-view-1.0",
+            "title": "View Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "view_version",
+          "schema_version",
+          "extractor_version",
+          "repository",
+          "commit_sha",
+          "analysis_sha256",
+          "source_counts",
+          "status_counts",
+          "status_labels",
+          "problem_statement",
+          "problem_context",
+          "intended_solution",
+          "implementation_approach",
+          "architecture",
+          "implementation_evidence",
+          "demonstrated_outcomes",
+          "limitations",
+          "unresolved_questions",
+          "mismatches",
+          "instruction_like_lines",
+          "evidence_trimmed"
+        ],
+        "title": "StoryView",
+        "type": "object"
+      },
+      "UnresolvedQuestions": {
+        "additionalProperties": false,
+        "properties": {
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/Claim"
+            },
+            "maxItems": 24,
+            "title": "Claims",
+            "type": "array"
+          }
+        },
+        "required": [
+          "claims"
+        ],
+        "title": "UnresolvedQuestions",
+        "type": "object"
+      },
       "UsageView": {
         "properties": {
           "created_at": {
@@ -807,6 +1628,47 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "VideoStoryView": {
+        "description": "The verified engineering story a published walkthrough narrates, and how it was voiced.",
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "narration": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NarrationView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "story": {
+            "$ref": "#/components/schemas/StoryView"
+          },
+          "video_id": {
+            "format": "uuid",
+            "title": "Video Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "video_id",
+          "job_id",
+          "category",
+          "narration",
+          "story"
+        ],
+        "title": "VideoStoryView",
         "type": "object"
       },
       "VideoView": {
@@ -2109,6 +2971,62 @@
           }
         ],
         "summary": "Download Video"
+      }
+    },
+    "/v1/video-jobs/{job_id}/videos/{video_id}/story": {
+      "get": {
+        "description": "The verified engineering story a walkthrough narrates, with every claim's status and\ncitations, and how the narration was worded and voiced. Read-only and owner-scoped.",
+        "operationId": "video_story_v1_video_jobs__job_id__videos__video_id__story_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "video_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Video Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoStoryView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "summary": "Video Story"
       }
     }
   }

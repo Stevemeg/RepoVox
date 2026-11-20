@@ -16,6 +16,7 @@ import signal
 import tempfile
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -31,8 +32,7 @@ from repovox.db.database import make_engine, rows
 from repovox.media import stages
 from repovox.media.architecture import ArchitectureError, Report, check
 from repovox.media.explainer import render_architecture
-from repovox.media.narration import Engine as SpeechEngine
-from repovox.media.narration import detect
+from repovox.media.narration import Voice, detect
 from repovox.media.refiner import (
     DETERMINISTIC,
     GroundedLLMRefiner,
@@ -40,6 +40,7 @@ from repovox.media.refiner import (
     refiner_from_settings,
 )
 from repovox.media.sandbox import discover_isolated, sources_from, story_isolated
+from repovox.media.speech import voice_from_settings, voice_record
 from repovox.media.store import MediaStorage, media_key
 from repovox.media.story import StoryError
 from repovox.media.story_extract import story_sources, verify_story
@@ -72,10 +73,14 @@ class MediaWorker:
         engine: Engine,
         storage: MediaStorage,
         name: str,
-        speech: SpeechEngine | None = None,
+        speech: Voice | None = None,
         refiner: NarrativeRefiner = DETERMINISTIC,
+        voices: Callable[[], Voice] = detect,
     ) -> None:
         self.engine, self.storage, self.name, self.speech = engine, storage, name, speech
+        # Chooses the narration voice the first time a stage needs one. A demanded neural
+        # voice that cannot load fails that stage with a fixed SpeechError code.
+        self.voices = voices
         # Rewords the verified story plan only; Stage 11 re-checks whatever it wrote.
         self.refiner = refiner
 
@@ -227,20 +232,26 @@ class MediaWorker:
             # The story's citations are re-verified against the pinned archive, not trusted.
             root = self.unpacked(reference, scratch, checkpoint)
             return stages.narration_stage(payload, board, story_sources(root, payload)), {}
-        speech = self.speech or detect()
         if ordinal == 12:
-            return stages.tts_stage(prior(10), prior(11), speech, scratch, checkpoint), {}
+            return stages.tts_stage(prior(10), prior(11), self.voice(), scratch, checkpoint), {}
         if ordinal == 13:
             return stages.render_stage(prior(10), prior(11), prior(12), checkpoint), {}
         if ordinal == 14:
             video, media = stages.encode_stage(prior(12), prior(13), scratch, checkpoint)
             # Stage summaries before 14 are not stored, so the published video's metadata
-            # carries the grounded narrator's provenance alongside the storyboard artifact.
-            narration = stages.narration_record(prior(10))
-            if narration is not None:
-                media["narration"] = narration
+            # carries how it was worded and voiced, and the bounded story view the API serves.
+            storyboard, speech = prior(10), prior(12)
+            media["narration"] = stages.video_narration(storyboard, speech)
+            story = stages.video_story(storyboard)
+            if story is not None:
+                media["story"] = story
             return video, {"video": media}
-        return self.architecture(scope, scratch, checkpoint, uploaded, speech)
+        return self.architecture(scope, scratch, checkpoint, uploaded, self.voice())
+
+    def voice(self) -> Voice:
+        if self.speech is None:
+            self.speech = self.voices()
+        return self.speech
 
     def unpacked(
         self, reference: dict[str, Any], scratch: Path, checkpoint: stages.Checkpoint
@@ -299,7 +310,7 @@ class MediaWorker:
         scratch: Path,
         checkpoint: stages.Checkpoint,
         uploaded: list[str],
-        speech: SpeechEngine,
+        speech: Voice,
     ) -> tuple[bytes, dict[str, Any]]:
         reference = scope["analysis"]
         try:
@@ -332,7 +343,7 @@ class MediaWorker:
         scratch: Path,
         checkpoint: stages.Checkpoint,
         uploaded: list[str],
-        speech: SpeechEngine,
+        speech: Voice,
     ) -> list[dict[str, Any]]:
         videos: list[dict[str, Any]] = []
         for architecture in report.architectures[:3]:
@@ -363,6 +374,7 @@ class MediaWorker:
                         "citations": item["citations"],
                         "unresolved": item["unresolved"],
                         "media": item["media"],
+                        "narration": voice_record(speech),
                         "architecture_sha256": item["artifacts"]["architecture.json"]["sha256"],
                         "citations_sha256": item["artifacts"]["citations.json"]["sha256"],
                     },
@@ -381,6 +393,7 @@ def main() -> None:
         MediaStorage(settings),
         f"media-{os.getpid()}",
         refiner=refiner_from_settings(settings),
+        voices=lambda: voice_from_settings(settings),
     )
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: stop.set())

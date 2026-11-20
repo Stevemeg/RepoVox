@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from repovox.media.story_view import NarrationView, StoryView
+
 
 class ProjectView(BaseModel):
     id: UUID
@@ -81,6 +83,16 @@ class VideoView(BaseModel):
     metadata: dict[str, Any]
     published_at: datetime
     expires_at: datetime
+
+
+class VideoStoryView(BaseModel):
+    """The verified engineering story a published walkthrough narrates, and how it was voiced."""
+
+    video_id: UUID
+    job_id: UUID
+    category: str
+    narration: NarrationView | None
+    story: StoryView
 
 
 class MediaJobView(BaseModel):

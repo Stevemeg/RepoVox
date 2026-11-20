@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const allowed =
-  /^(auth\/(session|sign-out|config|development\/sign-in|github\/(login|callback))|projects(\/[a-f0-9-]+(\/(jobs|video-jobs))?)?|jobs(\/[a-f0-9-]+(\/cancel)?)?|video-jobs\/[a-f0-9-]+(\/cancel|\/videos\/[a-f0-9-]+(\/(captions|download))?)?|development\/(projects\/[a-f0-9-]+\/(fixture-jobs|analysis-jobs)|jobs\/[a-f0-9-]+\/(retry|analysis)))$/;
+  /^(auth\/(session|sign-out|config|development\/sign-in|github\/(login|callback))|projects(\/[a-f0-9-]+(\/(jobs|video-jobs))?)?|jobs(\/[a-f0-9-]+(\/cancel)?)?|video-jobs\/[a-f0-9-]+(\/cancel|\/videos\/[a-f0-9-]+(\/(captions|download|story))?)?|development\/(projects\/[a-f0-9-]+\/(fixture-jobs|analysis-jobs)|jobs\/[a-f0-9-]+\/(retry|analysis)))$/;
 const oauthRoute = /^auth\/github\/(login|callback)$/;
 async function forward(
   request: NextRequest,
