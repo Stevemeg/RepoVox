@@ -3,7 +3,8 @@
 Each function re-validates its upstream artifacts instead of trusting them, so a worker can run
 one stage per lease from stored objects. Nothing here touches the database or object storage.
 
-  10 storyboard  verified payload (+ verified story)  -> storyboard JSON
+  10 storyboard  verified payload (+ verified story)  -> storyboard JSON, optionally worded
+                 by the grounded narration model (refiner.GroundedLLMRefiner)
   11 narration   payload + storyboard (re-verified)   -> narration script JSON
   12 tts         storyboard + script                  -> bundle {narration.wav, timings.json}
   13 render      storyboard + script + speech bundle  -> bundle {frameNNN[-MMM].png, captions.vtt}
@@ -32,6 +33,7 @@ from repovox.media import raster
 from repovox.media.architecture import Citation, Report
 from repovox.media.diagram import Diagram
 from repovox.media.narration import FPS, Timing, Voice, assemble, synthesize
+from repovox.media.refiner import DETERMINISTIC, NarrativeRefiner
 from repovox.media.story import EngineeringStory
 from repovox.media.story_board import build_story_board, check_story_board
 from repovox.media.storyboard import (
@@ -143,11 +145,24 @@ def storyboard_stage(
     payload: dict[str, Any],
     story: EngineeringStory | None = None,
     report: Report | None = None,
+    refiner: NarrativeRefiner = DETERMINISTIC,
 ) -> bytes:
-    """The walkthrough from the payload alone, or the engineering story for a verified story."""
+    """The walkthrough from the payload alone, or the engineering story for a verified story.
+
+    Only the story is ever reworded, and only by a refiner whose wording Stage 11 re-checks.
+    """
     if story is None:
         return encoded(build(payload).model_dump(mode="json"))
-    return encoded(build_story_board(payload, story, report).model_dump(mode="json"))
+    return encoded(build_story_board(payload, story, report, refiner).model_dump(mode="json"))
+
+
+def narration_record(storyboard: bytes) -> dict[str, Any] | None:
+    """The grounded narrator's provenance, for a stage summary or manifest; fixed codes only."""
+    board = load_board(storyboard)
+    if board.story is None or board.story.narration is None:
+        return None
+    record: dict[str, Any] = board.story.narration.model_dump(mode="json")
+    return record
 
 
 def is_story(storyboard: bytes) -> bool:

@@ -33,6 +33,12 @@ from repovox.media.architecture import ArchitectureError, Report, check
 from repovox.media.explainer import render_architecture
 from repovox.media.narration import Engine as SpeechEngine
 from repovox.media.narration import detect
+from repovox.media.refiner import (
+    DETERMINISTIC,
+    GroundedLLMRefiner,
+    NarrativeRefiner,
+    refiner_from_settings,
+)
 from repovox.media.sandbox import discover_isolated, sources_from, story_isolated
 from repovox.media.store import MediaStorage, media_key
 from repovox.media.story import StoryError
@@ -67,8 +73,11 @@ class MediaWorker:
         storage: MediaStorage,
         name: str,
         speech: SpeechEngine | None = None,
+        refiner: NarrativeRefiner = DETERMINISTIC,
     ) -> None:
         self.engine, self.storage, self.name, self.speech = engine, storage, name, speech
+        # Rewords the verified story plan only; Stage 11 re-checks whatever it wrote.
+        self.refiner = refiner
 
     def reconcile(self) -> int:
         with self.engine.begin() as c:
@@ -225,6 +234,11 @@ class MediaWorker:
             return stages.render_stage(prior(10), prior(11), prior(12), checkpoint), {}
         if ordinal == 14:
             video, media = stages.encode_stage(prior(12), prior(13), scratch, checkpoint)
+            # Stage summaries before 14 are not stored, so the published video's metadata
+            # carries the grounded narrator's provenance alongside the storyboard artifact.
+            narration = stages.narration_record(prior(10))
+            if narration is not None:
+                media["narration"] = narration
             return video, {"video": media}
         return self.architecture(scope, scratch, checkpoint, uploaded, speech)
 
@@ -251,14 +265,33 @@ class MediaWorker:
             if report is not None:
                 check(report, payload, sources_from(root, payload))
             verify_story(story, payload, story_sources(root, payload), report)
-            body = stages.storyboard_stage(payload, story, report)
+            # The model, if any, sees only the verified plan, never the extracted archive.
+            refiner = self.refiner
+            if isinstance(refiner, GroundedLLMRefiner):
+                refiner = refiner.bound(checkpoint)
+            body = stages.storyboard_stage(payload, story, report, refiner)
         except Lost:
             raise
         except NO_STORY as error:
             code = getattr(error, "code", "story_failure")
             logger.warning(json.dumps({"event": "media_story_unavailable", "code": code}))
             return stages.storyboard_stage(payload), {"storyboard": "walkthrough", "reason": code}
-        return body, {"storyboard": "engineering_story"}
+        summary: dict[str, Any] = {"storyboard": "engineering_story"}
+        narration = stages.narration_record(body)
+        if narration is not None:
+            summary["narration"] = narration
+            logger.info(
+                json.dumps(
+                    {
+                        "event": "media_story_narration",
+                        "provider": narration["provider"],
+                        "scenes_refined": narration["scenes_refined"],
+                        "scenes_fallback": narration["scenes_fallback"],
+                        "fallback_reason": narration["fallback_reason"],
+                    }
+                )
+            )
+        return body, summary
 
     def architecture(
         self,
@@ -343,7 +376,12 @@ def main() -> None:
     if settings.media_worker_database_url is None:
         raise RuntimeError("Media worker database URL required")
     engine = make_media_engine(settings.media_worker_database_url.get_secret_value(), "rvm_worker")
-    worker = MediaWorker(engine, MediaStorage(settings), f"media-{os.getpid()}")
+    worker = MediaWorker(
+        engine,
+        MediaStorage(settings),
+        f"media-{os.getpid()}",
+        refiner=refiner_from_settings(settings),
+    )
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: stop.set())
     signal.signal(signal.SIGINT, lambda *_: stop.set())

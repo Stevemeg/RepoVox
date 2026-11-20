@@ -6,9 +6,16 @@ marked valid. Repository strings are data: they become pixels and speech text, n
 
 import re
 from collections import Counter
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SerializerFunctionWrapHandler,
+    model_serializer,
+    model_validator,
+)
 
 from repovox.analysis.common import canonical, digest
 from repovox.analysis.contracts import PAYLOADS
@@ -105,12 +112,62 @@ class Scene(Closed):
     diagram: bool = False
 
 
+Code = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{0,63}$")]
+
+
+class NarrationProvenance(Closed):
+    """How a grounded language-model narrator worded a story storyboard. Fixed codes only.
+
+    Every scene is either refined (its model wording passed the claim-by-claim grounding check)
+    or fell back to its deterministic wording, with the exact reasons. `fallback_reason` is set
+    when no model wording was used at all: the provider failed or its answer was malformed.
+    """
+
+    refiner: Literal["grounded-llm-refiner-1.0"]
+    provider: Literal["ollama", "openai_compatible", "anthropic"]
+    model: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$")
+    # Digest of exactly what was sent: the scene plan and its verified claims.
+    blueprint_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    scenes_total: int = Field(ge=1, le=24)
+    scenes_refined: int = Field(ge=0, le=24)
+    scenes_fallback: int = Field(ge=0, le=24)
+    refined_scene_ids: tuple[str, ...] = Field(max_length=24)
+    fallback_reason: Code | None
+    rejection_reasons: dict[str, tuple[Code, ...]]
+
+    @model_validator(mode="after")
+    def consistent(self) -> "NarrationProvenance":
+        refined, rejected = set(self.refined_scene_ids), set(self.rejection_reasons)
+        if (
+            len(refined) != len(self.refined_scene_ids)
+            or self.scenes_refined != len(refined)
+            or self.scenes_refined + self.scenes_fallback != self.scenes_total
+            or refined & rejected
+            or len(rejected) > self.scenes_fallback
+            or any(not r or tuple(sorted(set(r))) != r for r in self.rejection_reasons.values())
+        ):
+            raise ValueError("narration provenance is inconsistent")
+        if self.fallback_reason is not None and (refined or rejected):
+            raise ValueError("a provider fallback refines and rejects no scene")
+        return self
+
+
 class StoryAttachment(Closed):
     """The verified story and architecture report a problem-to-solution storyboard narrates."""
 
     story: EngineeringStory
     architecture: Report | None
     narrator: str = Field(min_length=1, max_length=64)
+    # Present exactly when the grounded language-model narrator wrote the wording.
+    narration: NarrationProvenance | None = None
+
+    @model_serializer(mode="wrap")
+    def unchanged_when_deterministic(self, handler: SerializerFunctionWrapHandler) -> Any:
+        # A deterministic storyboard serializes byte for byte as it did before this field.
+        data = handler(self)
+        if self.narration is None and isinstance(data, dict):
+            data.pop("narration", None)
+        return data
 
 
 class Storyboard(Closed):

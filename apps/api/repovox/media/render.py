@@ -18,10 +18,12 @@ from typing import Any
 from repovox.analysis.common import digest
 from repovox.media.architecture import ArchitectureError, Report, discover
 from repovox.media.narration import NarrationError, Voice, detect
+from repovox.media.refiner import DETERMINISTIC, NarrativeRefiner
 from repovox.media.stages import (
     RenderError,
     encode_stage,
     encoded,
+    narration_record,
     narration_stage,
     render_stage,
     storyboard_stage,
@@ -64,16 +66,18 @@ def produce(
     engine: Voice | None = None,
     source_note: str = "analysis-payload",
     sources: dict[str, bytes] | None = None,
+    refiner: NarrativeRefiner = DETERMINISTIC,
 ) -> Path:
     """Render into a new directory; publish the whole bundle only after media validation."""
     started = time.perf_counter()
     story: EngineeringStory | None = None
     if sources is not None:
         story, report = engineering_story(payload, sources)
-        storyboard = storyboard_stage(payload, story, report)
+        storyboard = storyboard_stage(payload, story, report, refiner)
     else:
         storyboard = storyboard_stage(payload)  # Raises before any output if grounding fails.
     script = narration_stage(payload, storyboard, sources)
+    narration = narration_record(storyboard)
     tool("ffmpeg"), tool("ffprobe")
     engine = engine or detect()
     if not output.is_absolute() or not output.parent.is_dir() or output.exists():
@@ -90,10 +94,10 @@ def produce(
     audio, images = unbundle(speech), unbundle(frames)
     timings = {t["sentence_id"]: t for t in json.loads(audio["timings.json"])}
     sentences = json.loads(script)
-    narration = [{**sentence, **timings[sentence["sentence_id"]]} for sentence in sentences]
+    timed = [{**sentence, **timings[sentence["sentence_id"]]} for sentence in sentences]
     board = json.loads(storyboard)
     exclusive(work / "storyboard.json", storyboard)
-    exclusive(work / "narration.json", encoded(narration))
+    exclusive(work / "narration.json", encoded(timed))
     exclusive(work / "narration.wav", audio["narration.wav"])
     for name, body in images.items():
         exclusive(work / name, body)
@@ -126,8 +130,12 @@ def produce(
         },
         "uncertainty_labels": dict(sorted(Counter(s["uncertainty"] for s in sentences).items())),
         "narration_engine": engine.name,
-        "model_inference": "none",
-        "paid_services": "none",
+        # A grounded narration model only rewords the verified plan; see `narration`.
+        "model_inference": "none" if narration is None else "grounded-narration-refinement",
+        "paid_services": "none"
+        if narration is None or narration["provider"] == "ollama"
+        else "operator-configured hosted narration model",
+        "narration": narration,
         "ffmpeg_version": media.pop("ffmpeg_version"),
         "platform": sys.platform,
         "wall_seconds": round(time.perf_counter() - started, 3),

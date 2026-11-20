@@ -16,9 +16,16 @@ from repovox.analysis.common import canonical, digest
 from repovox.media.architecture import Report
 from repovox.media.refiner import (
     DETERMINISTIC,
+    DIAGRAM_TEXT_LIMIT,
+    GROUNDED_NARRATOR,
+    TEXT_LIMIT,
     NarrativeRefiner,
     PlannedSentence,
+    RecordedNarration,
     ScenePlan,
+    blueprint_digest,
+    refine_all,
+    verify_refined_scene,
 )
 from repovox.media.story import Claim, EngineeringStory, StoryError
 from repovox.media.story_extract import TEMPLATES, clip, plural, verify_story
@@ -52,8 +59,6 @@ SCENES = (
 )
 REQUIRED = {"introduction", "problem", "architecture", "limitations", "conclusion"}
 DIAGRAM_SCENES = {"architecture", "workflow"}
-TEXT_LIMIT = 340  # Four caption lines of 96 characters on a text frame.
-DIAGRAM_TEXT_LIMIT = 250  # Three caption lines of 100 characters on a diagram frame.
 RANK = {"UNVERIFIED": 0, "DOCUMENTATION_ONLY": 1, "INFERRED": 2, "VERIFIED": 3}
 LABEL: dict[str, Uncertainty] = {
     "UNVERIFIED": "unverified",
@@ -299,8 +304,10 @@ def build_story_board(
     claims = story.claims()
     knowledge = payload["knowledge"]
     scenes: list[Scene] = []
-    for scene in plan(story):
-        texts = refiner.refine(scene)
+    plans = plan(story)
+    refinement = refine_all(refiner, plans, story)
+    for scene in plans:
+        texts = refinement.texts.get(scene.id, ())
         if len(texts) != len(scene.sentences):
             raise GroundingError("narration_plan_mismatch")
         limit = DIAGRAM_TEXT_LIMIT if scene.diagram else TEXT_LIMIT
@@ -345,7 +352,12 @@ def build_story_board(
         pipeline_version=knowledge["versions"]["pipeline"],
         analysis_sha256=digest(canonical(payload)),
         scenes=tuple(scenes),
-        story=StoryAttachment(story=story, architecture=report, narrator=refiner.name),
+        story=StoryAttachment(
+            story=story,
+            architecture=report,
+            narrator=refiner.name,
+            narration=refinement.provenance,
+        ),
     )
 
 
@@ -363,8 +375,16 @@ def check_story_board(
         raise GroundingError(error.code) from None
     if board.analysis_sha256 != digest(canonical(payload)):
         raise GroundingError("analysis_mismatch")
-    if attachment.narrator != DETERMINISTIC.name:
-        raise GroundingError("narrator_unsupported")  # Milestone 2 brings its own grounding.
+    # Only two narrators exist: the template wording, and grounded model wording that carries
+    # its provenance and is re-checked claim by claim below.
+    if attachment.narrator == DETERMINISTIC.name:
+        if attachment.narration is not None:
+            raise GroundingError("narration_provenance_invalid")
+    elif attachment.narrator == GROUNDED_NARRATOR:
+        if attachment.narration is None:
+            raise GroundingError("narration_provenance_invalid")
+    else:
+        raise GroundingError("narrator_unsupported")
     claims = story.claims()
     order = [s.type for s in board.scenes]
     if (
@@ -404,8 +424,48 @@ def check_story_board(
                 or not set(sentence.connection_ids) <= links
             ):
                 raise GroundingError("story_scene_invalid")
-    if build_story_board(payload, story, report) != board:
+    if attachment.narration is None:
+        if build_story_board(payload, story, report) != board:
+            raise GroundingError("storyboard_not_reproducible")
+        return
+    check_refined_wording(board, payload, story, report)
+
+
+def check_refined_wording(
+    board: Storyboard, payload: dict[str, Any], story: EngineeringStory, report: Report | None
+) -> None:
+    """A model-worded storyboard: everything but the wording of its refined scenes must be
+    exactly the deterministic storyboard, and each refined scene must pass the same grounding
+    check the worker applied. No model is called."""
+    attachment = board.story
+    provenance = attachment.narration if attachment is not None else None
+    if provenance is None:
+        raise GroundingError("narration_provenance_invalid")
+    plans = plan(story)
+    ids = {scene.id for scene in plans}
+    if (
+        provenance.blueprint_sha256 != blueprint_digest(plans, story)
+        or provenance.scenes_total != len(plans)
+        or not set(provenance.refined_scene_ids) | set(provenance.rejection_reasons) <= ids
+    ):
+        raise GroundingError("narration_provenance_invalid")
+    texts = {scene.id: tuple(s.text for s in scene.sentences) for scene in board.scenes}
+    for scene in plans:
+        if scene.id not in provenance.refined_scene_ids:
+            continue
+        if scene.id not in texts or verify_refined_scene(scene, texts[scene.id], story):
+            raise GroundingError("narration_not_grounded")
+    replay = RecordedNarration(texts, provenance)
+    if build_story_board(payload, story, report, replay) != board:
         raise GroundingError("storyboard_not_reproducible")
 
 
-__all__ = ["SCENES", "build_story_board", "check_story_board", "plan"]
+__all__ = [
+    "DIAGRAM_TEXT_LIMIT",
+    "SCENES",
+    "TEXT_LIMIT",
+    "build_story_board",
+    "check_refined_wording",
+    "check_story_board",
+    "plan",
+]
