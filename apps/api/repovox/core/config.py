@@ -4,7 +4,7 @@ from pathlib import PurePath
 from typing import Literal
 from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # The only browser origins a deployment without TLS may use, and only on this host.
@@ -127,6 +127,22 @@ class Settings(BaseSettings):
     # Neural voice inference threads; unset keeps the runtime default (every host core). Set
     # it to the media worker's CPU allocation.
     tts_threads: int | None = Field(default=None, ge=1, le=64)
+    # Absolute directory where the neural voice's phonemizer may copy and load its speech
+    # library: a small tmpfs mounted without noexec. The worker's /tmp stays noexec. Unset
+    # keeps the default temporary directory.
+    tts_library_dir: str | None = Field(default=None, pattern=r"^/[A-Za-z0-9_./-]{1,200}$")
+
+    @field_validator("tts_library_dir")
+    @classmethod
+    def library_dir_outside_tmp(cls, value: str | None) -> str | None:
+        """Never /tmp itself or below it, and no parent segments: /tmp stays noexec."""
+        if value is None:
+            return None
+        parts = value.split("/")
+        if ".." in parts or (len(parts) > 1 and parts[1] == "tmp"):
+            raise ValueError("The speech library directory must be outside /tmp")
+        return value
+
     # Seconds the narration stage may spend, after its own checks, speaking the approved
     # script ahead into the media worker's in-memory speech cache; 0 turns this off. Every
     # media stage stays bounded by its own lease and deadline.

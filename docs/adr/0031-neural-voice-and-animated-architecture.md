@@ -106,6 +106,14 @@ citation keep the exact text.
     `no-new-privileges`.
 - **Threads.** `KokoroOnnxSynthesizer.threads` opens one ONNX Runtime CPU session with that
   many intra-op threads, because the default counts every host core.
+- **Library scratch.** The phonemizer copies its espeak-ng library into `tempfile.mkdtemp()`
+  and loads it, which the hardened `noexec` `/tmp` refuses ("failed to map segment"; found on
+  the first containerised run). `/tmp` is not relaxed. Instead:
+  - the overlay adds a separate 64 MiB tmpfs without `noexec`, `/run/repovox-speech`, owned by
+    the `repovox` user, with `nosuid` and `nodev`;
+  - `REPOVOX_TTS_LIBRARY_DIR` points the process temporary directory at it only while Kokoro
+    loads and speaks, under a lock, and always restores it;
+  - the setting refuses `/tmp` and anything below it.
 
 ### 3. Speech within the frozen deadlines: a bounded cache and speaking ahead
 

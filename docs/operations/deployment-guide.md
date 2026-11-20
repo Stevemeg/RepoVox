@@ -253,6 +253,7 @@ file sets them in the shared `x-api` block.
 | `REPOVOX_TTS_VOICE` | `af_heart` | not set | optional | A Kokoro voice id, `^[a-z0-9_-]{2,32}$` |
 | `REPOVOX_TTS_SPEED` | `1.0` | not set | `1.0` | 0.5 to 2.0 |
 | `REPOVOX_TTS_THREADS` | unset | not set | optional | Neural voice inference threads, 1 to 64; match the media worker's CPUs |
+| `REPOVOX_TTS_LIBRARY_DIR` | unset | not set | optional | Absolute directory outside `/tmp`, without `noexec`, where the neural voice's phonemizer loads its library copy |
 | `REPOVOX_MEDIA_SPEECH_PREWARM_SECONDS` | `240` | not set | `240` | 0 to 300; how long the narration stage may speak ahead for a neural voice; 0 turns it off |
 | `REPOVOX_MEDIA_ENCODE_BASE_SECONDS`, `..._SECONDS_PER_MINUTE`, `..._MAX_SECONDS` | `170`, `30`, `900` | not set | defaults | Encoder and probe time limit per video: base plus a share per minute of video, capped. A stage's own deadline still bounds it |
 
@@ -313,6 +314,10 @@ docker compose -f docker-compose.yml -f infrastructure/local/docker-compose.prod
 - **Settings.** The overlay sets `REPOVOX_TTS_PROVIDER=kokoro_onnx`, the two model paths under
   `/models/kokoro` (mounted read-only), `REPOVOX_TTS_VOICE=af_heart`, `REPOVOX_TTS_SPEED=1.0`
   and `REPOVOX_TTS_THREADS=4`.
+- **Speech library scratch.** The phonemizer must load a copy of its espeak-ng library, which
+  the `noexec` `/tmp` refuses. The overlay therefore mounts a separate 64 MiB tmpfs,
+  `/run/repovox-speech` (no `noexec`; `nosuid`, `nodev`, owned by `repovox`), and sets
+  `REPOVOX_TTS_LIBRARY_DIR` to it. `/tmp` keeps `noexec`.
 - **Resources.** Neural speech and encoding are CPU-bound and every media stage keeps its fixed
   deadline (speech 240 s, encode 180 s, architecture 600 s). The overlay gives `media-worker` 4
   CPUs and 3 GiB instead of 1 CPU and 2 GiB, and inherits every other limit. The narration stage

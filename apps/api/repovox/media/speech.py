@@ -23,9 +23,11 @@ import math
 import os
 import re
 import struct
+import tempfile
 import threading
 from collections import OrderedDict
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -246,6 +248,31 @@ def onnxruntime_module() -> Any:
     return importlib.import_module("onnxruntime")
 
 
+LIBRARY_LOCK = threading.Lock()
+
+
+@contextmanager
+def library_scratch(directory: Path | None) -> Iterator[None]:
+    """Where the phonemizer copies and loads its espeak-ng library while Kokoro runs.
+
+    The phonemizer copies the shared library into `tempfile.mkdtemp()` before loading it. The
+    hardened `/tmp` is `noexec`, so that load fails there; a deployment that sets
+    `REPOVOX_TTS_LIBRARY_DIR` gives it a separate executable scratch instead, and `/tmp` stays
+    `noexec`. The process-wide temporary directory is changed only inside this block, under a
+    lock, and is always restored.
+    """
+    if directory is None:
+        yield
+        return
+    with LIBRARY_LOCK:
+        previous = tempfile.tempdir
+        tempfile.tempdir = str(directory)
+        try:
+            yield
+        finally:
+            tempfile.tempdir = previous
+
+
 @dataclass(frozen=True, repr=False)
 class KokoroOnnxSynthesizer:
     """A local Kokoro ONNX voice. Approved printable-ASCII text in, validated PCM out."""
@@ -259,6 +286,8 @@ class KokoroOnnxSynthesizer:
     # when the container is given fewer; set it to the container's CPU allocation.
     threads: int | None = None
     runtime: Callable[[], Any] = onnxruntime_module  # Replaced only by tests.
+    # Executable scratch for the phonemizer's library copy; see `library_scratch`.
+    library_dir: Path | None = None
     _loaded: dict[str, Any] = field(default_factory=dict, compare=False)
 
     name = "kokoro-onnx"
@@ -277,7 +306,8 @@ class KokoroOnnxSynthesizer:
                 raise SpeechError("neural_tts_unavailable") from None
             try:
                 if self.threads is None:
-                    found = module.Kokoro(str(self.model_path), str(self.voices_path))
+                    with library_scratch(self.library_dir):
+                        found = module.Kokoro(str(self.model_path), str(self.voices_path))
                 else:
                     runtime = self.runtime()
                     options = runtime.SessionOptions()
@@ -286,7 +316,8 @@ class KokoroOnnxSynthesizer:
                     session = runtime.InferenceSession(
                         str(self.model_path), options, providers=["CPUExecutionProvider"]
                     )
-                    found = module.Kokoro.from_session(session, str(self.voices_path))
+                    with library_scratch(self.library_dir):
+                        found = module.Kokoro.from_session(session, str(self.voices_path))
                 self._loaded["engine"] = found
             except Exception:
                 raise SpeechError("neural_tts_load_failed") from None
@@ -303,7 +334,10 @@ class KokoroOnnxSynthesizer:
     def speak(self, text: str, scratch: Path, stem: str) -> Speech:
         engine = self.engine()
         try:
-            samples, rate = engine.create(text, voice=self.voice, speed=self.speed, lang="en-us")
+            with library_scratch(self.library_dir):
+                samples, rate = engine.create(
+                    text, voice=self.voice, speed=self.speed, lang="en-us"
+                )
         except Exception:
             raise SpeechError("neural_speech_failed") from None
         return neural_speech(samples, rate)
@@ -331,6 +365,7 @@ def voice_from_settings(
             settings.tts_speed,
             loader,
             settings.tts_threads,
+            library_dir=Path(settings.tts_library_dir) if settings.tts_library_dir else None,
         )
     if settings.tts_provider == "kokoro_onnx":
         if neural is None:

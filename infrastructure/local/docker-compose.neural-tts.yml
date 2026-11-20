@@ -16,6 +16,11 @@
 # capabilities, no-new-privileges) is inherited unchanged. REPOVOX_TTS_THREADS matches `cpus`.
 # The narration stage speaks the approved script ahead within its own lease
 # (REPOVOX_MEDIA_SPEECH_PREWARM_SECONDS), so a long story fits the speech stage's deadline.
+#
+# The phonemizer copies its espeak-ng library into a temporary directory and loads it, which
+# the noexec /tmp refuses. A separate 64 MiB tmpfs without noexec, owned by the repovox user
+# and used only while the voice loads and speaks (REPOVOX_TTS_LIBRARY_DIR), takes that copy;
+# /tmp keeps noexec, nosuid and nodev.
 services:
   media-worker:
     build:
@@ -23,7 +28,10 @@ services:
         INSTALL_NEURAL_TTS: 'true'
     cpus: 4
     mem_limit: 3g
+    tmpfs:
+      - '/run/repovox-speech:rw,nosuid,nodev,exec,size=67108864,uid=10001,gid=10001,mode=0700'
     environment:
+      REPOVOX_TTS_LIBRARY_DIR: /run/repovox-speech
       REPOVOX_TTS_PROVIDER: kokoro_onnx
       REPOVOX_TTS_MODEL_PATH: /models/kokoro/kokoro-v1.0.onnx
       REPOVOX_TTS_VOICES_PATH: /models/kokoro/voices-v1.0.bin

@@ -241,6 +241,45 @@ def test_kokoro_threads_open_one_bounded_session(
     assert voice_record(chosen)["tts_provider"] == "kokoro_onnx"
 
 
+def test_the_speech_library_scratch_is_used_only_while_kokoro_runs(
+    assets: tuple[str, str], tmp_path: Path
+) -> None:
+    import tempfile
+
+    seen: list[str] = []
+
+    class Phonemizing(RecordingKokoro):
+        def __init__(self, model: str, voices: str) -> None:
+            seen.append(tempfile.gettempdir())  # where a library copy would be made
+            super().__init__(model, voices)
+
+        def create(self, text: str, voice: str, speed: float, lang: str) -> Any:
+            seen.append(tempfile.gettempdir())
+            return super().create(text, voice, speed, lang)
+
+    before = tempfile.gettempdir()
+    library = tmp_path / "speech-library"
+    library.mkdir()
+    voice = KokoroOnnxSynthesizer(
+        Path(assets[0]),
+        Path(assets[1]),
+        loader=lambda: SimpleNamespace(Kokoro=Phonemizing),
+        library_dir=library,
+    )
+    voice.speak("Fast Eh P I.", tmp_path, "s000")
+    assert seen == [str(library), str(library)] and tempfile.gettempdir() == before
+    settings = Settings(
+        **SETTINGS,
+        tts_model_path=assets[0],
+        tts_voices_path=assets[1],
+        tts_library_dir="/run/repovox-speech",
+    )
+    assert settings.tts_library_dir == "/run/repovox-speech"
+    for outside in ("/tmp", "/tmp/speech", "/run/../tmp", "relative"):
+        with pytest.raises(ValueError):
+            Settings(**SETTINGS, tts_library_dir=outside)  # /tmp stays noexec
+
+
 class CountingVoice:
     name = "counting-voice"
 
