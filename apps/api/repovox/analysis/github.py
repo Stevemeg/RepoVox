@@ -73,13 +73,22 @@ class Snapshot:
 
 
 class HTTP(Protocol):
-    def get(self, host: str, path: str, limit: int, seconds: float = 10) -> bytes: ...
+    def get(
+        self, host: str, path: str, limit: int, seconds: float = 10, *, media: str = "json"
+    ) -> bytes: ...
+
+
+METADATA_LIMIT = 1024**2
+# The commit is resolved with the SHA media type: the answer is the 40 hex characters and
+# nothing else. The JSON commit object embeds up to 300 changed files with their patches,
+# which exceeds METADATA_LIMIT for a large merge commit even though only the SHA is used.
+SHA_LIMIT = 64
 
 
 def resolve(repo: Repository, http: HTTP) -> Snapshot:
     deadline = time.monotonic() + 10
     try:
-        metadata = json.loads(http.get("api.github.com", f"/repos/{repo.identity}", 1024**2))
+        metadata = json.loads(http.get("api.github.com", f"/repos/{repo.identity}", METADATA_LIMIT))
         if metadata.get("private") is True or metadata.get("visibility") == "private":
             raise AnalysisError("repository_private")
         if metadata.get("private") is not False or metadata.get("visibility") != "public":
@@ -95,16 +104,14 @@ def resolve(repo: Repository, http: HTTP) -> Snapshot:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise AnalysisError("github_timeout", True)
-        head = json.loads(
-            http.get(
-                "api.github.com",
-                f"/repos/{repo.identity}/commits/{quote(branch, safe='')}",
-                1024**2,
-                remaining,
-            )
-        )
-        sha = head["sha"]
-        if not isinstance(sha, str) or not re.fullmatch(r"[a-f0-9]{40}", sha):
+        sha = http.get(
+            "api.github.com",
+            f"/repos/{repo.identity}/commits/{quote(branch, safe='')}",
+            SHA_LIMIT,
+            remaining,
+            media="sha",
+        ).decode("ascii")
+        if not re.fullmatch(r"[a-f0-9]{40}", sha):
             raise ValueError
         if not isinstance(metadata["id"], int) or isinstance(metadata["id"], bool):
             raise ValueError

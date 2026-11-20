@@ -47,11 +47,14 @@ class ControlledGitHub:
                 tar.addfile(member, io.BytesIO(body))
         self.body = buffer.getvalue()
 
-    def get(self, host: str, path: str, limit: int, seconds: float = 10) -> bytes:
+    def get(
+        self, host: str, path: str, limit: int, seconds: float = 10, *, media: str = "json"
+    ) -> bytes:
         assert host == "api.github.com"
         self.calls.append(path)
         if "/commits/" in path:
-            return canonical({"sha": self.head})
+            assert media == "sha"
+            return self.head.encode("ascii")
         return canonical(
             {
                 "id": 1,

@@ -24,10 +24,12 @@ def tls_server(monkeypatch: pytest.MonkeyPatch):
         "redirect": "",
         "extra_headers": {},
         "delay": 0,
+        "accept": None,
     }
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
+            settings["accept"] = self.headers.get("Accept")
             time.sleep(settings["delay"])
             self.send_response(settings["status"])
             self.send_header("Content-Type", settings["type"])
@@ -136,6 +138,37 @@ def test_ambiguous_or_malicious_headers(
     tls_server["extra_headers"] = {header: value}
     with pytest.raises(AnalysisError, match=code):
         GitHubHTTP().get("api.github.com", "/repos/example/demo", 100)
+
+
+def test_sha_media_type_is_requested_and_its_answer_type_enforced(tls_server: dict) -> None:
+    sha = b"0c71c55687ff9ea7a49b6cfebd0f73af1374fc18"
+    tls_server.update(type="application/vnd.github.sha; charset=utf-8", body=sha)
+    path = "/repos/example/demo/commits/main"
+    assert GitHubHTTP().get("api.github.com", path, 64, media="sha") == sha
+    assert tls_server["accept"] == "application/vnd.github.sha"
+    # The SHA media type is not JSON, and JSON is not the SHA media type.
+    with pytest.raises(AnalysisError, match="github_response_type"):
+        GitHubHTTP().get("api.github.com", path, 64)
+    assert tls_server["accept"] == "application/vnd.github+json"
+    tls_server.update(type="application/json", body=b'{"sha":"' + sha + b'"}')
+    with pytest.raises(AnalysisError, match="github_response_type"):
+        GitHubHTTP().get("api.github.com", path, 64, media="sha")
+    # A large answer still fails on the requested bound, declared or streamed.
+    tls_server.update(type="application/vnd.github.sha", body=b"a" * 65)
+    with pytest.raises(AnalysisError, match="archive_download_limit"):
+        GitHubHTTP().get("api.github.com", path, 64, media="sha")
+    tls_server.update(length=False)
+    with pytest.raises(AnalysisError, match="archive_download_limit"):
+        GitHubHTTP().get("api.github.com", path, 64, media="sha")
+
+
+@pytest.mark.parametrize(
+    "host,media",
+    [("codeload.github.com", "sha"), ("api.github.com", "patch"), ("api.github.com", "diff")],
+)
+def test_only_known_api_media_types_are_requested(host: str, media: str) -> None:
+    with pytest.raises(AnalysisError, match="github_origin_blocked"):
+        GitHubHTTP().get(host, "/repos/example/demo/commits/main", 64, media=media)
 
 
 def test_aggregate_timeout(tls_server: dict) -> None:

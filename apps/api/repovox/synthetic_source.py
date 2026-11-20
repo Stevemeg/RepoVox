@@ -56,14 +56,19 @@ class SyntheticSource:
     def identifier(self, name: str) -> str:
         return hashlib.sha1(self.archive(name), usedforsecurity=False).hexdigest()
 
-    def get(self, host: str, path: str, limit: int, seconds: float = 10) -> bytes:
+    def get(
+        self, host: str, path: str, limit: int, seconds: float = 10, *, media: str = "json"
+    ) -> bytes:
         match = re.fullmatch(rf"/repos/{OWNER}/([^/]+)(/commits/[^/]+)?", path)
         if host != "api.github.com" or match is None:
             raise AnalysisError("repository_not_found")
         name = match.group(1)
         self.directory(name)
+        # Same answers as the GitHub API: the commit only as the SHA media type, metadata as JSON.
+        if media != ("sha" if match.group(2) else "json"):
+            raise AnalysisError("github_response_type")
         if match.group(2):
-            return canonical({"sha": self.identifier(name)})
+            return self.identifier(name).encode("ascii")
         return canonical(
             {
                 "id": int(hashlib.sha256(name.encode()).hexdigest()[:8], 16),

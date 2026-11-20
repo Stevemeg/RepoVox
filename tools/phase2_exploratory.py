@@ -60,11 +60,13 @@ token = json.load(sys.stdin).get("github_token") if args.token_stdin else None
 
 
 class PinnedHTTP(GitHubHTTP):
-    def get(self, host: str, path: str, limit: int, seconds: float = 10) -> bytes:
+    def get(
+        self, host: str, path: str, limit: int, seconds: float = 10, *, media: str = "json"
+    ) -> bytes:
         # The actual API resolves an immutable ref instead of current HEAD.
         if host == "api.github.com" and path.startswith(f"/repos/{args.repository}/commits/"):
             path = f"/repos/{args.repository}/commits/{sha}"
-        return super().get(host, path, limit, seconds)
+        return super().get(host, path, limit, seconds, media=media)
 
 
 http = PinnedHTTP(token)

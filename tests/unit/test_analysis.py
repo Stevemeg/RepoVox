@@ -170,11 +170,14 @@ def test_metadata_pin_and_private() -> None:
         calls: list[str] = []
         private = False
 
-        def get(self, host: str, path: str, limit: int, seconds: float = 10) -> bytes:
+        def get(
+            self, host: str, path: str, limit: int, seconds: float = 10, *, media: str = "json"
+        ) -> bytes:
             assert host == "api.github.com"
+            assert media == ("sha" if "/commits/" in path else "json")
             self.calls.append(path)
             return (
-                canonical({"sha": SHA})
+                SHA.encode("ascii")
                 if "/commits/" in path
                 else canonical(
                     {

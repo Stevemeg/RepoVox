@@ -14,6 +14,13 @@ from typing import Any, BinaryIO
 from repovox.analysis.common import AnalysisError
 
 ORIGINS = frozenset({"api.github.com", "codeload.github.com"})
+# API media types: what is sent as Accept, and the single content type the answer must carry.
+# "sha" asks a commit endpoint for the 40 hex characters of the resolved commit only, without
+# the changed-file list and patches GitHub otherwise embeds in the commit object.
+API_MEDIA = {
+    "json": ("application/vnd.github+json", "application/json"),
+    "sha": ("application/vnd.github.sha", "application/vnd.github.sha"),
+}
 DNS_SLOTS = threading.BoundedSemaphore(4)
 SPECIAL = tuple(
     ipaddress.ip_network(value)
@@ -124,8 +131,12 @@ class GitHubHTTP:
         limit: int,
         seconds: float = 10,
         checkpoint: Callable[[], None] = lambda: None,
+        *,
+        media: str = "json",
     ) -> Iterator[Iterator[bytes]]:
         if host not in ORIGINS or not path.startswith("/") or any(ord(c) < 33 for c in path):
+            raise AnalysisError("github_origin_blocked")
+        if media not in API_MEDIA or (media != "json" and host != "api.github.com"):
             raise AnalysisError("github_origin_blocked")
         deadline = time.monotonic() + seconds
         connection = PinnedHTTPS(
@@ -146,7 +157,7 @@ class GitHubHTTP:
         timer.start()
         headers = {"User-Agent": "RepoVox-static/1", "Accept-Encoding": "identity"}
         if host == "api.github.com":
-            headers["Accept"] = "application/vnd.github+json"
+            headers["Accept"] = API_MEDIA[media][0]
             headers["X-GitHub-Api-Version"] = "2022-11-28"
             if self.token:
                 headers["Authorization"] = f"Bearer {self.token}"
@@ -158,7 +169,7 @@ class GitHubHTTP:
             response = connection.getresponse()
             response_error(response.status, response.headers)
             expected = (
-                {"application/json"}
+                {API_MEDIA[media][1]}
                 if host == "api.github.com"
                 else {
                     "application/x-gzip",
@@ -212,8 +223,10 @@ class GitHubHTTP:
             timer.cancel()
             connection.close()
 
-    def get(self, host: str, path: str, limit: int, seconds: float = 10) -> bytes:
-        with self.stream(host, path, limit, seconds) as chunks:
+    def get(
+        self, host: str, path: str, limit: int, seconds: float = 10, *, media: str = "json"
+    ) -> bytes:
+        with self.stream(host, path, limit, seconds, media=media) as chunks:
             return b"".join(chunks)
 
     def download(
