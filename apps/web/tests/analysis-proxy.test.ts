@@ -10,7 +10,11 @@ it.each([
     "development/projects/11111111-1111-4111-8111-111111111111/analysis-jobs",
   ],
   ["GET", "development/jobs/22222222-2222-4222-8222-222222222222/analysis"],
-])("forwards the authenticated analysis %s route", async (method, path) => {
+  [
+    "GET",
+    "video-jobs/33333333-3333-4333-8333-333333333333/videos/44444444-4444-4444-8444-444444444444/story",
+  ],
+])("forwards the authenticated %s route %s", async (method, path) => {
   const fetch = vi.fn().mockResolvedValue(
     new Response('{"kind":"verify"}', {
       status: method === "POST" ? 202 : 200,
@@ -42,6 +46,8 @@ it.each([
 it.each([
   "development/jobs/22222222-2222-4222-8222-222222222222/gold",
   "development/jobs/22222222-2222-4222-8222-222222222222/analysis?token=untrusted",
+  "video-jobs/33333333-3333-4333-8333-333333333333/videos/44444444-4444-4444-8444-444444444444/story/raw",
+  "video-jobs/33333333-3333-4333-8333-333333333333/story",
 ])("rejects an unapproved path or query %s without fetching", async (path) => {
   const fetch = vi.fn();
   vi.stubGlobal("fetch", fetch);

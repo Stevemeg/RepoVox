@@ -272,6 +272,34 @@ def test_submission_to_playback_publishes_both_video_categories(
     assert storyboard["story"]["story"]["problem_statement"]["sufficiency"] == "insufficient"
     assert [s["type"] for s in storyboard["scenes"]][:2] == ["introduction", "problem"]
     assert any(s["diagram"] for s in storyboard["scenes"])
+    # The walkthrough's metadata says how it was worded and voiced; the story itself is
+    # served by its own owner-scoped route, never in the job listing.
+    walkthrough = next(v for v in done["videos"] if v["category"] == "walkthrough")
+    narration = walkthrough["metadata"]["narration"]
+    assert "story" not in walkthrough["metadata"]
+    assert (narration["refiner"], narration["provider"], narration["model"]) == (
+        "deterministic-template-1.0",
+        "deterministic",
+        None,
+    )
+    assert narration["tts_provider"] == "deterministic" and narration["tts_voice"]
+    assert explainer["metadata"]["narration"]["tts_provider"] == "deterministic"
+    story_route = f"/v1/video-jobs/{job['id']}/videos/{walkthrough['id']}/story"
+    told = a.get(story_route)
+    assert told.status_code == 200, told.text
+    view = told.json()
+    assert view["narration"] == narration and view["category"] == "walkthrough"
+    assert view["story"]["problem_statement"]["sufficiency"] == "insufficient"
+    assert view["story"]["commit_sha"] == "a" * 40
+    assert view["story"]["status_labels"]["DOCUMENTATION_ONLY"] == (
+        "AUTHOR-STATED / NOT VERIFIED BY CODE"
+    )
+    assert "/tmp/" not in told.text and "repovox-media-" not in told.text
+    assert b.get(story_route).status_code == 404
+    unrelated = a.get(f"/v1/video-jobs/{job['id']}/videos/{explainer['id']}/story")
+    assert unrelated.status_code == 404
+    assert unrelated.json()["error"]["code"] == "story_not_available"
+    assert TestClient(a.app).get(story_route).status_code == 401
 
     for video in done["videos"]:
         base = f"/v1/video-jobs/{job['id']}/videos/{video['id']}"

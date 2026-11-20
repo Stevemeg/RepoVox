@@ -188,14 +188,18 @@ URLS = {
 KINDS = list(URLS)
 
 
-def provider(kind: str, handler: Callable[[httpx.Request], httpx.Response]) -> HTTPProvider:
+def provider(
+    kind: str,
+    handler: Callable[[httpx.Request], httpx.Response],
+    temperature: float | None = None,
+) -> HTTPProvider:
     cls = {
         "ollama": OllamaProvider,
         "openai_compatible": OpenAICompatibleProvider,
         "anthropic": AnthropicProvider,
     }[kind]
     key = None if kind == "ollama" else SecretStr(KEY)
-    return cls(URLS[kind], "test-model:1", 5.0, key, httpx.MockTransport(handler))
+    return cls(URLS[kind], "test-model:1", 5.0, key, httpx.MockTransport(handler), temperature)
 
 
 def model(kind: str, rewrite: Rewrite = faithful, seen: list[Any] | None = None) -> HTTPProvider:
@@ -323,6 +327,24 @@ def test_timeout_is_bounded(seconds: float) -> None:
         Settings(**BASE, llm_provider="ollama", llm_model="m", llm_timeout_seconds=seconds)
 
 
+@pytest.mark.parametrize("value", [-0.1, 1.5])
+def test_temperature_is_bounded_when_set(value: float) -> None:
+    with pytest.raises(ValidationError):
+        Settings(**BASE, llm_provider="ollama", llm_model="m", llm_temperature=value)
+
+
+def test_temperature_is_unset_by_default_and_reaches_the_provider_when_set() -> None:
+    plain = Settings(**BASE, llm_provider="anthropic", llm_model="m", llm_api_key=KEY)
+    assert plain.llm_temperature is None
+    made = provider_from_settings(plain)
+    assert made is not None and made.temperature is None and made.sampling() == {}
+    tuned = Settings(
+        **BASE, llm_provider="anthropic", llm_model="m", llm_api_key=KEY, llm_temperature=0
+    )
+    made = provider_from_settings(tuned)
+    assert made is not None and made.sampling() == {"temperature": 0}
+
+
 def test_default_endpoints_and_ollama_never_sends_the_key() -> None:
     for provider_name, url in URLS.items():
         settings = Settings(**BASE, llm_provider=provider_name, llm_model="m", llm_api_key=KEY)
@@ -355,15 +377,17 @@ def test_the_api_key_is_never_shown_serialized_or_put_in_an_error() -> None:
 # ---------------------------------------------------------------- 2. the three provider adapters
 
 
+@pytest.mark.parametrize("temperature", [None, 0.3])
 @pytest.mark.parametrize("kind", KINDS)
-def test_each_provider_sends_its_documented_request(kind: str) -> None:
+def test_each_provider_sends_its_documented_request(kind: str, temperature: float | None) -> None:
     seen: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request)
         return httpx.Response(200, json=envelope(kind, '{"scenes": {}}'))
 
-    assert provider(kind, handler).complete("system text", "user text") == '{"scenes": {}}'
+    made = provider(kind, handler, temperature)
+    assert made.complete("system text", "user text") == '{"scenes": {}}'
     (request,) = seen
     body = json.loads(request.content)
     assert request.method == "POST" and body["model"] == "test-model:1"
@@ -371,18 +395,21 @@ def test_each_provider_sends_its_documented_request(kind: str) -> None:
     if kind == "ollama":
         assert str(request.url) == "http://127.0.0.1:11434/api/chat"
         assert body["stream"] is False and body["format"] == "json"
-        assert body["options"] == {"temperature": 0}
+        # Ollama always pins sampling: 0 unless a temperature is configured.
+        assert body["options"] == {"temperature": 0 if temperature is None else temperature}
         assert "authorization" not in request.headers
     elif kind == "openai_compatible":
         assert str(request.url) == "https://api.openai.com/v1/chat/completions"
         assert request.headers["authorization"] == f"Bearer {KEY}"
-        assert body["temperature"] == 0
+        assert body.get("temperature") == temperature  # Omitted unless configured.
+        assert ("temperature" in body) == (temperature is not None)
         assert body["response_format"] == {"type": "json_object"}
     else:
         assert str(request.url) == "https://api.anthropic.com/v1/messages"
         assert request.headers["x-api-key"] == KEY
         assert request.headers["anthropic-version"] == "2023-06-01"
-        assert body["temperature"] == 0 and body["system"] == "system text"
+        assert ("temperature" in body) == (temperature is not None)
+        assert body.get("temperature") == temperature and body["system"] == "system text"
         assert body["messages"] == [{"role": "user", "content": "user text"}]
         assert body["max_tokens"] > 0
 
@@ -1088,22 +1115,36 @@ def test_worker_stage_14_keeps_provenance_with_the_published_video(
     store = Store(archive)
     refiner = GroundedLLMRefiner(model("ollama")) if grounded else DETERMINISTIC
     body, finish = published(run_stage(payload, store, 10, [], refiner), store)
-    store.objects["speech"], store.objects["frames"] = b"speech", b"frames"
+    voice = {"tts_provider": "kokoro_onnx", "tts_engine": "kokoro-onnx", "tts_voice": "af_heart"}
+    speech = stages.bundle(
+        {"narration.wav": b"RIFF", "timings.json": b"[]", "voice.json": stages.encoded(voice)}
+    )
+    store.objects["speech"], store.objects["frames"] = speech, b"frames"
 
-    def encode(speech: bytes, frames: bytes, scratch: Path, checkpoint: Any) -> Any:
-        assert (speech, frames) == (b"speech", b"frames")
-        return b"\x00video", {"video_frames": 30, "full_decode": "passed", "captions": "WEBVTT"}
+    def encode(sent: bytes, frames: bytes, scratch: Path, checkpoint: Any) -> Any:
+        assert (sent, frames) == (speech, b"frames")
+        return b"video", {"video_frames": 30, "full_decode": "passed", "captions": "WEBVTT"}
 
     monkeypatch.setattr("repovox.media.worker.stages.encode_stage", encode)
     outputs = [
         {"ordinal": 10, "key": finish["key"], "bytes": len(body)},
-        {"ordinal": 12, "key": "speech", "bytes": 6},
+        {"ordinal": 12, "key": "speech", "bytes": len(speech)},
         {"ordinal": 13, "key": "frames", "bytes": 6},
     ]
     (done,) = run_stage(payload, store, 14, outputs).called("mv.finish")
     video = json.loads(done["summary"])["video"]
+    narration = video["narration"]
+    assert {k: narration[k] for k in voice} == voice  # The voice that spoke, by name only.
     if grounded:
-        assert video["narration"] == json.loads(body)["story"]["narration"]
-        assert video["narration"]["fallback_reason"] is None
+        stored = json.loads(body)["story"]["narration"]
+        assert {k: v for k, v in narration.items() if k not in voice} == stored
+        assert narration["fallback_reason"] is None and narration["provider"] == "ollama"
     else:
-        assert "narration" not in video
+        assert (narration["refiner"], narration["provider"], narration["model"]) == (
+            DETERMINISTIC.name,
+            "deterministic",
+            None,
+        )
+        assert narration["scenes_refined"] == 0 and narration["rejection_reasons"] == {}
+    assert video["story"]["view_version"] == "engineering-story-view-1.0"
+    assert video["story"]["commit_sha"] == json.loads(body)["commit_sha"]
