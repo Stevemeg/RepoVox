@@ -1044,10 +1044,15 @@ def extract_story(
                 ),
                 [symbol["start_line"]],
             )
-            if made is not None:
+            # Only a claim the story will publish can corroborate; one past its cap cannot.
+            if made is not None and made.id in kept_ids(builder):
                 supports.append(made)
         named_tech = [tech for tech, mention in mentions.items() if mention == line]
-        supports += [technology_claims[t] for t in named_tech if t in technology_claims]
+        supports += [
+            technology_claims[t]
+            for t in named_tech
+            if t in technology_claims and technology_claims[t].id in kept_ids(builder)
+        ]
         intended = builder.claim(
             "intended_solution",
             "intended_solution",
@@ -1295,7 +1300,7 @@ def extract_story(
             ),
             architecture=architecture,
             implementation_evidence=ImplementationEvidence(
-                claims=builder.take("implementation_evidence", 24)
+                claims=builder.take("implementation_evidence", 16)
             ),
             demonstrated_outcomes=DemonstratedOutcomes(
                 claims=builder.take("demonstrated_outcomes", 16)
@@ -1313,21 +1318,31 @@ def extract_story(
     return story
 
 
+# The artifact caps `extract_story` applies when it assembles the story, as the schema allows.
+CAPS = {
+    "problem_statement": 12,
+    "problem_context": 12,
+    "intended_solution": 16,
+    "implementation_evidence": 16,
+    "demonstrated_outcomes": 16,
+    "limitations": 16,
+    "unresolved_questions": 24,
+}
+
+
+def kept_ids(builder: Builder) -> set[str]:
+    """Claims that survive the artifact caps. A claim keeps its position once it is made."""
+    approach = list(builder.groups.get("implementation_approach", {}).values())
+    implemented = [c for c in approach if c.evidence_type == "implemented_solution"][:16]
+    decisions = [c for c in approach if c.evidence_type == "intended_solution"][:4]
+    return {c.id for artifact, limit in CAPS.items() for c in builder.take(artifact, limit)} | {
+        c.id for c in implemented + decisions
+    }
+
+
 def referenced(mismatch: Mismatch, builder: Builder) -> bool:
     """A mismatch survives only if every claim it names survived the artifact caps."""
-    caps = {
-        "problem_statement": 12,
-        "problem_context": 12,
-        "intended_solution": 16,
-        "implementation_evidence": 24,
-        "demonstrated_outcomes": 16,
-        "limitations": 16,
-        "unresolved_questions": 24,
-    }
-    kept = {c.id for artifact, limit in caps.items() for c in builder.take(artifact, limit)} | {
-        c.id for c in builder.groups.get("implementation_approach", {}).values()
-    }
-    return set(mismatch.stated_claim_ids + mismatch.evidence_claim_ids) <= kept
+    return set(mismatch.stated_claim_ids + mismatch.evidence_claim_ids) <= kept_ids(builder)
 
 
 def citation_spans(citations: Iterable[Citation], limit: int = 4) -> list[tuple[str, int, int]]:
