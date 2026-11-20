@@ -117,9 +117,11 @@ def annotate(root: Node, body: bytes, lang: str, symbols: list[dict[str, Any]]) 
             meta.import_module = s["name"]
             meta.imported_member = member
             meta.local_binding = s.get("alias") or None
-            meta.type_only = any(c.type == "type" for c in node.children) or bool(
-                s.pop("_type_only", False)
-            )
+            # Always remove the parser's private marker: it is not a 2.3 `Symbol` field. An
+            # `or` here once skipped the pop for `import type {...}`, which then failed the
+            # strict contract.
+            marked = bool(s.pop("_type_only", False))
+            meta.type_only = any(c.type == "type" for c in node.children) or marked
         if s["kind"] in {"function", "class", "import"}:
             name = meta.local_binding if s["kind"] == "import" else s["name"]
             if name and name != "anonymous":
