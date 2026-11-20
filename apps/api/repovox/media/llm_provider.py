@@ -1,8 +1,11 @@
 """Narration model adapters: one bounded JSON request per storyboard, fixed error codes only.
 
 Used by `refiner.GroundedLLMRefiner`, outside the parser sandbox, on the verified storyboard
-plan; never on repository files. Each adapter sends one request with temperature 0 and no
-retries. It refuses redirects and ignores proxy, certificate and netrc environment variables.
+plan; never on repository files. Each adapter sends one request with no retries. Ollama always
+sends a temperature (0 unless configured). Hosted adapters send one only when
+`REPOVOX_LLM_TEMPERATURE` is set, because current Claude and OpenAI reasoning models reject a
+sampling parameter with HTTP 400. Each adapter refuses redirects and ignores proxy,
+certificate and netrc environment variables.
 The connect, read and total time are bounded, and the response is read only up to
 `RESPONSE_LIMIT` bytes. Timeouts, non-2xx answers and malformed bodies raise
 `LLMProviderError` with a fixed code, so the caller can fall back to the deterministic
@@ -54,6 +57,7 @@ class HTTPProvider:
     timeout: float
     api_key: SecretStr | None = None
     transport: httpx.BaseTransport | None = None  # Injected only by tests.
+    temperature: float | None = None  # None: hosted adapters omit the parameter.
 
     name = "http"
 
@@ -123,6 +127,10 @@ class HTTPProvider:
     def messages(self, system: str, user: str) -> list[dict[str, str]]:
         return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
+    def sampling(self) -> dict[str, float]:
+        """The sampling parameter for a hosted request: present only when configured."""
+        return {} if self.temperature is None else {"temperature": self.temperature}
+
 
 def text_of(value: object) -> str:
     if not isinstance(value, str) or not value.strip():
@@ -144,7 +152,7 @@ class OllamaProvider(HTTPProvider):
                 "messages": self.messages(system, user),
                 "stream": False,
                 "format": "json",
-                "options": {"temperature": 0},
+                "options": {"temperature": 0 if self.temperature is None else self.temperature},
             },
         )
         message = data.get("message")
@@ -165,7 +173,7 @@ class OpenAICompatibleProvider(HTTPProvider):
             {
                 "model": self.model,
                 "messages": self.messages(system, user),
-                "temperature": 0,
+                **self.sampling(),
                 "response_format": {"type": "json_object"},
             },
         )
@@ -190,7 +198,7 @@ class AnthropicProvider(HTTPProvider):
             {
                 "model": self.model,
                 "max_tokens": ANTHROPIC_MAX_TOKENS,
-                "temperature": 0,
+                **self.sampling(),
                 "system": system,
                 "messages": [{"role": "user", "content": user}],
             },
@@ -228,7 +236,12 @@ def provider_from_settings(
         raise LLMProviderError("llm_not_configured")  # Settings validation already refuses this.
     key = None if settings.llm_provider == "ollama" else settings.llm_api_key
     return PROVIDERS[settings.llm_provider](
-        endpoint, settings.llm_model, settings.llm_timeout_seconds, key, transport
+        endpoint,
+        settings.llm_model,
+        settings.llm_timeout_seconds,
+        key,
+        transport,
+        settings.llm_temperature,
     )
 
 

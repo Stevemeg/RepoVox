@@ -99,6 +99,9 @@ class Settings(BaseSettings):
     llm_base_url: str | None = None
     llm_api_key: SecretStr | None = None
     llm_timeout_seconds: float = Field(default=20.0, ge=1.0, le=120.0)
+    # Unset: hosted providers receive no sampling parameter, which current reasoning and
+    # Claude models require; Ollama keeps temperature 0. Set only to send an explicit value.
+    llm_temperature: float | None = Field(default=None, ge=0.0, le=1.0)
 
     @property
     def llm_endpoint(self) -> str | None:
