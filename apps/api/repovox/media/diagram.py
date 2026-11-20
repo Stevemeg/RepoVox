@@ -243,10 +243,16 @@ def short_layer(value: str) -> str:
 # about it (its kind, role and declaring path); no component or relationship is ever added.
 TIER_ORDER = ("client", "api", "service", "platform")
 TIER_NAMES = {
-    "client": ("CLIENT", "FRONTEND"),
-    "api": ("API", "ROUTES"),
+    "client": ("CLIENT /", "FRONTEND"),
+    "api": ("API /", "ROUTES"),
     "service": ("CORE", "SERVICES"),
-    "platform": ("ML/WORKERS", "DATA & EXT"),
+    "platform": ("ML / DATA", "& EXTERNAL"),
+}
+TIER_TITLES = {
+    "client": "CLIENT / FRONTEND",
+    "api": "API / ROUTES",
+    "service": "CORE SERVICES",
+    "platform": "ML / DATA & EXTERNAL",
 }
 TIER_COLORS: dict[str, Color] = {
     "client": (96, 165, 250),
@@ -333,8 +339,39 @@ AREA_TOP, AREA_BOTTOM, CONTENT_X, CONTENT_W = 126, 540, 182, 1052
 Band = tuple[str, Box]
 
 
-def classify(component: Component) -> tuple[str, str]:
-    """(tier, role badge) from the IR's own kind, role and declaring path."""
+SUBSYSTEM_TIERS = {
+    "client": ("client", "UI"),
+    "api": ("api", "API"),
+    "service": ("service", "SVC"),
+    "ml": ("platform", "ML"),
+    "data": ("platform", "DATA"),
+    "worker": ("platform", "SVC"),
+}
+
+
+Roles = dict[str, str]  # Directory -> subsystem role, as the system map tiered it from code.
+
+
+def classify(component: Component, roles: Roles | None = None) -> tuple[str, str]:
+    """(tier, role badge) from the IR's own kind, role and declaring path.
+
+    `roles` are the system map's subsystem roles by directory. When given, a component
+    declared in one of those directories takes that subsystem's tier, so every video of a
+    report puts the same code in the same tier. Routes, external resources and model parts
+    keep their own tier.
+    """
+    if component.kind.endswith("_subsystem") and component.role in SUBSYSTEM_TIERS:
+        return SUBSYSTEM_TIERS[component.role]  # Tiered from cited code by the system map.
+    folder = component.citations[0].path.rpartition("/")[0]
+    own = {"endpoint", "handler", "application", "service", "input", "output"}
+    if (
+        roles
+        and folder in roles
+        and component.group != "external"
+        and component.kind not in own | EXTERNAL_KINDS | ML_KINDS
+        and roles[folder] in SUBSYSTEM_TIERS
+    ):
+        return SUBSYSTEM_TIERS[roles[folder]]
     cited = component.citations[0].path.lower()
     path = f"{component.group.lower()}/{cited}"
     parts = set(re.split(r"[/\\]", path))
@@ -359,45 +396,101 @@ def classify(component: Component) -> tuple[str, str]:
     return "service", "SVC"
 
 
+Packed = tuple[str, list[Component], int, int]  # group, cards, card columns, width
+MAX_CONTAINERS = 4  # Containers side by side in one row of a tier; more wrap to a second row.
+
+
+def label_width(group: str) -> int:
+    """Room a container needs for a readable name: its last two path segments, at most."""
+    tail = "/".join(group.split("/")[-2:]) if group else "(unnamed)"
+    return min(len(tail), 18) * 12 + 22
+
+
+def container_rows(packed: list[Packed]) -> list[list[Packed]] | None:
+    """Containers in one row, or two when more than four or one row is too wide."""
+    width = sum(p[3] for p in packed) + (len(packed) - 1) * GAP
+    if len(packed) <= MAX_CONTAINERS and width <= CONTENT_W:
+        return [packed]
+    if len(packed) < 2:
+        return None
+    half = -(-len(packed) // 2)
+    lines = [packed[:half], packed[half:]]
+    if all(sum(p[3] for p in line) + (len(line) - 1) * GAP <= CONTENT_W for line in lines):
+        return lines
+    return None
+
+
+def chained(members: list[Component], connections: list[Connection]) -> list[Component]:
+    """Cards in reading order: each card is followed by the cards it points to, so a route
+    sits next to its handler and a line does not cross a neighbour."""
+    inside = {c.id for c in members}
+    after: dict[str, list[str]] = {}
+    pointed: set[str] = set()
+    for link in connections:
+        if link.source in inside and link.target in inside and link.kind not in FEEDBACK:
+            after.setdefault(link.source, []).append(link.target)
+            pointed.add(link.target)
+    by_id = {c.id: c for c in members}
+    found: list[str] = []
+    for start in [c.id for c in members if c.id not in pointed] + [c.id for c in members]:
+        stack = [start]
+        while stack:
+            node = stack.pop(0)
+            if node in found:
+                continue
+            found.append(node)
+            stack[:0] = [n for n in after.get(node, []) if n not in found]
+    return [by_id[i] for i in found]
+
+
 def tiered(
-    components: list[Component], connections: list[Connection]
+    components: list[Component], connections: list[Connection], roles: Roles | None = None
 ) -> tuple[dict[str, Box], list[Lane], list[Band]] | None:
     """Tier bands top to bottom, one container per boundary, cards in flow order inside.
 
-    None when the view does not fit; the caller then uses `automatic`, which the IR's own
-    drawability check already guarantees.
+    A container is at least as wide as its name's last two segments, so names are not cut to
+    a shared prefix. A tier with more than four containers wraps them onto two rows. None when
+    the view does not fit; the caller then uses `automatic`, which the IR's own drawability
+    check already guarantees.
     """
     level = layers(components, connections)
     index = {c.id: i for i, c in enumerate(components)}
-    tier = {c.id: classify(c)[0] for c in components}
+    tier = {c.id: classify(c, roles)[0] for c in components}
     present = [t for t in TIER_ORDER if any(tier[c.id] == t for c in components)]
     groups = {
         t: list(dict.fromkeys(c.group for c in components if tier[c.id] == t)) for t in present
     }
     for card_w, card_h in CARD_SIZES:
-        plans: list[tuple[str, int, list[tuple[str, list[Component], int]], int]] = []
+        plans: list[tuple[str, int, list[list[Packed]]]] = []
         for t in present:
+            # The arrangement with the lowest band: stacking cards inside a container can be
+            # lower than wrapping its containers onto a second row.
+            options: list[tuple[int, int, list[list[Packed]]]] = []
             for rows in range(1, 8):
-                packed = []
-                width = 0
+                packed: list[Packed] = []
                 for group in groups[t]:
-                    members = sorted(
-                        (c for c in components if tier[c.id] == t and c.group == group),
-                        key=lambda c: (level[c.id], index[c.id]),
+                    members = chained(
+                        sorted(
+                            (c for c in components if tier[c.id] == t and c.group == group),
+                            key=lambda c: (level[c.id], index[c.id]),
+                        ),
+                        connections,
                     )
                     cols = -(-len(members) // rows)
-                    box_w = cols * card_w + (cols - 1) * GAP + 2 * PAD
-                    packed.append((group, members, cols))
-                    width += box_w
-                width += (len(packed) - 1) * GAP
-                if width <= CONTENT_W:
-                    plans.append((t, rows, packed, width))
-                    break
-            else:
+                    cards = cols * card_w + (cols - 1) * GAP + 2 * PAD
+                    packed.append((group, members, cols, max(cards, label_width(group))))
+                lines = container_rows(packed)
+                if lines is not None:
+                    row = HEAD + rows * (card_h + GAP) - GAP + 2 * PAD
+                    options.append((len(lines) * row + (len(lines) - 1) * GAP, rows, lines))
+            if not options:
                 break
+            _, rows, lines = min(options, key=lambda o: (o[0], o[1]))
+            plans.append((t, rows, lines))
         if len(plans) != len(present):
             continue
-        heights = [HEAD + rows * (card_h + GAP) - GAP + 2 * PAD for _, rows, _, _ in plans]
+        row_h = {t: HEAD + rows * (card_h + GAP) - GAP + 2 * PAD for t, rows, _ in plans}
+        heights = [len(lines) * row_h[t] + (len(lines) - 1) * GAP for t, _, lines in plans]
         total = sum(heights) + BAND_GAP * (len(plans) - 1)
         if total > AREA_BOTTOM - AREA_TOP:
             continue
@@ -405,21 +498,27 @@ def tiered(
         lanes: list[Lane] = []
         bands: list[Band] = []
         y = AREA_TOP + (AREA_BOTTOM - AREA_TOP - total) // 2
-        for (t, rows, packed, width), height in zip(plans, heights, strict=True):
+        for (t, rows, lines), height in zip(plans, heights, strict=True):
             bands.append((t, (40, y, 1200, height)))
-            x = CONTENT_X + (CONTENT_W - width) // 2
-            for group, members, cols in packed:
-                box_w = cols * card_w + (cols - 1) * GAP + 2 * PAD
-                lanes.append((group, (x, y + 2, box_w, height - 4)))
-                for n, member in enumerate(members):
-                    column, row = divmod(n, rows)
-                    boxes[member.id] = (
-                        x + PAD + column * (card_w + GAP),
-                        y + HEAD + PAD + row * (card_h + GAP) - 4,
-                        card_w,
-                        card_h,
-                    )
-                x += box_w + GAP
+            top = y
+            for line in lines:
+                width = sum(p[3] for p in line) + (len(line) - 1) * GAP
+                x = CONTENT_X + (CONTENT_W - width) // 2
+                for group, members, _, box_w in line:
+                    lanes.append((group, (x, top + 2, box_w, row_h[t] - 4)))
+                    cols = -(-len(members) // rows)
+                    inner = cols * card_w + (cols - 1) * GAP
+                    left = x + PAD + (box_w - 2 * PAD - inner) // 2
+                    for n, member in enumerate(members):
+                        row, column = divmod(n, cols)  # Row by row: chains read across.
+                        boxes[member.id] = (
+                            left + column * (card_w + GAP),
+                            top + HEAD + PAD + row * (card_h + GAP) - 4,
+                            card_w,
+                            card_h,
+                        )
+                    x += box_w + GAP
+                top += row_h[t] + GAP
             y += height + BAND_GAP
         return boxes, lanes, bands
     return None
@@ -433,15 +532,42 @@ def fit(value: str, width: int, scale: int = 2) -> str:
 
 
 def fit_path(value: str, width: int) -> str:
-    """A path that fits, keeping its last segments: .../evaluation/EvaluationDetail.tsx."""
+    """A path that fits, keeping its end: .../evaluation/EvaluationDetail.tsx. When even the
+    last segment is too long, its end is kept (...ationDetail.tsx): never its shared start."""
     room = max(4, width // 12)
+    value = display(value, 400)
     if len(value) <= room:
         return value
     parts = value.split("/")
     while len(parts) > 1 and len(".../" + "/".join(parts)) > room:
         parts = parts[1:]
     shortened = ".../" + "/".join(parts)
-    return shortened if len(shortened) <= room else fit(value, width)
+    if len(shortened) <= room:
+        return shortened
+    return "..." + value[len(value) - (room - 3) :]
+
+
+def full_label(component: Component) -> str:
+    """A card's whole name; a route's card label may be cut, its anchors keep the path."""
+    path = component.anchors[0] if component.anchors else ""
+    method = component.label.split(" ", 1)[0]
+    whole = f"{method} {path}"
+    if component.kind == "endpoint" and whole.startswith(component.label):
+        return whole  # The label is this text cut to the card's 28 characters.
+    return component.label
+
+
+def card_label(component: Component, width: int) -> str:
+    """A card's name that fits. A route keeps its method and the end of its path, with
+    parameters shortened: POST .../{}/jobs, never POST /projects/..."""
+    if component.kind != "endpoint" or " /" not in component.label:
+        return fit(component.label, width)
+    method, path = full_label(component).split(" ", 1)
+    path = re.sub(r"\{[^}]*\}", "{}", path)
+    room = max(4, width // 12)
+    if len(f"{method} {path}") <= room:
+        return f"{method} {path}"
+    return f"{method} {fit_path(path, (room - len(method) - 1) * 12)}"
 
 
 def pill(canvas: Canvas, x: int, y: int, text: str, fill: Color, ink: Color) -> int:
@@ -472,7 +598,12 @@ class Diagram:
     """The architecture of one view, laid out in tiers and drawn with its narration state."""
 
     def __init__(
-        self, architecture: Architecture, repository: str, commit_sha: str, view: View | None = None
+        self,
+        architecture: Architecture,
+        repository: str,
+        commit_sha: str,
+        view: View | None = None,
+        roles: Roles | None = None,
     ) -> None:
         self.architecture = architecture
         self.header = f"REPOVOX / {repository} @ {commit_sha[:12]}"[:96]
@@ -483,7 +614,7 @@ class Diagram:
         self.connections = [c for c in architecture.connections if c.id in wanted]
         self.parts = {c.id: c for c in self.components}
         self.links = {c.id: c for c in self.connections}
-        self.badges = {c.id: classify(c)[1] for c in self.components}
+        self.badges = {c.id: classify(c, roles)[1] for c in self.components}
         table = LAYOUTS.get(architecture.type) if view is None else None
         self.lanes: list[Lane] = []
         self.bands: list[Band] = []
@@ -491,7 +622,7 @@ class Diagram:
         if fixed and table is not None:
             self.boxes = {c.id: table[c.id] for c in self.components}
         else:
-            found = tiered(self.components, self.connections)
+            found = tiered(self.components, self.connections, roles)
             if found is None:
                 self.boxes, self.lanes = automatic(self.components, self.connections)
             else:
@@ -549,9 +680,13 @@ class Diagram:
                 canvas.text(x + 10, y + 56 + i * 21, fit(short_layer(line), w - 20), 2, soft)
         else:
             canvas.text(
-                x + 9, y + 7 + max(0, h - CARD_H) // 3, fit(component.label, w - 18), 2, ink
+                x + 9, y + 7 + max(0, h - CARD_H) // 3, card_label(component, w - 18), 2, ink
             )
             detail = component.lines[0] if component.lines else component.role
+            if component.group == "external":
+                detail = component.kind  # What it stands for: a database, object storage.
+            elif component.kind == "endpoint":
+                detail = "route"
             detail = ROLE_NAMES.get(detail, detail).replace("latent size", "size").replace("_", " ")
             room = w - 18 - (len(badge) * 12 + 18)
             canvas.text(x + 9, y + h - 20, fit(detail, room), 2, soft)
@@ -611,9 +746,15 @@ class Diagram:
             link = self.links.get(connections[0])
             x += pill(canvas, x, 96, f"STEP {step[0]} OF {step[1]}", ACCENT, BG) + 10
             if link is not None:
-                source = self.parts[link.source].label if link.source in self.parts else ""
-                target = self.parts[link.target].label if link.target in self.parts else ""
+                source = full_label(self.parts[link.source]) if link.source in self.parts else ""
+                target = full_label(self.parts[link.target]) if link.target in self.parts else ""
                 canvas.text(x, 100, fit(f"{source} -> {target}", 1240 - 360 - x), 2, TEXT)
+        elif components and not connections and self.whole_tier(components):
+            # A whole tier narrated at once: name the tier and how many cards it holds.
+            tier = self.tier_of[components[0]]
+            x += pill(canvas, x, 96, TIER_TITLES[tier], TIER_COLORS[tier], BG) + 10
+            count = len(components)
+            canvas.text(x, 100, fit(f"{count} in this tier", 1240 - 360 - x), 2, TEXT)
         elif components and not connections and len(components) <= 3:
             first = self.parts.get(components[0])
             if first is not None:
@@ -709,6 +850,14 @@ class Diagram:
         label = f"{position + 1}/{total}"
         canvas.text(WIDTH - 40 - len(label) * 12, 684, label, 2, MUTED)
         return canvas
+
+    def whole_tier(self, components: tuple[str, ...]) -> bool:
+        """Two or more cards that are exactly one drawn tier's cards."""
+        tiers = {self.tier_of.get(c, "") for c in components}
+        if len(components) < 2 or len(tiers) != 1 or "" in tiers:
+            return False
+        tier = tiers.pop()
+        return set(components) == {c for c, t in self.tier_of.items() if t == tier}
 
     def ends(self, connection: str) -> tuple[str, str]:
         link = self.links[connection]

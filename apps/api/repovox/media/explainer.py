@@ -20,7 +20,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from repovox.analysis.common import digest
-from repovox.media.archgraph import sentence
+from repovox.media.archgraph import directory_roles, route_words, sentence
 from repovox.media.architecture import (
     Architecture,
     ArchitectureError,
@@ -29,7 +29,7 @@ from repovox.media.architecture import (
     Report,
     validate,
 )
-from repovox.media.diagram import Diagram
+from repovox.media.diagram import TIER_ORDER, Diagram, classify
 from repovox.media.narration import FPS, Voice, assemble, detect
 from repovox.media.speech import SpeechCache, audio_text, natural, speak, vocabulary
 from repovox.media.stages import (
@@ -42,6 +42,8 @@ from repovox.media.stages import (
     timestamp,
 )
 from repovox.media.storyboard import display
+from repovox.media.system_view import TIER_WORDS
+from repovox.media.system_view import TYPE as SYSTEM_TYPE
 
 VERSION = "architecture-explainer-1.0"
 ANIMATION_STEP = 6  # Video frames per animation frame: five diagram updates per second.
@@ -109,6 +111,8 @@ def listing(items: list[str]) -> str:
 
 def narrate(architecture: Architecture) -> tuple[Line, ...]:
     """Educational order: purpose, components, inputs and outputs, flow, decisions, unknowns."""
+    if architecture.type == SYSTEM_TYPE:
+        return narrate_system(architecture)
     if architecture.views:
         return narrate_graph(architecture)
     script = Script(architecture)
@@ -264,20 +268,27 @@ KIND_WORDS = {
 }
 
 
+DISCLOSURE = (
+    "Solid borders are verified bindings. Dashed borders are inferred: a name bound only by a "
+    "unique top-level definition, or a request path matched to a route by its text. Each "
+    "card's border and citation show which."
+)
+
+
 def describe(component: Component) -> str:
-    """One sentence about a component, using only what the IR records about it."""
+    """One sentence about a component, using only what the IR records about it. Whether its
+    binding is verified is said once per view (`DISCLOSURE`) and shown by its border."""
+    if component.kind.endswith("_subsystem"):
+        return describe_subsystem(component)
     detail = component.lines[0] if component.lines else ""
-    weak = "" if component.status == "VERIFIED" else " Its binding is inferred, not confirmed."
     if component.kind in {"function", "class"}:
         extra = f", which {detail}" if detail.startswith("takes") else ""
         extra = f", with {detail}" if detail.startswith("methods") else extra
-        return (
-            f"{component.label} is a {component.kind} declared in {component.group}{extra}.{weak}"
-        )
+        return f"{component.label} is a {component.kind} declared in {component.group}{extra}."
     if component.kind == "part":
-        return f"{component.label} is a part the class constructs as {detail}.{weak}"
+        return f"{component.label} is a part the class constructs as {detail}."
     if component.kind == "endpoint":
-        return f"{component.label} is a route declared in {component.group}."
+        return f"{route_words(component)} is a route declared in {component.group}."
     if component.kind == "source_file":
         return f"{component.label} is a {detail} file under {component.group}."
     if component.group == "external":
@@ -285,9 +296,142 @@ def describe(component: Component) -> str:
         what = "a client library" if detail == "client library" else "a built-in function"
         return (
             f"{component.label} is {what} for a {kind}. It stands for something "
-            f"outside this repository.{weak}"
+            f"outside this repository."
         )
-    return f"{component.label} is a {KIND_WORDS.get(component.kind, component.kind)}.{weak}"
+    return f"{component.label} is a {KIND_WORDS.get(component.kind, component.kind)}."
+
+
+ROLE_PHRASES = {
+    "client": "client code",
+    "ml": "model code",
+    "data": "data access",
+    "worker": "background work",
+    "service": "core logic",
+}
+
+
+def facts_of(component: Component) -> dict[str, str]:
+    """The system map's card lines, by what they state."""
+    found: dict[str, str] = {"detail": component.lines[0] if component.lines else ""}
+    for line in component.lines[1:]:
+        if line.startswith("declares "):
+            found["declares"] = line.removeprefix("declares ")
+        elif line.startswith("e.g. "):
+            found["example"] = line.removeprefix("e.g. ")
+        elif line.endswith(("file", "files")):
+            found["files"] = line
+    return found
+
+
+def describe_subsystem(component: Component) -> str:
+    """What a subsystem is, from its card lines: its tier evidence, size and declarations."""
+    facts = facts_of(component)
+    detail = facts["detail"]
+    counted = detail.endswith(("file", "files"))
+    files = facts.get("files") or (detail if counted else "its files")
+    where = f"{component.label}, in {component.group},"
+    names = facts["declares"].split(", ") if facts.get("declares") else []
+    declared = f" It declares {listing(names)}." if names else ""
+    if component.role == "api" and detail.endswith(("route", "routes")):
+        example = f", such as {facts['example']}" if facts.get("example") else ""
+        return f"{where} declares {detail}{example}, across {files}."
+    if component.role == "api":
+        what = "a command-line entry point" if detail == "CLI" else "the web application object"
+        return f"{where} holds {what}, across {files}.{declared}"
+    if detail and not counted:
+        role = ROLE_PHRASES.get(component.role, "code")
+        return f"{where} imports {detail}, which marks it as {role}, across {files}.{declared}"
+    return f"{where} has {files}.{declared}"
+
+
+def narrate_system(architecture: Architecture) -> tuple[Line, ...]:
+    """The whole-repository map: its tiers, the subsystems in each, one end-to-end path across
+    them, the other cross-tier links, and what is not established. The binding status is
+    disclosed once; every card keeps its badge, border and citation on screen."""
+    script = Script(architecture)
+    parts = {c.id: c for c in architecture.components}
+    view = architecture.views[0]
+    top = [parts[i] for i in view.component_ids]
+    tiers: dict[str, list[Component]] = {}
+    for component in top:
+        tiers.setdefault(classify(component)[0], []).append(component)
+    present = [t for t in TIER_ORDER if t in tiers]
+    subsystems = [c for c in top if c.kind.endswith("_subsystem")]
+    script.say(
+        "purpose",
+        f"{architecture.title}. This map puts {len(subsystems)} subsystems of the repository in "
+        f"{len(present)} {'tier' if len(present) == 1 else 'tiers'}, "
+        f"{listing([TIER_WORDS[t] for t in present])}, joined by {len(view.connection_ids)} "
+        "cited static relationships.",
+        architecture.status,
+        tuple(c.id for c in top),
+        (),
+        tuple(c.citations[0] for c in subsystems[:6]),
+    )
+    if any(c.status != "VERIFIED" for c in architecture.connections) or any(
+        c.status != "VERIFIED" for c in top
+    ):
+        script.say("purpose", DISCLOSURE)
+    spoken = 0
+    for tier in present:
+        members = tiers[tier]
+        groups = list(dict.fromkeys(c.group for c in members if c.group != "external"))
+        where = f", under {listing(groups[:3])}" if groups else ""
+        script.say(
+            "tiers",
+            f"The {TIER_WORDS[tier]} tier holds {listing([c.label for c in members])}{where}.",
+            "VERIFIED" if all(c.status == "VERIFIED" for c in members) else "INFERRED",
+            tuple(c.id for c in members),
+            (),
+            tuple(c.citations[0] for c in members[:6]),
+        )
+        # Two subsystems of each tier are described, three of the model and data tier.
+        for component in [c for c in members if c.kind.endswith("_subsystem")][
+            : 3 if tier == "platform" else 2
+        ]:
+            if spoken >= 10:
+                break
+            onward = [
+                parts[c.target].label
+                for c in architecture.connections
+                if c.source == component.id
+                and c.id in view.connection_ids
+                and TIER_ORDER.index(classify(parts[c.target])[0]) > TIER_ORDER.index(tier)
+            ]
+            unique = list(dict.fromkeys(onward))[:3]
+            link = f" It links onward to {listing(unique)}." if unique else ""
+            script.say(
+                "subsystems",
+                describe(component) + link,
+                component.status,
+                (component.id,),
+                (),
+                component.citations,
+            )
+            spoken += 1
+    for position, flow in enumerate(architecture.flows):
+        section = "flow" if position == 0 else "links"
+        if position:
+            opening = "Other links that cross a tier boundary."
+        elif len(present) > 1:
+            opening = "Now one path across the tiers, one cited relationship at a time."
+        else:
+            opening = "Now one path through the subsystems, one cited relationship at a time."
+        script.say(section, opening)
+        for step in flow.steps[: 6 if position == 0 else 4]:
+            script.say(
+                section,
+                step.text,
+                step.status,
+                step.component_ids,
+                step.connection_ids,
+                step.citations,
+            )
+    if architecture.unresolved:
+        script.say("unknowns", "Static analysis did not establish the following.")
+        for item in architecture.unresolved[:5]:
+            script.say("unknowns", f"{item.topic.capitalize()}: {item.reason}", "UNRESOLVED")
+    return tuple(script.lines)
 
 
 def narrate_graph(architecture: Architecture) -> tuple[Line, ...]:
@@ -310,6 +454,8 @@ def narrate_graph(architecture: Architecture) -> tuple[Line, ...]:
         (),
         tuple(c.citations[0] for c in shown[:6]),
     )
+    if any(c.status != "VERIFIED" for c in shown):
+        script.say("purpose", DISCLOSURE)  # Once per view, not once per card.
     for component in shown[:9]:
         script.say(
             "components",
@@ -447,10 +593,11 @@ def render_architecture(
     """Write one architecture's validated video bundle into an empty directory."""
     lines = narrate(architecture)
     check_narration(lines, architecture)
+    roles = directory_roles(next((a for a in report.architectures if a.type == SYSTEM_TYPE), None))
     diagrams = {
-        view.id: Diagram(architecture, report.repository, report.commit_sha, view)
+        view.id: Diagram(architecture, report.repository, report.commit_sha, view, roles)
         for view in architecture.views
-    } or {"overview": Diagram(architecture, report.repository, report.commit_sha)}
+    } or {"overview": Diagram(architecture, report.repository, report.commit_sha, None, roles)}
     scratch = work / "scratch"
     scratch.mkdir(mode=0o700)
     speech = []
@@ -473,7 +620,8 @@ def render_architecture(
         ]
         bar = (
             (steps.index(line.id) + 1, len(steps))
-            if line.connection_ids and line.section in {"flow", "zoom", "inputs and outputs"}
+            if line.connection_ids
+            and line.section in {"flow", "links", "zoom", "inputs and outputs"}
             else None
         )
         images = diagram_frames(

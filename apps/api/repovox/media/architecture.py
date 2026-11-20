@@ -1056,7 +1056,7 @@ def discover(payload: dict[str, Any], sources: dict[str, bytes]) -> Report:
     from repovox.media.archgraph import build
 
     generic = build(ctx, claimed, paired, len(architectures))
-    if generic and generic[0].type == "system_overview":
+    if generic and generic[0].type in {"system_overview", "system_architecture"}:
         architectures = [generic[0], *architectures, *generic[1:]]
     else:
         architectures += generic

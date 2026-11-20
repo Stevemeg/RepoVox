@@ -33,7 +33,14 @@ from repovox.analysis.common import DEFAULT_LIMITS, canonical, digest
 from repovox.analysis.contracts import PAYLOADS
 from repovox.analysis.privacy import redact
 from repovox.media.archgraph import sentence
-from repovox.media.architecture import Architecture, ArchitectureError, Citation, Report, check
+from repovox.media.architecture import (
+    Architecture,
+    ArchitectureError,
+    Citation,
+    Component,
+    Report,
+    check,
+)
 from repovox.media.story import (
     EXTRACTOR_VERSION,
     SCHEMA_VERSION,
@@ -231,6 +238,7 @@ TEMPLATES = {
     "declaration": "{path} declares the {kind} {name}.",
     "architecture_overview": ("{title}: {components} connected by {connections} in the source."),
     "component": "{label} is a {kind} in {group}.",
+    "tier": "The {tier} tier holds {members}.",
     "component_external": "{label} stands for a {kind} outside this repository.",
     "architecture_unavailable": (
         "Architecture discovery did not run for this story, so no architecture is described."
@@ -314,6 +322,7 @@ VOCABULARY = frozenset(
     | words("tsx documentation configuration top level matches declared entry rule service")
     | words("handler external client library builtin built in component components")
     | words("relationship relationships static was were")
+    | words("tier tiers subsystem subsystems client api core services ml data external")
 )
 
 
@@ -1475,7 +1484,9 @@ def describe_architecture(
             analysis=citation_claims(c for comp in shown[:4] for c in comp.citations[:1]),
             components=[c.id for c in shown],
         )
-    for component in shown[:5]:
+    if primary.type == "system_architecture":
+        tier_claims(builder, shown)
+    for component in shown[:5] if primary.type != "system_architecture" else []:
         status = ir_status(component.status)
         if status is None:
             continue
@@ -1543,6 +1554,32 @@ def describe_architecture(
         claims=builder.take("architecture", 12),
         workflow=tuple(workflow),
     )
+
+
+def tier_claims(builder: Builder, shown: list[Component]) -> None:
+    """The system map, tier by tier: which subsystems each holds, cited on their own lines."""
+    from repovox.media.diagram import TIER_ORDER, classify
+    from repovox.media.system_view import TIER_WORDS
+
+    tiers: dict[str, list[Component]] = {}
+    for component in shown:
+        tiers.setdefault(classify(component)[0], []).append(component)
+    for tier in TIER_ORDER:
+        members = tiers.get(tier, [])
+        statuses = [ir_status(c.status) for c in members]
+        if not members or None in statuses:
+            continue
+        labels = [c.label for c in members]
+        listed = labels[0] if len(labels) == 1 else ", ".join(labels[:-1]) + " and " + labels[-1]
+        builder.claim(
+            "architecture",
+            "implemented_solution",
+            "VERIFIED" if all(s == "VERIFIED" for s in statuses) else "INFERRED",
+            TEMPLATES["tier"].format(tier=TIER_WORDS[tier], members=listed),
+            [span for c in members[:4] for span in citation_spans(c.citations, 1)],
+            analysis=citation_claims(c for comp in members[:4] for c in comp.citations[:1]),
+            components=[c.id for c in members],
+        )
 
 
 def decisions_of(builder: Builder, report: Report | None) -> tuple[Claim, ...]:

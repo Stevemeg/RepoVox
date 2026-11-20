@@ -96,8 +96,13 @@ MUTATORS = {"append", "extend", "add", "update", "put", "send", "insert"}
 SCRIPT_MUTATORS = {"push", "unshift", "add", "set", "append"}
 ROUTE_METHODS = {"get", "post", "put", "patch", "delete"}
 ROUTE = re.compile(r"""@(\w+)\.(get|post|put|patch|delete)\(\s*["']([^"']+)["']""")
+# Python router objects, by the package that exports their constructor, and the keyword that
+# gives the prefix every route declared on one starts with.
+PY_ROUTERS = {"fastapi": {"APIRouter": "prefix"}, "flask": {"Blueprint": "url_prefix"}}
+FLASK_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
 URL = re.compile(r"""["'`](?:https?://[^/"'`\s]+)?(/[A-Za-z0-9_\-./]*)["'`]""")
 MAX_NODES = 10
+OVERVIEW_FILES = 9  # Files the file-level system overview can show.
 
 
 @dataclass
@@ -154,6 +159,7 @@ class Route:
     matchable: bool = True
     handler: str = ""  # The handler's definition id, once resolved.
     def_line: int = 0
+    label: str = ""  # What the route card shows, when it differs from `method path`.
 
 
 @dataclass
@@ -169,6 +175,42 @@ class FlowScope:
 
 
 Snapshot = tuple[dict[str, Component], dict[str, Connection], dict[str, str], dict[str, int]]
+
+
+def titled(lead_text: str, path: str, limit: int = 50) -> str:
+    """`lead_text` and as much of `path` as fits, keeping its end: never cut mid-word."""
+    room = limit - len(lead_text)
+    parts = path.split("/")
+    while len(parts) > 1 and len("/".join(parts)) > room:
+        parts = parts[1:]
+    tail = "/".join(parts)
+    if len(tail) > room:
+        tail = "..." + tail[len(tail) - max(1, room - 3) :]
+    return f"{lead_text}{tail}"
+
+
+def whole(lead_text: str, names: list[str], limit: int = 40) -> str:
+    """`lead_text` and as many whole names as fit; never a name cut short."""
+    shown: list[str] = []
+    for name in names:
+        if len(lead_text + ", ".join([*shown, name])) > limit and shown:
+            break
+        shown.append(name)
+    return (lead_text + ", ".join(shown))[:limit]
+
+
+def takes(parameters: list[str]) -> str:
+    return whole("takes ", parameters)
+
+
+def route_words(component: Component) -> str:
+    """A route card's full method and path; its label may be cut to fit the card."""
+    path = component.anchors[0] if component.anchors else ""
+    method = component.label.split(" ", 1)[0]
+    whole_text = f"{method} {path}"
+    if component.kind == "endpoint" and whole_text.startswith(component.label):
+        return whole_text  # The label is this text cut to the card's 28 characters.
+    return component.label
 
 
 def slug(value: str) -> str:
@@ -1580,16 +1622,19 @@ class Graph:
             citation = ctx.cite(definition.path, definition.line)
             anchor = definition.anchor
             if kind == "function" and definition.parameters:
-                lines = (("takes " + ", ".join(definition.parameters))[:40],)
+                lines = (takes(definition.parameters),)
             elif kind == "class":
                 methods = sorted(
-                    d.name.split(".")[-1]
-                    for d in repo.defs.values()
-                    if d.owner == key
-                    and not d.name.endswith("__")
-                    and not d.name.endswith(".constructor")
+                    (
+                        d.name.split(".")[-1]
+                        for d in repo.defs.values()
+                        if d.owner == key
+                        and not d.name.endswith("__")
+                        and not d.name.endswith(".constructor")
+                    ),
+                    key=lambda name: (name.startswith("_"), name),
                 )
-                lines = (("methods " + ", ".join(methods))[:40],) if methods else ()
+                lines = (whole("methods ", methods),) if methods else ()
         if citation is None or (anchor and anchor not in citation.quote):
             # The validator requires the cited line to show the element: never emit one
             # that it would reject.
@@ -1927,8 +1972,8 @@ def sentence(connection: Connection, components: dict[str, Component]) -> str:
         return f"The source of {source.label} contains a call to {target.label}."
     if connection.kind == "routes":
         return (
-            f"The route {source.label} is declared on {target.label}. Which handler serves "
-            f"a request at runtime is not verified."
+            f"The route {route_words(source)} is declared on {target.label}. Which handler "
+            f"serves a request at runtime is not verified."
         )
     if connection.kind == "imports":
         return f"{source.label} imports {target.label}."
@@ -2013,7 +2058,7 @@ def orchestrations(
         built = graph.architecture(
             f"graph-{start + len(found)}",
             "component_graph",
-            f"{name} in {scope.path}",
+            titled(f"{name} in "[:40], scope.path),
             views,
             unknown_callees(scope),
             tuple(i for k, i in top.items() if k.split("|", 1)[1].startswith("input::")),
@@ -2044,13 +2089,149 @@ def handler_of(repo: Repo, path: str, node: Node) -> str | None:
     return found
 
 
+def py_string(node: Node | None, body: bytes) -> str | None:
+    """A plain Python string literal's value: never an f-string, bytes or a concatenation."""
+    if node is None or node.type != "string":
+        return None
+    if any(c.type == "interpolation" for c in node.named_children):
+        return None
+    raw = text(node, body)
+    found = re.fullmatch(r"""[rRuU]?("|')([^"'\\\n]*)\1""", raw)
+    return found.group(2) if found else None
+
+
+@dataclass(frozen=True)
+class PyRouter:
+    """A module-level name bound once to `APIRouter(...)` or `Blueprint(...)`."""
+
+    line: int
+    prefix: str  # The literal prefix, without a trailing slash; "" when none is given.
+    prefix_line: int  # 0 when no prefix keyword is written.
+    known: bool  # False when a prefix keyword is written but is not a plain literal.
+
+
+def python_routers(repo: Repo, path: str, file: SourceFile) -> dict[str, PyRouter]:
+    """Router objects one Python file constructs from the constructor `fastapi` or `flask`
+    exports, as the analyzer recorded that import. A name assigned more than once at module
+    level is not a router: which object it holds is not settled by its syntax."""
+    factories: dict[str, str] = {}
+    for item in repo.by_path.get(path, []):
+        if item["kind"] != "import" or item["name"] not in PY_ROUTERS:
+            continue
+        syntax = item.get("syntax", {})
+        member = syntax.get("imported_member")
+        offered = PY_ROUTERS[item["name"]]
+        if member in offered:
+            factories[syntax.get("local_binding") or member] = member
+        elif not member:
+            alias = syntax.get("local_binding") or item["name"]
+            factories.update({f"{alias}.{name}": name for name in offered})
+    if not factories:
+        return {}
+    found: dict[str, PyRouter] = {}
+    counts: dict[str, int] = {}
+    body = file.body
+    for statement in file.root.named_children:
+        node = statement.named_children[0] if statement.named_child_count else None
+        if statement.type != "expression_statement" or node is None or node.type != "assignment":
+            continue
+        left, right = node.child_by_field_name("left"), node.child_by_field_name("right")
+        if left is None or left.type != "identifier":
+            continue
+        name = text(left, body)
+        counts[name] = counts.get(name, 0) + 1
+        function = right.child_by_field_name("function") if right is not None else None
+        made = factories.get(re.sub(r"\s+", "", text(function, body)))
+        if right is None or right.type != "call" or made is None:
+            continue
+        keyword = next(v for k, v in PY_ROUTERS.items() if made in v)[made]
+        value = arguments(right)[1].get(keyword)
+        prefix = py_string(value, body)
+        found[name] = PyRouter(
+            line(node),
+            (prefix or "").rstrip("/"),
+            line(value) if value is not None and prefix else 0,
+            value is None or prefix is not None,
+        )
+    return {name: item for name, item in found.items() if counts.get(name) == 1}
+
+
+def python_router_routes(
+    repo: Repo, path: str, file: SourceFile, routers: dict[str, PyRouter]
+) -> list[Route]:
+    """`@router.get("/x")` (FastAPI) and `@bp.route("/x", methods=[...])` (Flask) on top-level
+    functions, on a router this file constructs. Each route is cited on its decorator, on the
+    line its path is written on, and on the prefix its router declares."""
+    body = file.body
+    found: list[Route] = []
+    for child in file.root.named_children:
+        node = (
+            child.child_by_field_name("definition")
+            if child.type == "decorated_definition"
+            else None
+        )
+        if node is None or node.type != "function_definition":
+            continue
+        handler = f"{path}::{text(node.child_by_field_name('name'), body)}"
+        if handler not in repo.defs:
+            continue
+        for decorator in (c for c in child.named_children if c.type == "decorator"):
+            call = decorator.named_children[0] if decorator.named_child_count else None
+            function = call.child_by_field_name("function") if call is not None else None
+            if call is None or call.type != "call" or function is None:
+                continue
+            if function.type != "attribute":
+                continue
+            owner = text(function.child_by_field_name("object"), body)
+            method = text(function.child_by_field_name("attribute"), body)
+            router = routers.get(owner)
+            positional, keywords = arguments(call)
+            if router is None:
+                continue
+            if method in ROUTE_METHODS:
+                verb = method.upper()
+            elif method == "route":
+                listed = keywords.get("methods")
+                named = [py_string(c, body) for c in (listed.named_children if listed else []) if c]
+                verb = next((m.upper() for m in named if m and m.upper() in FLASK_METHODS), "GET")
+            else:
+                continue
+            written = positional[0] if positional else keywords.get("path")
+            own = py_string(written, body)
+            if own is None or (own and not own.startswith("/")) or (not own and not router.prefix):
+                continue
+            full = (router.prefix + own) if own != "/" or not router.prefix else router.prefix
+            cited = [(path, line(decorator))]
+            if written is not None and line(written) != line(decorator):
+                cited.append((path, line(written)))
+            if router.prefix_line:
+                cited.append((path, router.prefix_line))
+            found.append(
+                Route(
+                    verb,
+                    full,
+                    tuple(cited),
+                    tuple(a for a in (own, router.prefix) if a),
+                    "declared router route",
+                    matchable=router.known,
+                    handler=handler,
+                    def_line=line(node),
+                    label=f"{verb} {own or '/'}",
+                )
+            )
+            break  # One route per handler, as for application decorators.
+    return found
+
+
 def routes(repo: Repo) -> dict[str, list[Route]]:
     """Declared routes per file, each with its handler's definition id and line.
 
-    Python routes are decorators. JavaScript and TypeScript routes are calls such as
-    `app.get("/items", handler)` on the application object the analyzer bound, routes on an
-    Express router with the prefixes its mounts add, and Next.js route handlers. Routes in
-    test files are not the repository's service.
+    Python routes are decorators: on the application object the analyzer recorded, or on an
+    `APIRouter` or `Blueprint` the file constructs from the package the analyzer recorded it
+    being imported from, with the router's literal prefix. JavaScript and TypeScript routes are
+    calls such as `app.get("/items", handler)` on the application object the analyzer bound,
+    routes on an Express router with the prefixes its mounts add, and Next.js route handlers.
+    Routes in test files are not the repository's service.
     """
     allowed = {
         c["path"]
@@ -2074,6 +2255,11 @@ def routes(repo: Repo) -> dict[str, list[Route]]:
                     )
             continue
         if path not in allowed:
+            routers = python_routers(repo, path, file)
+            if routers:
+                found.setdefault(path, []).extend(python_router_routes(repo, path, file, routers))
+                if not found[path]:
+                    del found[path]
             continue
         for child in file.root.named_children:
             node = (
@@ -2120,7 +2306,7 @@ def services(repo: Repo, declared: dict[str, list[Route]], start: int) -> list[A
                 id=endpoint,
                 role="endpoint",
                 kind="endpoint",
-                label=f"{route.method} {route.path}"[:28],
+                label=(route.label or f"{route.method} {route.path}")[:28],
                 lines=(route.note,),
                 status="INFERRED",
                 anchors=route.anchors,
@@ -2167,6 +2353,7 @@ def services(repo: Repo, declared: dict[str, list[Route]], start: int) -> list[A
                 )
                 if graph.fits(None, before) and site.target in repo.defs:
                     graph.uses(site.target, callee)
+                    deeper(repo, graph, scope, site, callee)
             unresolved += unknown_callees(scope)
         if unmounted:
             unresolved.append(
@@ -2190,13 +2377,62 @@ def services(repo: Repo, declared: dict[str, list[Route]], start: int) -> list[A
         built = graph.architecture(
             f"service-{start + len(found)}",
             "service",
-            f"HTTP service in {path}",
+            titled("HTTP service in ", path),
             [],
             unresolved[-3:],
         )
         if built is not None:
             found.append(built)
     return found
+
+
+def deeper(repo: Repo, graph: Graph, scope: FlowScope, site: Site, callee: str) -> None:
+    """One more hop from a handler's callee in another module: what that function, or the
+    method of that class the handler's call names, calls in a third module. At most two
+    callees, each cited on its own call site, so a route's view reaches past the first
+    service it calls without growing past the diagram limit."""
+    definition = repo.defs[site.target]
+    if definition.path == scope.path:
+        return
+    keys = [site.target]
+    if definition.kind == "class":
+        # The methods the handler calls on what it constructs: `.name(` in its own source.
+        handler = repo.defs.get(scope.key)
+        body = repo.ctx.files[scope.path].body
+        written = text(handler.node, body) if handler is not None else ""
+        called = dict.fromkeys(re.findall(r"\.\s*([A-Za-z_]\w*)\s*\(", written))
+        keys = [f"{site.target}.{name}" for name in called if f"{site.target}.{name}" in repo.defs]
+    added = 0
+    for key in keys:
+        inner = repo.scopes.get(key)
+        if inner is None:
+            continue
+        for found in inner.sites:
+            target = repo.defs.get(found.target)
+            if (
+                added >= 2
+                or target is None
+                or target.path in {scope.path, definition.path}
+                or len(graph.components) >= MAX_NODES + 2
+            ):
+                continue
+            before = graph.snapshot()
+            head = lead(found.callee)
+            reached = graph.add(found.target, inner, found.line, None, head.split(".")[0])
+            if reached is None or reached == callee:
+                continue
+            graph.link(
+                callee,
+                reached,
+                "calls",
+                "call site",
+                "static_structure",
+                "VERIFIED",
+                [(inner.path, found.line)],
+                (head,),
+            )
+            if graph.fits(None, before):
+                added += 1
 
 
 def overview(repo: Repo, declared: dict[str, list[Route]], subsystems: int) -> Architecture | None:
@@ -2283,7 +2519,7 @@ def overview(repo: Repo, declared: dict[str, list[Route]], subsystems: int) -> A
         degree[target] = degree.get(target, 0) + 1
     for path, _ in resources:
         degree[path] = degree.get(path, 0) + 1
-    ranked = sorted(degree, key=lambda p: (-degree[p], p))[:9]
+    ranked = sorted(degree, key=lambda p: (-degree[p], p))[:OVERVIEW_FILES]
     keep = set(ranked)
     ids: dict[str, str] = {}
     for path in sorted(keep):
@@ -2377,8 +2613,86 @@ def build(
         for r in items
     }
     found += orchestrations(repo, claimed | handlers, classes, 1)
-    top = overview(repo, declared, existing + len(found))
-    return ([top] if top else []) + found
+    from repovox.media.system_view import build_system
+
+    # The repository-wide subsystem map stands for the whole system when the repository has
+    # one; otherwise the file-level overview does, as before.
+    system = build_system(repo, declared)
+    top = system or overview(repo, declared, existing + len(found))
+    return ([top] if top else []) + ranked(found, system)
+
+
+UI_PRIMITIVE = re.compile(r"^[a-z][a-z0-9]*$|^[A-Z][a-z]+$")  # `date`, `human`, `Section`
+
+
+def directory_roles(system: Architecture | None) -> dict[str, str]:
+    """Directory -> subsystem role (`ml`, `data`, ...) as the system map tiered it from code."""
+    if system is None:
+        return {}
+    return {
+        citation.path.rpartition("/")[0]: component.role
+        for component in system.components
+        if component.kind.endswith("_subsystem")
+        for citation in component.citations
+    }
+
+
+def workflow_score(architecture: Architecture, roles: dict[str, str] | None = None) -> float:
+    """How much of the system one workflow explains: tiers crossed, backend share, depth.
+
+    A view drawn from a UI file whose callees are themselves client components (prop and
+    formatting helpers such as `Facts`, `date` or `Section`) explains layout, not the system,
+    and ranks below any backend workflow.
+    """
+    from repovox.media.diagram import classify
+
+    overview = architecture.views[0] if architecture.views else None
+    members = set(overview.component_ids) if overview else {c.id for c in architecture.components}
+    top = [
+        c for c in architecture.components if c.id in members and c.kind not in {"input", "output"}
+    ]
+    if not top:
+        return 0.0
+    tiers = [classify(c)[0] for c in top]
+    backend = sum(t != "client" for t in tiers) / len(tiers)
+    links = [c for c in architecture.connections if {c.source, c.target} <= members]
+    outgoing: dict[str, list[str]] = {}
+    for link in links:
+        outgoing.setdefault(link.source, []).append(link.target)
+
+    def depth(node: str, seen: frozenset[str]) -> int:
+        return max(
+            (1 + depth(n, seen | {n}) for n in outgoing.get(node, []) if n not in seen), default=0
+        )
+
+    longest = max((depth(c.id, frozenset({c.id})) for c in top), default=0)
+    score = 3.0 * len(set(tiers)) + 4.0 * backend + 1.5 * min(longest, 5)
+    score += 2.0 if architecture.type == "service" else 0.0
+    score += 2.0 if "platform" in tiers else 0.0
+    reached = {(roles or {}).get(c.citations[0].path.rpartition("/")[0], "") for c in top}
+    score += 3.0 if "ml" in reached else 0.0  # Reaches model code the system map tiered.
+    score += 1.0 if "data" in reached else 0.0
+    client = [c for c, t in zip(top, tiers, strict=True) if t == "client"]
+    primitives = sum(bool(UI_PRIMITIVE.match(c.label)) for c in client)
+    if client and len(client) >= 0.6 * len(top) and primitives >= len(client) / 2:
+        score -= 10.0  # A UI page passing props to layout and formatting helpers.
+    return round(score, 6)
+
+
+def ranked(found: list[Architecture], system: Architecture | None = None) -> list[Architecture]:
+    """Deep workflows first, backend before UI; at most four route services are kept."""
+    roles = directory_roles(system)
+    scores = [workflow_score(a, roles) for a in found]
+    order = sorted(range(len(found)), key=lambda i: (-scores[i], i))
+    kept: list[Architecture] = []
+    services_kept = 0
+    for i in order:
+        if found[i].type == "service":
+            if services_kept >= 4:
+                continue
+            services_kept += 1
+        kept.append(found[i])
+    return kept
 
 
 __all__ = ["Citation", "build", "sentence"]
