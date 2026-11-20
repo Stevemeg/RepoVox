@@ -42,3 +42,4 @@ All proposed for Phase 0 review, dated 2026-10-08. Acceptance follows independen
 | [029](0029-prose-path-names-and-oversized-syntax-facts.md) | Plain-word path spans are names, not tokens; an oversized syntax fact is dropped instead of the repository |
 | [030](0030-deterministic-test-fact-budget.md) | Above the unchanged 10,000-fact cap, test-file facts are dropped in fixed, verified and disclosed tiers; non-test facts never are |
 | [031](0031-neural-voice-and-animated-architecture.md) | Technical pronunciation for speech only, an opt-in Kokoro-82M voice with a bounded speak-ahead cache, layered animated architecture frames and a faster, length-scaled encoder |
+| [032](0032-whole-repository-system-architecture-view.md) | Whole-repository system map of cited subsystems in four tiers, backend-first workflow ranking, and legible wrapped tiers with one binding disclosure per view |
