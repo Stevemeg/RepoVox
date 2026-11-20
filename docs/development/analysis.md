@@ -18,7 +18,10 @@ an owner-scoped project, an idempotency key and
 exact `https://github.com/owner/repository`, optional `.git` and trailing slash.
 No credentials/ports/query/fragment/encoded path/alternate host/Unicode host/tree/blob
 URL is accepted. GitHub metadata must be public and match the canonical locator.
-Default branch is resolved once to forty lowercase hexadecimal SHA characters.
+Default branch is resolved once to forty lowercase hexadecimal SHA characters, requested
+as the `application/vnd.github.sha` media type so no changed-file list or patch is sent
+(64-byte answer cap; repository metadata keeps its 1 MiB cap). See
+[ADR-0028](../adr/0028-sha-only-commit-resolution-and-weight-containers.md).
 The browser BFF explicitly allows these admission/result routes. Admission's proxy
 timeout is 15 seconds around the 10-second aggregate GitHub resolution and bounded DB
 publication; other routes retain their existing 10-second timeout and strict allowlist.
@@ -44,7 +47,14 @@ resolved containment. No `extractall`. It rejects links/devices/FIFOs/sparse mem
 absolute/parent/drive/UNC/NUL/control paths, duplicate members, NFKC/case collisions,
 multiple roots, nested archives, malformed tar/gzip, depth/resource overflow and hidden
 non-NUL data after tar filename terminators. Tar expansion includes headers/padding,
-not only declared files. Scratch is removed on handled exit. Worker container tmpfs
+not only declared files. Model-weight containers (final extension `.pth`, `.pt` or
+`.keras`) are the one exception to the nested-archive rejection in the analysis runner,
+media worker and local runner: never written, parsed or unpacked, but hashed,
+secret-screened, counted toward the byte and file quotas and listed as skipped
+`ml_weight_container`; Stage 9 matches them against its own re-extraction. Every other
+ZIP/gzip/7z signature, whatever the name, is still `archive_nested`, and the evaluation
+and pilot tools keep the strict rule ([ADR-0028](../adr/0028-sha-only-commit-resolution-and-weight-containers.md)).
+Scratch is removed on handled exit. Worker container tmpfs
 bounds interrupted scratch; abnormal container death clears it on container removal.
 
 All bytes are screened before original archives are published. Known credential/key
