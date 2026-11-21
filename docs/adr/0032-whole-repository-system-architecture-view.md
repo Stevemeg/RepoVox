@@ -1,7 +1,8 @@
 # ADR-0032: Whole-repository system architecture view, workflow ranking and legible tiers
 
 Status: proposed; implementation output, not independently reviewed or accepted. Date:
-2026-11-20. Branch `feat/system-architecture-view`, stacked on
+2026-11-20, revised 2026-11-21 ([review corrections](#4-review-corrections-2026-11-21)).
+Branch `feat/system-architecture-view`, stacked on
 `feat/neural-voice-and-visual-architecture` at `52d6f83`. Related:
 
 - [ADR-0025 problem-to-solution story](0025-problem-to-solution-engineering-story.md)
@@ -64,6 +65,7 @@ Statistics and metrics libraries do not mark model code.
 | Relationship | Status | Cited on |
 | --- | --- | --- |
 | A resolved import between their files | VERIFIED | The import line, showing the module and the imported name |
+| An absolute Python import of a package beside the importing file, below the repository root (`python-backend/main.py` importing `airline.agents`) | INFERRED (`static_structure`) | The import line, showing the module and the imported name |
 | A request path literal in client code that ends with a declared route's path | INFERRED (`literal_match`) | The client line, the route decorator, the path line and the router's prefix line |
 | A client-library call to a database, cache, object store or queue | as the binding allows | The call line |
 
@@ -81,13 +83,16 @@ a plain literal makes the route unmatchable.
 - Inside the ML and data tier, model code, data access and workers take turns.
 - Subsystems are ranked by cross-tier neighbours, matched requests, routes, external resources
   and size. Folders named `utils`, `types`, `schemas` or `scripts` rank lower.
-- A subsystem with no drawn relationship is left out.
+- A subsystem no relationship reaches is still drawn while the card budget has room. It ranks
+  at half its score, a single-file one at a fifth, so a multi-file package can outrank a joined
+  single-file utility and only a full budget or an unplaceable layout leaves one out.
 - At most 16 subsystem relationships and two external resources are drawn. Downward relationships
   come first, and every drawn subsystem keeps one.
 - What is left out is counted under the unresolved topic `not drawn`.
 
 **When it applies.** The map is built only when the repository has more production files than
-the file-level overview can show (nine) and at least three subsystems connect. Otherwise the
+the file-level overview can show (nine), at least three cited subsystems are chosen and at
+least two relationships are drawn. Otherwise the
 file-level `system_overview` is used, unchanged. A one-tier repository draws only that tier, and
 its path is a `dependency flow`; no empty tier is ever drawn.
 
@@ -147,12 +152,57 @@ its path is a `dependency flow`; no empty tier is ever drawn.
 - The walkthrough's Architecture scene states one claim per tier (`TEMPLATES["tier"]`), each
   citing its subsystems.
 
+### 4. Review corrections (2026-11-21)
+
+A live run of `openai/openai-cs-agents-demo` (MIT) at `bd7bfca0` showed four defects. Stages 1 to 9,
+the 2.3 analysis schema, `Limits.facts`, the migrations and the IR validator are unchanged.
+
+- **Dropped core package (`system_view`).** `python-backend/main.py` imports `airline.agents`.
+  The analyzer resolves absolute imports only from the repository root, so the six-file
+  `python-backend/airline` package had no relationship and was left out with room to spare,
+  leaving the core services tier empty. `SystemMap.local_packages` now looks the module up from
+  the importing file's own folder upward (`backend/`, `server/`, `src/` and hyphenated folders
+  alike) and joins it as an `INFERRED` import cited on the import line. Pairs a `VERIFIED`
+  import already joins are left alone. `select` no longer prunes subsystems without a drawn
+  relationship (see Selection above). The disclosure now names this third kind of inference.
+- **Arrows through cards (`diagram`).** A line between tiers whose elbows both cut through a
+  neighbouring card now turns in the gap between the two bands (`channels`), leaving and
+  entering its cards by their facing edges. It is used only when it crosses fewer cards, so
+  layouts that were already clean are unchanged and the layout stays deterministic.
+- **Weak story matches (`story_extract`, [ADR-0025](0025-problem-to-solution-engineering-story.md)).**
+  - A lead-in that ends with a colon ("It is composed of two parts:"), or a short line whose
+    only content words describe layout, is never a problem, a feature or a mismatch. A
+    technology it names still counts as named.
+  - A statement is corroborated only through at least one specific shared word: `chat`,
+    `agent`, `context`, `app`, `client`, `server`, `data`, `user`, `model`, `service` and
+    similar words alone never match.
+  - A statement about the browser side (Next.js, React, UI, frontend) is backed only by script
+    code, one about the Python side only by Python code. A "Next.js UI" claim can no longer be
+    matched to the Python class `AirlineAgentChatContext`.
+- **Speech and frames ([ADR-0031](0031-neural-voice-and-animated-architecture.md)).**
+  - Pronunciation, for speech input only: two spelled names that meet get a clause break
+    (`OpenAI API` is "Open Eh I, Eh P I"). A name with a technical part is read part by part
+    (`openai-cs-agents-demo` is "Open Eh I, C S agents demo"). Lowercase compounds with a
+    technical ending are split for the phonemizer (`chatkit`, `duckdb`, `mysdk`); short stems
+    keep real words whole (`robot`, `okapi`). Captions, the Stage 11 spoken form and citations
+    are untouched.
+  - `STEP n OF total` counts every relationship a video narrates (`explainer.step_bars`,
+    `stages.step_counts`), so two links read STEP 1 OF 2 and STEP 2 OF 2.
+  - Footers name the voice that spoke, from the Stage 12 voice record: `KOKORO NEURAL VOICE` for
+    `kokoro_onnx`, otherwise `LOCAL SYNTHETIC VOICE`.
+  - Story text slides (problem, context, solution, approach, decisions, results, limitations)
+    show each cited sentence as a card. Each card has its status badge (`VERIFIED`, `INFERRED`,
+    `AUTHOR-STATED`, `UNVERIFIED`), the `file:line` of its claims, and its text wrapped to two
+    lines with an ellipsis, instead of bare `README.md:9  UNVERIFIED` rows. The text is the
+    already sanitised narrated sentence. No schema or stored artifact changes.
+
 ## Security and truthfulness
 
 | Concern | Effect |
 | --- | --- |
 | Invented subsystems or links | None. Every card and relationship carries citations that `check` re-verifies against the source bytes and verified claims; tiers only order the drawing. |
 | Runtime claims | A matched request path stays `INFERRED`/`literal_match`, which `check` refuses as `VERIFIED`; wording describes source text. |
+| Import-path guesses | An import resolved beside the importing file is `INFERRED` and drawn dashed: which folder is on the import path at runtime is not established. |
 | Untrusted source | Read as data, never executed; routers are read from syntax and analyzer-recorded imports only. |
 | Resource limits | Bounded: 14 subsystems, 16 relationships, 2 externals, 5-step paths, two extra hops per route callee. Building the map took 0.1 s on the mirror. |
 
@@ -198,3 +248,12 @@ covers:
   file-level overview.
 - **Stage 10 and 11.** The walkthrough story uses the map and passes story verification and the
   Stage 10 and 11 checks.
+- **Review corrections.** A `HELPDESK` fixture (a hyphenated `python-backend/` folder importing
+  its sibling `airline` package, and a Next.js UI):
+  - `airline` is drawn in core services, behind a cited `INFERRED` import;
+  - an unconnected `ui/app` is still drawn while cards remain;
+  - a constructed two-tier map routes a line through the band gap with no card crossed.
+
+  `test_engineering_story.py` checks lead-in lines, specific words and the language rule.
+  `test_pronunciation_and_visual_arch.py` checks clean names, global step badges, story
+  slide cards and the voice footer, including through a Kokoro Stage 12 to 13 render.
