@@ -220,14 +220,22 @@ def main():
     actual = set(re.findall(r'^\s+(\w+) --> (\w+)\s*$', model, re.M))
     expected = {('queued','running'),('queued','cancelled'),('queued','failed'),('running','retry_wait'),('retry_wait','running'),('running','awaiting_reconciliation'),('awaiting_reconciliation','running'),('running','succeeded'),('running','failed'),('retry_wait','failed'),('awaiting_reconciliation','failed'),('running','cancel_requested'),('retry_wait','cancel_requested'),('awaiting_reconciliation','cancel_requested'),('cancel_requested','cancelled'),('cancel_requested','failed')}
     assert actual == expected, 'State diagram differs from documented transition contract'
-    log = subprocess.check_output(['git','log','--all','--format=%an|%ae|%cn|%ce%n%B'], cwd=ROOT, text=True)
+    log = subprocess.check_output(['git','log','--all','--format=%H|%an|%ae|%cn|%ce%n%B'], cwd=ROOT, text=True)
     assert not re.search(r'^(?:Co-authored-by|Generated-by):', log, re.M | re.I), 'Unexpected attribution trailer'
     # Read authentic baseline attribution; CI needs no invented/modified Git identity configuration.
     roots = subprocess.check_output(['git','rev-list','--max-parents=0','HEAD'],cwd=ROOT,text=True).splitlines()
     assert len(roots) == 1, 'Unexpected history roots'
     email = subprocess.check_output(['git','show','-s','--format=%ae',roots[0]],cwd=ROOT,text=True).strip()
-    for identity in re.findall(r'^([^|\n]+)\|([^|\n]+)\|([^|\n]+)\|([^|\n]+)$', log, re.M):
-        assert identity == ('Stevemeg',email,'Stevemeg',email), f'Unexpected commit identity: {identity}'
+    # The owner's own GitHub web-editor commit: Stevemeg's noreply address as author, GitHub as committer.
+    # Exempt only this exact SHA with this exact identity; history is never rewritten.
+    owner_web_edits = {
+        '033c85e827b4a35e053f10fea22a8510bd722fbb': ('Kona Bharath Vamshidhar Reddy','146036166+Stevemeg@users.noreply.github.com','GitHub','noreply@github.com'),
+    }
+    for sha, *identity in re.findall(r'^([0-9a-f]{40})\|([^|\n]+)\|([^|\n]+)\|([^|\n]+)\|([^|\n]+)$', log, re.M):
+        identity = tuple(identity)
+        if owner_web_edits.get(sha) == identity:
+            continue
+        assert identity == ('Stevemeg',email,'Stevemeg',email), f'Unexpected commit identity: {sha} {identity}'
     print(f'PASS: {len(REQUIRED)} required paths, {len(md_files)} Markdown files, {links} local links/anchors, {len(json_files)} JSON files')
     print('PASS: schema + 10 synthetic contracts/provenance/timing; 11 rejected mutations + stage-specific Director chunks/assembly/provenance/budgets; evaluation preparation/phase gates; requirement IDs; state diagram transition set; Git identities/trailers')
     print('LIMIT: no application/security/load/media/deployment tests; Mermaid rendering checked separately; source entailment requires later independent audit')
