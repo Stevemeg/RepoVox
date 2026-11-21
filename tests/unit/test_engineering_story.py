@@ -1004,3 +1004,38 @@ def test_a_ui_claim_is_never_backed_by_a_python_class_through_generic_words(
         for ref in claims[i].evidence_refs
     )
     assert any("triage_agent" in claims[i].text for i in python.supports)
+
+
+def test_a_named_language_layer_is_backed_by_that_layer_code_only(tmp_path: Path) -> None:
+    """ "A python backend that handles the agent orchestration logic" shares no specific word
+    with any declaration, but it names a layer: Python code in a backend folder backs it.
+    "A Next.js UI" is still never backed by the Python `AirlineAgentChatContext` class, and
+    the colon lead-in is still not a feature."""
+    files = dict(HELPDESK)
+    files["README.md"] = (
+        "# Helpdesk Agents Demo\n\n"
+        "This repository contains a demo of a customer service interface.\n\n"
+        "It is composed of two parts:\n\n"
+        "1. A python backend that handles the agent orchestration logic, implementing the "
+        "customer service example.\n\n"
+        "2. A Next.js UI allowing the visualization of the agent orchestration process and "
+        "providing a chat interface.\n"
+    )
+    found = shape(tmp_path, files, "example/helpdesk")
+    story = found.story
+    claims = story.claims()
+    python = next(c for c in story.intended_solution.claims if c.text.startswith("A python"))
+    assert python.status == "INFERRED" and python.supports
+    backing = [claims[i] for i in python.supports]
+    assert all(
+        ref.path.startswith("python-backend/") and ref.path.endswith(".py")
+        for c in backing
+        for ref in c.evidence_refs
+    )
+    readme_only = [m for m in story.mismatches if m.kind == "readme_only_feature"]
+    assert not any(python.id in m.stated_claim_ids for m in readme_only)
+    ui = next(c for c in story.intended_solution.claims if "Next.js UI" in c.text)
+    assert not any(ref.path.endswith(".py") for i in ui.supports for ref in claims[i].evidence_refs)
+    assert not any("AirlineAgentChatContext" in claims[i].text for i in ui.supports)
+    assert not any("two parts" in c.text for c in story.intended_solution.claims)
+    verify_story(story, found.payload, found.sources, found.report)
