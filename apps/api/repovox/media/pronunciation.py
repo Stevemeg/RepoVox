@@ -10,7 +10,12 @@ result is passed only to a `narration.Synthesizer` or speech engine. It adds no 
 word it emits is a reading of a word that is already in the text.
 
 Spelled letters are separated by spaces. The letter A is written "Eh": espeak-ng, which both
-the operating-system voice and Kokoro's phonemizer use, reads a lone "A" as the article.
+the operating-system voice and Kokoro's phonemizer use, reads a lone "A" as the article. Two
+spelled names side by side are kept apart by a clause break, so "OpenAI API" is said as
+"Open Eh I, Eh P I" and never runs together as one string of letters. A repository or
+identifier name is read part by part when a part is technical (`openai-cs-agents-demo` is
+"Open Eh I, C S agents demo"), and a lowercase compound with a technical ending is split for
+the phonemizer (`chatkit` is "chat kit", `duckdb` is "duck D B").
 """
 
 import re
@@ -116,6 +121,21 @@ EXTENSIONS: dict[str, str] = {
     "keras": "keras",
 }
 LETTERS = {"A": "Eh"}
+# Technical endings glued to a lowercase word, the shortest stem that may carry each, and
+# whether the ending is spelled. A short stem is never split: robot, okapi and sabot stay whole.
+COMPOUNDS: tuple[tuple[str, int, bool], ...] = (
+    ("kit", 3, False),
+    ("bot", 4, False),
+    ("sdk", 2, True),
+    ("cli", 3, True),
+    ("api", 3, True),
+    ("db", 3, True),
+    ("ql", 3, True),
+    ("ui", 3, True),
+)
+UNIT = r"(?:[A-Z]|Eh)"  # One spelled letter, as `spell` writes it.
+SPELLED_END = re.compile(rf"(?:^|\s){UNIT} {UNIT}$")
+SPELLED_START = re.compile(rf"^{UNIT} {UNIT}(?:\s|$)")
 ABBREVIATIONS = [
     (re.compile(r"\be\.g\.,?", re.IGNORECASE), "for example,"),
     (re.compile(r"\bi\.e\.,?", re.IGNORECASE), "that is,"),
@@ -158,6 +178,48 @@ def spell(word: str) -> str:
     return " ".join(LETTERS.get(c, c) for c in word.upper())
 
 
+def joined(parts: list[str]) -> str:
+    """Spoken parts in order; a clause break between two spelled names that meet."""
+    said = ""
+    for part in (p for p in parts if p):
+        gap = ", " if SPELLED_END.search(said) and SPELLED_START.match(part) else " "
+        said = f"{said}{gap}{part}" if said else part
+    return said
+
+
+def technical(part: str) -> bool:
+    """A part of a name that is read as a term, an acronym or a compound, not as English."""
+    lower = part.lower()
+    return (
+        lower in LOWER_TERMS
+        or lower in LOWER_ACRONYMS
+        or bool(re.fullmatch(r"[b-df-hj-np-tv-xz]{2}", lower))
+        or compound(part) is not None
+    )
+
+
+def piece(part: str) -> str:
+    """One part of a file, folder or hyphenated name: a two-consonant part is spelled
+    (`cs` is "C S", `ml` is "M L"); anything else is read as a word."""
+    if re.fullmatch(r"[b-df-hj-np-tv-xz]{2}", part):
+        return spell(part)
+    return word(part)
+
+
+def compound(token: str) -> str | None:
+    """`chatkit` -> "chat kit", `duckdb` -> "duck D B", `mysdk` -> "my S D K"; else None."""
+    if not token.isalpha() or not (token.islower() or token.istitle()):
+        return None
+    lower = token.lower()
+    for ending, shortest, spelled in COMPOUNDS:
+        stem = lower[: -len(ending)]
+        if lower.endswith(ending) and len(stem) >= shortest:
+            head = word(stem)
+            head = head[:1].upper() + head[1:] if token[0].isupper() else head
+            return f"{head} {spell(ending) if spelled else ending}"
+    return None
+
+
 def numeral(value: str) -> str:
     return " point ".join(value.split("."))
 
@@ -194,6 +256,8 @@ def word(token: str) -> str:
             return " ".join(word(p) for p in parts)  # GAN-based, CI-friendly
         if any(any(c.isdigit() for c in p) for p in parts):
             return " ".join(word(p) for p in parts)  # ADR-0019, model-v2
+        if any(technical(p) for p in parts):
+            return joined([piece(p) for p in parts])  # openai-cs-agents-demo
         return token  # an ordinary hyphenated word
     if re.fullmatch(r"[vV]\d+", token):
         return "version " + token[1:]
@@ -211,6 +275,9 @@ def word(token: str) -> str:
         return LOWER_TERMS[lower]  # fastapi, pytorch, readme written in lower case
     if token.islower() and lower in LOWER_ACRONYMS:
         return spell(lower)
+    split = compound(token)
+    if split is not None:
+        return split  # chatkit, duckdb, mysdk
     head = re.fullmatch(r"([a-z]+)(\d+)", token)
     if head:
         return f"{word(head.group(1))} {head.group(2)}"
@@ -220,7 +287,7 @@ def word(token: str) -> str:
 def name(segment: str) -> str:
     """A file or directory name read as words: `test_config` -> `test config`."""
     pieces = [p for p in re.split(r"[_.\-@~]+", segment) if p]
-    return " ".join(word(p) for p in pieces)
+    return joined([piece(p) for p in pieces])
 
 
 def extension(ext: str) -> str:
@@ -253,10 +320,10 @@ def path(token: str) -> str:
         return "the root folder"
     last = parts[-1]
     if re.fullmatch(r"[^.]+(?:\.[^.]+)*\.[A-Za-z][A-Za-z0-9]{0,4}", last):
-        folders = " ".join(name(p) for p in parts[:-1][-3:])
+        folders = joined([name(p) for p in parts[:-1][-3:]])
         spoken = filename(last) + (f" in {folders}" if folders else "")
     else:
-        spoken = " ".join(name(p) for p in parts[-4:])
+        spoken = joined([name(p) for p in parts[-4:]])
     return spoken + line + stop
 
 
@@ -285,6 +352,22 @@ def replace(match: re.Match[str]) -> str:
     if kind == "dotted":
         return dotted(token)
     return word(token)
+
+
+def tokens(text: str) -> str:
+    """Every token in its spoken form; two spelled names separated only by a space get a
+    clause break, so "OpenAI API" is "Open Eh I, Eh P I", not one run of letters."""
+    said: list[str] = []
+    previous, end = "", 0
+    for match in TOKEN.finditer(text):
+        gap = text[end : match.start()]
+        spoken = replace(match)
+        if said and gap and not gap.strip() and SPELLED_END.search(previous):
+            if SPELLED_START.match(spoken):
+                gap = ", "
+        said += [gap, spoken]
+        previous, end = spoken, match.end()
+    return "".join([*said, text[end:]])
 
 
 def pace(text: str) -> str:
@@ -332,7 +415,7 @@ def pronounce(text: str) -> str:
     for pattern, replacement in ABBREVIATIONS + OPERATORS:
         text = pattern.sub(replacement, text)
     text = HASH.sub(" ", text)
-    text = TOKEN.sub(replace, text)
+    text = tokens(text)
     return pace(text)
 
 

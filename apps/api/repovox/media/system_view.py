@@ -11,11 +11,17 @@ one of four tiers from what its own code shows, and every tier is backed by a ci
   database, cache, object-storage or queue clients, and background workers.
 
 Subsystems are joined only by evidence with exact citations: a resolved import between their
-files (verified), a request path literal in client code that matches a declared route by its
-text (inferred, cited on both lines), and a client-library call to an external resource. The
-map keeps at most four subsystems per tier and twelve in all, chosen for cross-tier links
-first, so a full-stack repository shows every tier it has and a one-tier repository shows only
-that tier. A tier with no evidence is never drawn. One cross-tier path is narrated end to end.
+files (verified), an absolute Python import that names a package beside the importing file
+below the repository root, such as `python-backend/main.py` importing `airline.agents` from
+`python-backend/airline` (inferred: the analyzer resolves absolute imports only from the
+repository root, and which folder is on the import path at runtime is not established), a
+request path literal in client code that matches a declared route by its text (inferred, cited
+on both lines), and a client-library call to an external resource. The map keeps at most four
+subsystems per tier and fourteen in all. Subsystems with cross-tier links rank first, then
+multi-file packages ahead of single-file utilities; a subsystem is left out only when that
+card budget is reached or the layout cannot place it, never while room remains. A full-stack
+repository therefore shows every tier it has and a one-tier repository shows only that tier.
+A tier with no evidence is never drawn. One cross-tier path is narrated end to end.
 """
 
 import math
@@ -437,6 +443,7 @@ class SystemMap:
                     (module, shown) if shown else (module,),
                     shown,
                 )
+        self.local_packages()
         self.requests()
         for scope in self.repo.scopes.values():
             key = self.of.get(scope.path)
@@ -447,6 +454,68 @@ class SystemMap:
                     kind = KINDS[site.target.split("::")[1]]
                     if kind in {"database", "cache", "object_storage", "message_broker"}:
                         self.resources.append((key, scope.path, site))
+
+    def beside(self, path: str, module: str, member: str) -> str | None:
+        """The production file an absolute Python import names, looked up from the importing
+        file's own folder upward: `python-backend/main.py` importing `airline.agents` finds
+        `python-backend/airline/agents.py`. The nearest folder holding exactly one matching
+        module wins; `from airline import agents` may name the submodule `airline/agents.py`."""
+        stem = module.replace(".", "/")
+        folder = dirname(path)
+        while True:
+            base = f"{folder}/{stem}" if folder else stem
+            found = [p for p in (f"{base}.py", f"{base}/__init__.py") if p in self.of]
+            if member and member != "*":
+                submodule = [
+                    p
+                    for p in (f"{base}/{member}.py", f"{base}/{member}/__init__.py")
+                    if p in self.of
+                ]
+                found = submodule or found
+            if len(found) == 1:
+                return found[0]
+            if not folder:
+                return None
+            folder = dirname(folder)
+
+    def local_packages(self) -> None:
+        """Absolute Python imports of a package beside the importing file, below the root.
+
+        The analyzer resolves an absolute import only from the repository root, so an
+        application kept in a folder such as `python-backend/`, `backend/`, `server/` or `src/`
+        imports its own packages without a resolved edge. Such an import is joined here, cited
+        on its import line and marked INFERRED: which folder is on the import path at runtime
+        is not established. Subsystems a resolved import already joins are left as they are.
+        """
+        for path in self.production:
+            if not path.endswith(".py"):
+                continue
+            for item in sorted(self.imports(path), key=lambda s: (s["start_line"], s["id"])):
+                module = str(item["name"])
+                if not module or module.startswith(".") or not re.fullmatch(r"[\w.]+", module):
+                    continue
+                member = str(item.get("syntax", {}).get("imported_member") or "")
+                target = self.beside(path, module, member)
+                if target is None:
+                    continue
+                source_key, target_key = self.of[path], self.of[target]
+                joined = self.links.get((source_key, "imports", target_key))
+                if source_key == target_key or (joined is not None and joined.status == "VERIFIED"):
+                    continue
+                quote = self.quote(path, item["start_line"])
+                if module not in quote:
+                    continue
+                shown = member if member and member in quote and member != "*" else ""
+                self.link(
+                    source_key,
+                    target_key,
+                    "imports",
+                    [(path, item["start_line"])],
+                    (module, shown) if shown else (module,),
+                    shown,
+                    "static_structure",
+                    "INFERRED",
+                )
 
     def requests(self) -> None:
         """Request path literals in client code that end with a declared route's path."""
@@ -516,15 +585,22 @@ class SystemMap:
                 score *= 0.35
             if system.detail == "CLI":
                 score *= 0.6  # A script entry point ranks below a declared HTTP surface.
+            if not neighbours[key]:
+                # Drawn only while the card budget has room: a multi-file package before a
+                # single-file utility, both after every subsystem a relationship joins.
+                score = 0.5 * score if len(system.files) > 1 else 0.2 * score
             system.score = round(score, 6)
         self.neighbours = neighbours
 
     def select(self) -> list[str]:
         """Up to four subsystems per tier and fourteen in all, taken tier by tier in rounds so
         every tier present is shown; inside the ML, data and external tier, model code, data
-        and workers take turns."""
+        and workers take turns. Every cited subsystem is a candidate, so a real package is left
+        out only when the budget is full, never because no relationship reaches it. A subsystem
+        no relationship reaches ranks at half its score, a single-file one at a fifth (`rank`),
+        so a multi-file package can still outrank a joined single-file utility."""
         ranked = sorted(
-            (k for k, s in self.subsystems.items() if self.neighbours[k] and s.signal),
+            (k for k, s in self.subsystems.items() if s.signal),
             key=lambda k: (-self.subsystems[k].score, k),
         )
         queues: dict[str, list[str]] = {t: [] for t in TIER_ORDER}
@@ -537,12 +613,6 @@ class SystemMap:
             for tier in reversed(TIER_ORDER):  # Models and data first: they are scarcest.
                 if queues[tier] and len(chosen) < MAX_SUBSYSTEMS:
                     chosen.append(queues[tier].pop(0))
-        # A subsystem with no relationship to another drawn subsystem would float alone.
-        while True:
-            kept = [k for k in chosen if self.neighbours[k] & (set(chosen) - {k})]
-            if kept == chosen:
-                break
-            chosen = kept
         return sorted(
             chosen,
             key=lambda k: (

@@ -31,7 +31,14 @@ from repovox.media.architecture import (
 )
 from repovox.media.diagram import TIER_ORDER, Diagram, classify
 from repovox.media.narration import FPS, Voice, assemble, detect
-from repovox.media.speech import SpeechCache, audio_text, natural, speak, vocabulary
+from repovox.media.speech import (
+    SpeechCache,
+    audio_text,
+    natural,
+    speak,
+    vocabulary,
+    voice_record,
+)
 from repovox.media.stages import (
     Checkpoint,
     RenderError,
@@ -270,8 +277,8 @@ KIND_WORDS = {
 
 DISCLOSURE = (
     "Solid borders are verified bindings. Dashed borders are inferred: a name bound only by a "
-    "unique top-level definition, or a request path matched to a route by its text. Each "
-    "card's border and citation show which."
+    "unique top-level definition, an import of a package found beside the importing file, or "
+    "a request path matched to a route by its text. Each card's border and citation show which."
 )
 
 
@@ -573,6 +580,18 @@ def exclusive(path: Path, body: bytes) -> None:
         handle.write(body)
 
 
+STEP_SECTIONS = frozenset({"flow", "links", "zoom", "inputs and outputs"})
+
+
+def step_bars(lines: tuple[Line, ...]) -> dict[str, tuple[int, int]]:
+    """`STEP n OF total` for every narrated relationship, counted across the whole video.
+
+    The end-to-end path and the other cross-tier links are one sequence of steps, so a video
+    with two relationships shows STEP 1 OF 2 and STEP 2 OF 2, never STEP 1 OF 1 twice."""
+    steps = [x.id for x in lines if x.connection_ids and x.section in STEP_SECTIONS]
+    return {identity: (n, len(steps)) for n, identity in enumerate(steps, 1)}
+
+
 def line_mode(index: int, line: Line) -> str:
     if line.connection_ids:
         return "flow"
@@ -594,10 +613,13 @@ def render_architecture(
     lines = narrate(architecture)
     check_narration(lines, architecture)
     roles = directory_roles(next((a for a in report.architectures if a.type == SYSTEM_TYPE), None))
+    voice = voice_record(engine)["tts_provider"]  # The footer names the voice that speaks.
     diagrams = {
-        view.id: Diagram(architecture, report.repository, report.commit_sha, view, roles)
+        view.id: Diagram(architecture, report.repository, report.commit_sha, view, roles, voice)
         for view in architecture.views
-    } or {"overview": Diagram(architecture, report.repository, report.commit_sha, None, roles)}
+    } or {
+        "overview": Diagram(architecture, report.repository, report.commit_sha, None, roles, voice)
+    }
     scratch = work / "scratch"
     scratch.mkdir(mode=0o700)
     speech = []
@@ -611,19 +633,10 @@ def render_architecture(
     cues = ["WEBVTT", ""]
     narration = []
     animated = 0
+    bars = step_bars(lines)
     for i, (line, timing) in enumerate(zip(lines, timings, strict=True)):
         checkpoint()
-        steps = [
-            x.id
-            for x in lines
-            if x.section == line.section and x.connection_ids and x.view == line.view
-        ]
-        bar = (
-            (steps.index(line.id) + 1, len(steps))
-            if line.connection_ids
-            and line.section in {"flow", "links", "zoom", "inputs and outputs"}
-            else None
-        )
+        bar = bars.get(line.id)
         images = diagram_frames(
             diagrams[line.view],
             line.component_ids,

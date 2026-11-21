@@ -361,8 +361,9 @@ def timestamp(frame: int) -> str:
     return f"{hours:02d}:{minutes:02d}:{rest // 1000:02d}.{rest % 1000:03d}"
 
 
-def story_diagram(board: Storyboard) -> Diagram | None:
-    """The diagram of a story's primary architecture, in the view its claims were drawn from."""
+def story_diagram(board: Storyboard, voice: str | None = None) -> Diagram | None:
+    """The diagram of a story's primary architecture, in the view its claims were drawn from.
+    `voice` is the speaking voice's provider, named in the frame footer."""
     attachment = board.story
     if attachment is None or attachment.architecture is None:
         return None
@@ -373,7 +374,7 @@ def story_diagram(board: Storyboard) -> Diagram | None:
     if primary is None:
         return None
     view = next((v for v in primary.views if v.id == description.view), None)
-    return Diagram(primary, board.repository, board.commit_sha, view)
+    return Diagram(primary, board.repository, board.commit_sha, view, voice=voice)
 
 
 def citation_for(diagram: Diagram, sentence: Sentence) -> Citation | None:
@@ -442,20 +443,34 @@ def diagram_frames(
     return [final.png()]
 
 
+def step_counts(board: Storyboard) -> dict[str, tuple[int, int]]:
+    """`STEP n OF total` for each workflow relationship, counted across the whole video, so the
+    step bar shows overall progress, never one scene's count restarting at 1."""
+    steps = [
+        s.id
+        for scene in board.scenes
+        if scene.type == "workflow"
+        for s in scene.sentences
+        if s.connection_ids
+    ]
+    return {identity: (n, len(steps)) for n, identity in enumerate(steps, 1)}
+
+
 def render_stage(
     storyboard: bytes, script: bytes, speech: bytes, checkpoint: Checkpoint = noop
 ) -> bytes:
     board = load_board(storyboard)
     sentences = checked_script(board, script)
     timings = timings_of(unbundle(speech), len(sentences))
-    diagram = story_diagram(board) if any(scene.diagram for scene in board.scenes) else None
+    voice = voice_of(speech)["tts_provider"]  # The footer names the voice that spoke.
+    diagram = story_diagram(board, voice) if any(scene.diagram for scene in board.scenes) else None
     files: dict[str, bytes] = {}
     cues = ["WEBVTT", ""]
     index = animated = 0
+    steps = step_counts(board)
     for position, scene in enumerate(board.scenes):
         drawn = diagram if scene.diagram else None
-        canvas = raster.base(board, scene, position) if drawn is None else None
-        steps = [s.id for s in scene.sentences if s.connection_ids]
+        canvas = raster.base(board, scene, position, voice) if drawn is None else None
         for order, sentence in enumerate(scene.sentences):
             checkpoint()
             timing = timings[index]
@@ -466,11 +481,7 @@ def render_stage(
                     mode = "reveal"
                 else:
                     mode = "spotlight"
-                step = (
-                    (steps.index(sentence.id) + 1, len(steps))
-                    if scene.type == "workflow" and sentence.id in steps
-                    else None
-                )
+                step = steps.get(sentence.id)
                 images = diagram_frames(
                     drawn,
                     sentence.component_ids,

@@ -12,7 +12,7 @@ import struct
 import zlib
 from functools import lru_cache
 
-from repovox.media.storyboard import Scene, Sentence, Storyboard
+from repovox.media.storyboard import Scene, Sentence, Storyboard, display
 
 WIDTH, HEIGHT = 1280, 720
 
@@ -417,7 +417,134 @@ def wrap(value: str, width: int, lines: int) -> list[str]:
     return result
 
 
-def base(board: Storyboard, scene: Scene, position: int) -> Canvas:
+def clamp(value: str, width: int, lines: int) -> list[str]:
+    """`value` wrapped to at most `lines` lines of `width` characters; a cut ends in "..."."""
+    words = display(value, 4000).split()
+    result: list[str] = []
+    current = ""
+    for word in words:
+        while len(word) > width:
+            if current:
+                result.append(current)
+                current = ""
+            result.append(word[:width])
+            word = word[width:]
+        if current and len(current) + 1 + len(word) > width:
+            result.append(current)
+            current = word
+        else:
+            current = f"{current} {word}" if current else word
+    if current:
+        result.append(current)
+    if len(result) <= lines:
+        return result
+    kept = result[:lines]
+    last = kept[-1]
+    kept[-1] = (last if len(last) <= width - 3 else last[: width - 3].rstrip()) + "..."
+    return kept
+
+
+def tail(value: str, width: int) -> str:
+    """A citation that fits `width` characters, keeping its end: .../services/jobs.py:42."""
+    value = display(value, 400)
+    if len(value) <= width:
+        return value
+    parts = value.split("/")
+    while len(parts) > 1 and len(".../" + "/".join(parts)) > width:
+        parts = parts[1:]
+    shortened = ".../" + "/".join(parts)
+    return shortened if len(shortened) <= width else "..." + value[len(value) - width + 3 :]
+
+
+# Story scenes whose slide lists what they narrate, each item with its status and citation.
+CLAIM_SCENES = frozenset(
+    {
+        "problem",
+        "context",
+        "solution",
+        "approach",
+        "architecture",
+        "decisions",
+        "results",
+        "limitations",
+    }
+)
+STATUS_BADGES: dict[str, tuple[str, Color]] = {
+    "verified": ("VERIFIED", ACCENT),
+    "inferred": ("INFERRED", WARN),
+    "documentation": ("AUTHOR-STATED", WARN),
+    "unverified": ("UNVERIFIED", (244, 140, 120)),
+    "none": ("CONTEXT", MUTED),
+}
+CLAIM_TOP, CLAIM_BOTTOM = 146, 536
+
+
+def claim_items(board: Storyboard, scene: Scene) -> list[tuple[str, str, str]]:
+    """(status, citation, text) for each cited sentence of a story scene, in narration order.
+
+    The text is the narrated sentence itself, so the slide shows what is said; the citation is
+    the source location of each claim the sentence rests on, as the story records it."""
+    if board.story is None:
+        return []
+    claims = board.story.story.claims()
+    items: list[tuple[str, str, str]] = []
+    for sentence in scene.sentences:
+        if not sentence.claim_ids:
+            continue
+        located = [
+            claims[i].source_location
+            for i in sentence.claim_ids
+            if i in claims and claims[i].source_location
+        ]
+        places = list(dict.fromkeys(p for p in located if p))
+        citation = places[0] if places else "no source location"
+        if len(places) > 1:
+            citation = f"{places[0]} +{len(places) - 1} more"
+        items.append((sentence.uncertainty, citation, sentence.text))
+    return items
+
+
+def claim_cards(c: Canvas, items: list[tuple[str, str, str]]) -> None:
+    """Each item as a card: status badge and citation, then its text wrapped to the card.
+
+    Two text lines per card when four or fewer are shown, otherwise one; anything longer ends
+    in an ellipsis, and items that do not fit are counted, never drawn over each other."""
+    lines = 2 if len(items) <= 4 else 1
+    height = 24 + lines * 20 + 10
+    room = (CLAIM_BOTTOM - CLAIM_TOP + 8) // (height + 8)
+    shown = items if len(items) <= room else items[: max(1, room - 1)]
+    y = CLAIM_TOP
+    for status, citation, text in shown:
+        word, tone = STATUS_BADGES.get(status, STATUS_BADGES["none"])
+        c.round_rect(64, y, 1152, height, 8, CARD)
+        c.round_rect(64, y + 6, 4, height - 12, 2, tone)
+        badge = len(word) * 12 + 14
+        c.round_rect(80, y + 6, badge, 20, 10, tone)
+        c.text(87, y + 9, word, 2, BG)
+        c.text(80 + badge + 12, y + 9, tail(citation, (1200 - 92 - badge - 12) // 12), 2, MUTED)
+        for i, line in enumerate(clamp(text, 94, lines)):
+            c.text(80, y + 32 + i * 20, line, 2, TEXT)
+        y += height + 8
+    if len(shown) < len(items):
+        more = f"+{len(items) - len(shown)} more in the narration"
+        c.text(80, y + 2, more, 2, MUTED)
+
+
+VOICE_LABELS = {
+    "kokoro_onnx": "KOKORO NEURAL VOICE",
+    "deterministic": "LOCAL SYNTHETIC VOICE",
+    "local": "LOCAL SYNTHETIC VOICE",
+}
+
+
+def voice_label(provider: str | None) -> str:
+    """The footer's name for the voice that spoke, from the Stage 12 voice record's provider.
+    An unnamed or unknown provider is the local synthetic voice, as before voices were named."""
+    return VOICE_LABELS.get(provider or "", "LOCAL SYNTHETIC VOICE")
+
+
+def base(board: Storyboard, scene: Scene, position: int, voice: str | None = None) -> Canvas:
+    """One scene's slide without its caption. `voice` is the Stage 12 voice provider."""
     c = Canvas()
     c.rect(0, 0, WIDTH, 6, ACCENT)
     header = f"REPOVOX / {board.repository} @ {board.commit_sha[:12]}"
@@ -435,6 +562,8 @@ def base(board: Storyboard, scene: Scene, position: int) -> Canvas:
             c.text(80, y + 38 + i * 24, number, 2, MUTED)
             c.text(80 + len(number) * 12, y + 38 + i * 24, line.rstrip())
         c.text(64, y + 56 + len(excerpt.lines) * 24, "SHA256 " + excerpt.file_sha256, 2, MUTED)
+    elif board.story is not None and scene.type in CLAIM_SCENES and claim_items(board, scene):
+        claim_cards(c, claim_items(board, scene))
     else:
         for row in scene.rows:
             c.text(64, y + 6, row.label, 2, MUTED)
@@ -456,10 +585,10 @@ def base(board: Storyboard, scene: Scene, position: int) -> Canvas:
             y += 76
     c.rect(0, 664, WIDTH, 56, CARD)
     footer = (
-        "ENGINEERING STORY / CITED EVIDENCE / LOCAL SYNTHETIC VOICE"
+        "ENGINEERING STORY / CITED EVIDENCE / "
         if board.story is not None
-        else "STATIC ANALYSIS / CITED SOURCE EVIDENCE / LOCAL SYNTHETIC VOICE"
-    )
+        else "STATIC ANALYSIS / CITED SOURCE EVIDENCE / "
+    ) + voice_label(voice)
     c.text(64, 684, footer, 2, ACCENT)
     label = f"{position + 1}/{len(board.scenes)}"
     c.text(WIDTH - 64 - len(label) * 12, 684, label, 2, MUTED)

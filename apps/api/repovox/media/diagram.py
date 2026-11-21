@@ -33,6 +33,7 @@ from repovox.media.raster import (
     Color,
     LayoutError,
     mix,
+    voice_label,
     wrap,
 )
 from repovox.media.storyboard import display
@@ -181,6 +182,34 @@ def route(a: Box, b: Box, hv: bool, lane: int) -> list[Point]:
     y = by + bh // 2 if bh < 100 else by + 40 + 45 * lane
     start = (x, ay + ah) if by > ay else (x, ay)
     return [start, (x, y), (bx if bx > ax else bx + bw, y)]
+
+
+def channels(a: Box, b: Box, near: Box, far: Box, lane: int) -> list[list[Point]]:
+    """Routes between two tiers that run their horizontal leg in the gap between bands.
+
+    `near` is the source's band and `far` the target's. The line leaves the source card from
+    its facing edge, turns in the gap beside the target's band or the source's band, and enters
+    the target card from its facing edge, so it never runs along a row of cards. Several lines
+    into one card enter it side by side (`lane`)."""
+    ax, ay, aw, ah = a
+    bx, by, bw, bh = b
+    down = by > ay
+    offset = (0, -16, 16, -32, 32)[lane % 5]
+    sx = ax + aw // 2
+    tx = min(bx + bw - 12, max(bx + 12, bx + bw // 2 + offset))
+    start = (sx, ay + ah) if down else (sx, ay)
+    end = (tx, by) if down else (tx, by + bh)
+    half = BAND_GAP // 2
+    if down:
+        gaps = [far[1] - half, near[1] + near[3] + half]
+    else:
+        gaps = [far[1] + far[3] + half, near[1] - half]
+    found: list[list[Point]] = []
+    for y in dict.fromkeys(gaps):
+        points = [start, end] if sx == tx else [start, (sx, y), (tx, y), end]
+        if points not in found:
+            found.append(points)
+    return found
 
 
 def crossings(points: list[Point], others: list[Box]) -> int:
@@ -604,8 +633,12 @@ class Diagram:
         commit_sha: str,
         view: View | None = None,
         roles: Roles | None = None,
+        voice: str | None = None,
     ) -> None:
+        """`voice` is the speaking voice's provider (`kokoro_onnx`, `deterministic`, ...),
+        named in the footer; unnamed means the local synthetic voice."""
         self.architecture = architecture
+        self.voice = voice_label(voice)
         self.header = f"REPOVOX / {repository} @ {commit_sha[:12]}"[:96]
         self.title = view.title if view else architecture.title
         members = set(view.component_ids) if view else {c.id for c in architecture.components}
@@ -635,22 +668,30 @@ class Diagram:
         }
         counts: dict[str, int] = {}
         self.routes: dict[str, list[Point]] = {}
+        area = dict(self.bands)
         for connection in self.connections:
             a, b = self.boxes[connection.source], self.boxes[connection.target]
             lane = counts.get(connection.target, 0)
             hv = (connection.source, connection.target) in HV
             points = route(a, b, hv, lane)
+            others = [
+                box
+                for key, box in self.boxes.items()
+                if key not in (connection.source, connection.target)
+            ]
             if not fixed and len(points) == 3:
                 # Take whichever elbow crosses fewer other boxes.
-                others = [
-                    box
-                    for key, box in self.boxes.items()
-                    if key not in (connection.source, connection.target)
-                ]
                 other = route(a, b, not hv, lane)
                 if crossings(other, others) < crossings(points, others):
                     points = other
-            if len(points) == 3:
+            near, far = self.tier_of[connection.source], self.tier_of[connection.target]
+            if not fixed and near and far and near != far and crossings(points, others):
+                # A line between tiers that would cut through a neighbouring card runs its
+                # horizontal leg in the gap between the bands instead, when that crosses fewer.
+                for candidate in channels(a, b, area[near], area[far], lane):
+                    if crossings(candidate, others) < crossings(points, others):
+                        points = candidate
+            if len(points) >= 3:
                 counts[connection.target] = lane + 1
             self.routes[connection.id] = points
 
@@ -842,7 +883,7 @@ class Diagram:
             source = f"{citation.path}:{citation.line}  {citation.quote}"
             canvas.text(40, 642, display(source, 100), 2, MUTED)
         canvas.rect(0, 664, WIDTH, 56, CARD)
-        canvas.text(40, 684, "ARCHITECTURE FROM SOURCE EVIDENCE / LOCAL VOICE", 2, ACCENT)
+        canvas.text(40, 684, f"ARCHITECTURE FROM SOURCE / {self.voice}", 2, ACCENT)
         canvas.ring(700, 684, 22, 16, 4, MUTED, 2)
         canvas.text(730, 684, "VERIFIED", 2, MUTED)
         canvas.ring(850, 684, 22, 16, 4, MUTED, 2, dashed=True)

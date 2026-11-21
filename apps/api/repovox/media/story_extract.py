@@ -223,6 +223,59 @@ STOPWORDS = frozenset(
     """.split()
 )
 GENERIC_NAMES = frozenset({"main", "init", "run", "get", "set", "call", "self", "anonymous"})
+# Words so common in both README prose and declared names that sharing them shows nothing:
+# a statement and a declaration that share only these never corroborate each other.
+GENERIC_MATCH = frozenset(
+    """
+    chat agent context app client server data user model service interface backend frontend
+    handler manager logic process request response message state config helper base core demo
+    example
+    """.split()
+)
+# Words that describe how a text is laid out rather than what the software does.
+LAYOUT_WORDS = frozenset(
+    """
+    part parts composed consists consist following below above section sections component
+    components piece pieces step steps item items list contains contain divided split
+    repository repo
+    """.split()
+)
+# A statement about the browser side is corroborated only by script code, one about the Python
+# side only by Python code. A statement naming both may be backed by either.
+UI_CLAIM = re.compile(
+    r"(?i)(?<![\w.])(?:next\.?js|react(?:\.?js)?|vue(?:\.?js)?|svelte|angular|front-?end|"
+    r"browser|ui|(?:web|chat|user|graphical) interface)(?![\w-])"
+)
+PYTHON_CLAIM = re.compile(r"(?i)(?<![\w.])(?:python|fastapi|django|flask|pytorch)(?![\w-])")
+SCRIPT_LANGUAGES = frozenset({"javascript", "typescript", "tsx"})
+
+
+def lead_in(text: str) -> bool:
+    """A structural fragment, not a feature: a line that introduces a list ("It is composed of
+    two parts:") or a short line whose only content words describe layout."""
+    stripped = text.strip()
+    if stripped.endswith(":"):
+        return True
+    count = len(re.findall(r"[A-Za-z][A-Za-z.'-]*", stripped))
+    return count <= 8 and not content_words(stripped) - LAYOUT_WORDS
+
+
+def specific(word: str) -> bool:
+    """A content word that can corroborate on its own: not one every code base shares."""
+    return not variants(word) & GENERIC_MATCH
+
+
+def claim_languages(text: str) -> frozenset[str] | None:
+    """Which parser languages may back a statement: script code for the browser side, Python
+    for the Python side, any when it names both or neither."""
+    browser, python = bool(UI_CLAIM.search(text)), bool(PYTHON_CLAIM.search(text))
+    if browser and not python:
+        return SCRIPT_LANGUAGES
+    if python and not browser:
+        return frozenset({"python"})
+    return None
+
+
 TEMPLATES = {
     "problem_insufficient": (
         "The repository does not document the problem it solves, so no problem statement is "
@@ -810,21 +863,25 @@ def extract_story(
         span = [(line.path, line.number, line.number)]
         return builder.claim(artifact, kind, status, line.text, span)
 
-    intro = [line for line in lines if line.section == "intro"][:4]
+    # A lead-in such as "It is composed of two parts:" introduces what follows and states
+    # nothing itself: it is never a problem, a feature or a mismatch. A technology it names
+    # still counts as named by the documentation.
+    claimable = [line for line in lines if not lead_in(line.text)]
+    intro = [line for line in claimable if line.section == "intro"][:4]
     problems = [line for line in intro if PROBLEM_CUE.search(line.text)]
-    problems += [line for line in lines if line.section == "problem"]
+    problems += [line for line in claimable if line.section == "problem"]
     for line in problems[:6]:
         doc_claim("problem_statement", "author_stated_problem", line)
-    for line in [line for line in lines if line.section == "context"][:4]:
+    for line in [line for line in claimable if line.section == "context"][:4]:
         doc_claim("problem_context", "inferred_problem_context", line)
     intended_lines = [line for line in intro if not PROBLEM_CUE.search(line.text)][:3]
-    intended_lines += [line for line in lines if line.section == "solution"][:8]
-    for line in [line for line in lines if line.section == "decisions"][:4]:
+    intended_lines += [line for line in claimable if line.section == "solution"][:8]
+    for line in [line for line in claimable if line.section == "decisions"][:4]:
         doc_claim("implementation_approach", "intended_solution", line)
-    limitation_lines = [line for line in lines if line.section == "limitations"][:6]
+    limitation_lines = [line for line in claimable if line.section == "limitations"][:6]
     outcome_lines = [
         line
-        for line in lines
+        for line in claimable
         if line.section not in {"usage", "limitations"}
         and (PERFORMANCE.search(line.text) or PRODUCTION.search(line.text))
     ][:4]
@@ -836,7 +893,7 @@ def extract_story(
             if name not in mentions and pattern.search(line.text):
                 mentions[name] = line
     for line in mentions.values():
-        if line not in intended_lines:
+        if line not in intended_lines and not lead_in(line.text):
             intended_lines.append(line)
 
     # 2. Implementation: what the pinned commit contains, from Stage 9 claims.
@@ -1062,21 +1119,27 @@ def extract_story(
     for line in intended_lines:
         terms = content_words(line.text)
         wanted = {v for w in terms for v in variants(w)}
+        distinct = {v for w in terms if specific(w) for v in variants(w)}
         covered = sum(bool(variants(w) & declared_words) for w in terms)
+        hits = sum(bool(variants(w) & declared_words) for w in terms if specific(w))
         # One shared word is coincidence: corroboration needs two of the statement's content
-        # words in declared names, or the only word of a one- or two-word statement.
-        enough = covered >= 2 or (0 < len(terms) <= 2 and covered >= 1)
+        # words in declared names, or the only word of a one- or two-word statement. At least
+        # one of them must be specific: "chat", "agent" and "context" alone corroborate nothing.
+        enough = hits >= 1 and (covered >= 2 or (0 < len(terms) <= 2 and covered >= 1))
+        # A statement about the browser side is backed by script code, the Python side by
+        # Python: a "Next.js UI" is never corroborated by a Python class.
+        backers = claim_languages(line.text)
         matched = sorted(
             (
-                (symbol, len(found & wanted))
+                (symbol, len(found & distinct), len(found & wanted))
                 for symbol, found in (index if enough else [])
-                if found & wanted
+                if found & distinct and (backers is None or symbol["parser_language"] in backers)
             ),
-            key=lambda item: (-item[1], item[0]["path"], item[0]["start_line"]),
+            key=lambda item: (-item[1], -item[2], item[0]["path"], item[0]["start_line"]),
         )
         supports: list[Claim] = []
         stubbed: list[tuple[dict[str, Any], Claim]] = []
-        for symbol, _ in matched[:4]:
+        for symbol, *_ in matched[:4]:
             if symbol["id"] in stubs:
                 if symbol["id"] in stub_claims:
                     stubbed.append((symbol, stub_claims[symbol["id"]]))
