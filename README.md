@@ -1,62 +1,110 @@
 # RepoVox
 
-Bring source code to life visually.
+Bring source code to life visually. RepoVox turns a public GitHub repository into narrated,
+evidence-grounded engineering videos. It reads the repository at one pinned commit as data,
+never runs it, and cites every statement it makes to a file and line.
 
-**Status: Phase 2 engineering accepted at `b60ba548`; Phase 2B preparation; EVAL-ENTRY pending.**
-Phase 2B accepted at `e87a95c4`; owner-authorized [AI exploratory pilot](docs/delivery/phase2c-a-verification.md)
-is a separate blind source-review preparation track. It contributes no official
-human-reviewed gold. [Reviewer handoff](docs/development/exploratory-handoff.md).
-Accepted Phase 0 `e35d8ef8a8a53cb34e46271a9813b5332ea42c1f` and Phase 1
-`ec09b733ab3ceffe592ad96d07902b92596dfd1b` remain in history. PRs #1/#2 are
-unmerged; Phase 2 is stacked on Phase 1. Development analysis executes Stages 1–9.
-Models, deployment and Phase 3 remain disabled. Independent human
-reviewer is PENDING OWNER APPOINTMENT; the official evaluation corpus is UNFROZEN.
+> **Status:** implementation output, not independently reviewed. Public production deployment
+> stays gated on an independent security review. The official evaluation corpus is UNFROZEN and
+> the independent reviewer appointment is pending; see the
+> [sole-contributor policy and phase authority](AGENTS.md).
 
-**Branch `feature/repository-to-video`: video generation is implemented, not yet
-independently reviewed.** Repository walkthroughs and architecture-explainer videos are
-generated from verified analysis of Python, JavaScript and TypeScript (including JSX and
-TSX) source, in a separate [media database](docs/operations/media-database.md) (revision
-`m001`, enabled with `REPOVOX_VIDEO`). The core database stays at revision `0004`, where
-`rv.job_guard` and `rv.video_disabled` still refuse every core video row. What the
-[architecture explainer](docs/development/architecture-explainer.md) reads in each language,
-and its known limits, are documented there.
+## What it does
 
-## Local development
+- **Sandboxed static analysis (Stages 1–9).**
+  - A public GitHub URL is resolved to a commit and its archive is fetched read-only.
+  - The archive is screened before anything is parsed: credentials, nested archives, unsafe
+    paths, size and fact limits. Any hit fails closed.
+  - Python, JavaScript, TypeScript, JSX and TSX are parsed with tree-sitter in a Linux child
+    process. That process is confined by Landlock, a seccomp filter and resource limits.
+  - The output is a verified analysis artifact (contract `2.3`) of symbols, relationships,
+    entry points, evidence and claims. See [analysis, API and limits](docs/development/analysis.md).
+- **Problem-to-solution engineering story.** The walkthrough video covers:
+  - the problem the authors document, and the solution they propose;
+  - how it was built, the architecture and the main workflow;
+  - technical decisions, demonstrated results, limitations and open questions.
 
-Requirements: Docker Desktop (Linux containers), Compose v2, Python 3.11+ and Node 24.22.1. Keep at least 15 GB free for builds. Generate distinct ignored local credentials and start the stack:
+  Each sentence cites claims and is labelled with the weakest status among them: `VERIFIED`,
+  `INFERRED`, `AUTHOR-STATED` or `UNVERIFIED`. Mismatches between the documentation and the code
+  are stated. An undocumented problem is reported as such, never inferred
+  ([ADR-0025](docs/adr/0025-problem-to-solution-engineering-story.md)).
+- **Animated system architecture.**
+  - A whole-repository map places cited subsystems in up to four tiers: client and frontend,
+    API and routes, core services, and ML, data and external. It animates one cross-tier path.
+  - Further explainer videos zoom into route services and component graphs.
+  - Every card and arrow carries citations; inferred relationships are drawn dashed
+    ([ADR-0032](docs/adr/0032-whole-repository-system-architecture-view.md)).
+- **Voice.**
+  - Narration is spoken locally: the operating-system voice (`espeak-ng`) by default, or the
+    optional Kokoro-82M neural voice on CPU through `kokoro-onnx`. No paid speech API is used.
+  - Technical terms get a spoken pronunciation; captions keep the exact text
+    ([ADR-0031](docs/adr/0031-neural-voice-and-animated-architecture.md)).
+- **Optional grounded narration.**
+  - Wording is deterministic by default.
+  - When the owner configures a language model, it may reword scenes: self-hosted Ollama, or an
+    OpenAI-compatible or Anthropic endpoint under the [model policy](AGENTS.md#model-policy).
+  - Stage 11 re-checks every reworded sentence against its cited claims; anything that fails
+    falls back to the template wording
+    ([ADR-0026](docs/adr/0026-grounded-llm-narration-refiner.md)).
+- **Web app.** A Next.js dashboard to:
+  - sign in and add GitHub repositories;
+  - start a video job and follow its progress;
+  - play or download each video with captions and the cited story.
 
-```powershell
-python tools/phase1_env.py
-docker compose up -d --build
-docker compose ps -a
+  Published media follow a 24-hour retention lifecycle.
+
+## Repository layout
+
+| Path | Contents |
+| --- | --- |
+| `apps/api/` | FastAPI API, Celery analysis worker, dispatcher and media worker (Python) |
+| `apps/api/repovox/analysis/` | Stages 1–9: acquisition, screening, sandboxed parsing, knowledge, evidence and verification |
+| `apps/api/repovox/media/` | Stages 10–15: story, storyboard, grounded narration, speech, frames, encoding and architecture explainers |
+| `apps/api/migrations/`, `apps/api/migrations_media/` | Core database (`0004`) and media database (`m001`) migrations |
+| `apps/web/` | Next.js web app |
+| `infrastructure/local/` | Dockerfiles and Compose overlays: hardening, neural voice, production |
+| `scripts/` | `deploy_selfhosted.sh` and `setup_kokoro_voice.sh` |
+| `docs/` | Product, architecture, security, operations, ADRs and delivery records |
+| `tests/` | Unit and integration tests with locally authored synthetic fixtures |
+| `tools/` | Documentation, contract, security and evaluation tooling |
+
+## Quickstart (self-hosted)
+
+On a Linux host (WSL 2 works) with Docker Engine, Compose v2, Landlock and seccomp. See the
+[host prerequisites](docs/operations/deployment-guide.md#1-host-prerequisites).
+
+```sh
+bash scripts/deploy_selfhosted.sh --check   # preflight only; changes nothing
+bash scripts/deploy_selfhosted.sh           # generates .env (mode 600), builds, starts and waits for health
 ```
 
-The [Node/Next security handoff](docs/security/node-next-remediation.md) documents
-the exact runtime pins and effective bundled-root inspection; the global Windows
-trust store and unrelated host installations are outside that correction.
-The separate [SDK trust handoff](docs/security/botocore-trust-hardening.md)
-documents upstream fallback removal and explicit fail-closed certificate selection.
+Open `http://localhost:3000` and choose a development identity (Alex Chen or Sam Rivera). The
+API listens on `http://127.0.0.1:8000`. `--mode production` uses GitHub sign-in for provisioned
+accounts behind a TLS reverse proxy.
 
-Open `http://localhost:3000` and choose Alex Chen or Sam Rivera. Create/view/delete
-owned GitHub locators, run retained labelled synthetic fixtures, or acknowledge local
-source processing and start development analysis. Linux parser isolation is mandatory.
-PostgreSQL remains durable truth, Redis/Celery delivers notifications, and private
-SeaweedFS stores immutable archives/analysis. Database/storage volumes survive
-`docker compose down`. [Analysis/API/limits](docs/development/analysis.md),
-[evaluation preparation](docs/development/evaluation-preparation.md),
-[Phase 2B handoff](docs/delivery/phase2b-verification.md),
-[Phase 2 verification](docs/delivery/phase2-verification.md),
-[independent-review corrections](docs/delivery/phase2-review-corrections.md),
-[local setup](docs/development/local.md), [tests](docs/development/testing.md) and
-[accepted Phase 1 evidence](docs/delivery/phase1-verification.md).
+Optional Kokoro neural voice: download the reviewed model files into the git-ignored
+`.models/kokoro/`, then add the neural-voice overlay:
+
+```sh
+bash scripts/setup_kokoro_voice.sh
+docker compose -f docker-compose.yml -f infrastructure/local/docker-compose.prod.yml \
+  -f infrastructure/local/docker-compose.neural-tts.yml up -d --build --wait
+```
+
+More detail:
+- the [self-hosted deployment guide](docs/operations/deployment-guide.md) covers secrets, TLS,
+  GitHub OAuth, the optional narration model, backup, upgrade and rollback;
+- the [frontend developer handoff](docs/development/frontend-handoff.md) covers running the web
+  app against a local backend and the frozen API contract.
+
+Never commit `.env`, `.artifacts/` or `.models/`; all three are git-ignored.
 
 ## Application checks
 
 First use the [hash-anchored security bootstrap](docs/security/python-trust-remediation.md)
-in an owner-selected disposable Python environment. Do not use an old pip/uv for
-network installation; new virtual environments also need the patched bootstrap.
+in an owner-selected disposable Python environment. Do not use an old pip or uv for network installation.
 
-```powershell
+```sh
 python tools/security_bootstrap.py
 uv sync --frozen
 uv run ruff check apps/api tests tools/phase1*.py tools/phase2*.py
@@ -78,7 +126,9 @@ docker compose -p repovox-test run --rm --build tests
 docker compose -p repovox-test down --volumes
 ```
 
-Integration tests use an explicitly disposable database with real PostgreSQL RLS, Redis and S3 operations; no mocked isolation proof or silent service skips. Read [test execution](docs/development/testing.md) before destructive test reset. Full production security, deletion/restore, managed identity and later media/AI gates remain in the approved Phase 0 roadmap.
+Integration tests use an explicitly disposable database with real PostgreSQL row-level
+security, Redis and S3 operations. Read [test execution](docs/development/testing.md) before a
+destructive test reset.
 
 ## Reading order
 
@@ -92,13 +142,13 @@ Integration tests use an explicitly disposable database with real PostgreSQL RLS
 8. [RepoVox Director](docs/ai/director-architecture.md), [model selection](docs/ai/model-selection.md), [training](docs/ai/training-strategy.md), [evaluation](docs/ai/evaluation-plan.md), [self-hosted speech](docs/ai/speech-strategy.md) and [change impact](docs/ai/change-impact.md)
 9. [ADRs](docs/adr/README.md) and [targeted remediation verification](docs/delivery/phase0-remediation-verification.md), [revision verification](docs/delivery/phase0-revision-verification.md) ([historical record](docs/delivery/phase0-verification.md))
 
-V1: public GitHub URL; Python, JavaScript and TypeScript; asynchronous generation; 3–5 minute 1280×720 narrated MP4; dashboard, progress, playback, download and history; claims tied to source files and the exact commit. Private repositories, arbitrary documents, avatars, teams, custom editing and advanced billing are deferred.
-
-Self-hosted RepoVox Director and speech are the primary production strategy. Normal videos require no paid third-party LLM/TTS API; external AI evaluation needs explicit owner approval. No model has been trained/evaluated locally. [Revision verification](docs/delivery/phase0-revision-verification.md) distinguishes design checks from future GPU/training results.
+Self-hosted narration and speech are the primary production strategy. Normal videos need no
+paid third-party LLM or TTS API, and external AI evaluation needs explicit owner approval. No
+model has been trained or evaluated locally.
 
 ## Documentation checks
 
-Python 3.11+ and Node.js LTS are used for planning tooling only:
+Python 3.11+ and Node.js LTS are used for documentation tooling only:
 
 ```powershell
 python tools/security_bootstrap.py
@@ -116,6 +166,4 @@ git diff --check
 ```
 
 Documentation checks validate paths, headings, JSON examples and contract invariants;
-Mermaid rendering is separate. See [sole-contributor policy and current phase authority](AGENTS.md).
-Owner authorized Phase 2 engineering and Phase 2B evaluation preparation. Stop at independent review; do not merge,
-deploy, train or begin Phase 3. The evaluation corpus must be actually reviewed/frozen.
+Mermaid rendering is separate.
