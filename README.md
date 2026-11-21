@@ -16,7 +16,7 @@
 [![Docker](https://img.shields.io/badge/deploy-Docker%20Compose-2496ED.svg)](docs/operations/deployment-guide.md)
 [![Status](https://img.shields.io/badge/status-security%20review%20pending-orange.svg)](AGENTS.md)
 
-[Features](#-features) · [Architecture](#-architecture) · [Installation](#-installation) · [Results](#-results) · [Roadmap](#-roadmap) · [Docs](docs/)
+[Features](#features) · [Architecture](#architecture) · [Installation](#installation) · [Results](#results) · [Roadmap](#roadmap) · [Docs](#documentation)
 
 </div>
 
@@ -29,24 +29,24 @@
 
 ##  Table of Contents
 
-- [The Problem](#-the-problem)
-- [The Solution](#-the-solution)
-- [Features](#-features)
-- [Design Principles](#-design-principles)
-- [Architecture](#-architecture)
-- [Installation](#-installation)
-- [Running the Project](#-running-the-project)
-- [Example Output](#-example-output)
-- [Results](#-results)
-- [Project Structure](#-project-structure)
-- [Technologies](#-technologies)
-- [Project Maturity](#-project-maturity)
-- [Roadmap](#-roadmap)
-- [Tests and Quality Gates](#-tests-and-quality-gates)
-- [Documentation](#-documentation)
-- [Contributing](#-contributing)
-- [License](#-license)
-- [Contact](#-contact)
+- [The Problem](#the-problem)
+- [The Solution](#the-solution)
+- [Features](#features)
+- [Design Principles](#design-principles)
+- [Architecture](#architecture)
+- [Installation](#installation)
+- [Running the Project](#running-the-project)
+- [Example Output](#example-output)
+- [Results](#results)
+- [Project Structure](#project-structure)
+- [Technologies](#technologies)
+- [Project Maturity](#project-maturity)
+- [Roadmap](#roadmap)
+- [Tests and Quality Gates](#tests-and-quality-gates)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+- [License](#license)
+- [Contact](#contact)
 
 ---
 
@@ -170,18 +170,6 @@ Design records and contracts:
 - [Architecture explainer](docs/development/architecture-explainer.md) for the architecture videos
 - [Media database](docs/operations/media-database.md) for Stages 10–15 and the handoff between the two databases
 - [ADR index](docs/adr/README.md): 33 architecture decision records
-
-<!--
-##  Screenshots
-
-| Dashboard | Video job progress |
-|---|---|
-| ![Dashboard](assets/screenshot_dashboard.png) | ![Progress](assets/screenshot_progress.png) |
-
-| Walkthrough video | Architecture explainer |
-|---|---|
-| ![Walkthrough](assets/screenshot_walkthrough.png) | ![Architecture](assets/screenshot_architecture.png) |
--->
 
 ##  Installation
 
