@@ -1,0 +1,148 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760" role="img" aria-labelledby="t d">
+<title id="t">RepoVox system architecture</title>
+<desc id="d">Analysis worker stages 1 to 9 read one pinned commit as data inside a sandbox; media worker stages 10 to 15 turn the verified result into narrated videos; a Next.js app, FastAPI API, PostgreSQL, Redis and S3-compatible storage run the platform.</desc>
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b1020"/><stop offset="1" stop-color="#170f38"/></linearGradient>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#94a3b8"/></marker>
+<style>
+.s{font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,"Helvetica Neue",Helvetica,Arial,sans-serif}
+.m{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"DejaVu Sans Mono",monospace}
+</style></defs>
+<rect width="1280" height="760" fill="url(#bg)"/>
+<g class="s">
+<text x="40" y="46" font-size="24" font-weight="800" fill="#f8fafc">From repository to narrated video</text>
+<text x="40" y="72" font-size="14.5" fill="#a5b4fc">One pinned commit, read as data and never executed. Fifteen fenced stages. Every claim is re-verified before it is spoken.</text>
+<rect x="896" y="26" width="344" height="40" rx="20" fill="#0f172a" stroke="#22d3ee" stroke-opacity="0.6"/>
+<text x="918" y="51" font-size="12" font-weight="700" letter-spacing="1.5" fill="#67e8f9">INPUT</text>
+<text x="972" y="51" class="m" font-size="13.5" fill="#e2e8f0">https://github.com/owner/repo</text>
+<rect x="40" y="96" width="1200" height="236" rx="16" fill="#ffffff" fill-opacity="0.03" stroke="#22d3ee" stroke-opacity="0.45" stroke-width="1.5"/>
+<text x="60" y="126" font-size="13" font-weight="800" letter-spacing="2" fill="#22d3ee">ANALYSIS WORKER · STAGES 1–9</text>
+<text x="1220" y="126" text-anchor="end" font-size="13" fill="#94a3b8">Celery task per stage · PostgreSQL leases and fences</text>
+<path d="M70.0 168H1210.0" stroke="#22d3ee" stroke-opacity="0.35" stroke-width="2"/>
+<rect x="60.0" y="146" width="118.2" height="92" rx="10" fill="#0c1a2b" stroke="#22d3ee" stroke-opacity="0.55"/>
+<circle cx="78.0" cy="168" r="11" fill="#22d3ee" fill-opacity="0.18" stroke="#22d3ee"/>
+<text x="78.0" y="172.5" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f8fafc">1</text>
+<text x="95.0" y="173" class="m" font-size="12" font-weight="700" fill="#f1f5f9">validate</text>
+<text x="72.0" y="210" font-size="12" fill="#cbd5e1">URL → 40-char</text>
+<text x="72.0" y="226" font-size="12" fill="#cbd5e1">commit SHA</text>
+<rect x="190.2" y="146" width="118.2" height="92" rx="10" fill="#0c1a2b" stroke="#22d3ee" stroke-opacity="0.55"/>
+<circle cx="208.2" cy="168" r="11" fill="#22d3ee" fill-opacity="0.18" stroke="#22d3ee"/>
+<text x="208.2" y="172.5" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f8fafc">2</text>
+<text x="225.2" y="173" class="m" font-size="12" font-weight="700" fill="#f1f5f9">acquire</text>
+<text x="202.2" y="210" font-size="12" fill="#cbd5e1">read-only archive,</text>
+<text x="202.2" y="226" font-size="12" fill="#cbd5e1">secret screen</text>
+<rect x="320.4" y="146" width="118.2" height="92" rx="10" fill="#0c1a2b" stroke="#22d3ee" stroke-opacity="0.55"/>
+<circle cx="338.4" cy="168" r="11" fill="#22d3ee" fill-opacity="0.18" stroke="#22d3ee"/>
+<text x="338.4" y="172.5" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f8fafc">3</text>
+<text x="355.4" y="173" class="m" font-size="12" font-weight="700" fill="#f1f5f9">filter</text>
+<text x="332.4" y="210" font-size="12" fill="#cbd5e1">file inventory,</text>
+<text x="332.4" y="226" font-size="12" fill="#cbd5e1">eligible coverage</text>
+<rect x="450.7" y="146" width="118.2" height="92" rx="10" fill="#0c1a2b" stroke="#22d3ee" stroke-opacity="0.55"/>
+<circle cx="468.7" cy="168" r="11" fill="#22d3ee" fill-opacity="0.18" stroke="#22d3ee"/>
+<text x="468.7" y="172.5" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f8fafc">4</text>
+<text x="485.7" y="173" class="m" font-size="12" font-weight="700" fill="#f1f5f9">structure</text>
+<text x="462.7" y="210" font-size="12" fill="#cbd5e1">tree-sitter syntax:</text>
+<text x="462.7" y="226" font-size="12" fill="#cbd5e1">symbols, imports</text>
+<rect x="580.9" y="146" width="118.2" height="92" rx="10" fill="#0c1a2b" stroke="#22d3ee" stroke-opacity="0.55"/>
+<circle cx="598.9" cy="168" r="11" fill="#22d3ee" fill-opacity="0.18" stroke="#22d3ee"/>
+<text x="598.9" y="172.5" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f8fafc">5</text>
+<text x="615.9" y="173" class="m" font-size="12" font-weight="700" fill="#f1f5f9">entrypoints</text>
+<text x="592.9" y="210" font-size="12" fill="#cbd5e1">mains, scripts,</text>
+<text x="592.9" y="226" font-size="12" fill="#cbd5e1">declared routes</text>
+<rect x="711.1" y="146" width="118.2" height="92" rx="10" fill="#0c1a2b" stroke="#22d3ee" stroke-opacity="0.55"/>
+<circle cx="729.1" cy="168" r="11" fill="#22d3ee" fill-opacity="0.18" stroke="#22d3ee"/>
+<text x="729.1" y="172.5" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f8fafc">6</text>
+<text x="746.1" y="173" class="m" font-size="12" font-weight="700" fill="#f1f5f9">infer</text>
+<text x="723.1" y="210" font-size="12" fill="#cbd5e1">static</text>
+<text x="723.1" y="226" font-size="12" fill="#cbd5e1">relationships</text>
+<rect x="841.3" y="146" width="118.2" height="92" rx="10" fill="#0c1a2b" stroke="#22d3ee" stroke-opacity="0.55"/>
+<circle cx="859.3" cy="168" r="11" fill="#22d3ee" fill-opacity="0.18" stroke="#22d3ee"/>
+<text x="859.3" y="172.5" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f8fafc">7</text>
+<text x="876.3" y="173" class="m" font-size="12" font-weight="700" fill="#f1f5f9">knowledge</text>
+<text x="853.3" y="210" font-size="12" fill="#cbd5e1">project</text>
+<text x="853.3" y="226" font-size="12" fill="#cbd5e1">knowledge model</text>
+<rect x="971.6" y="146" width="118.2" height="92" rx="10" fill="#0c1a2b" stroke="#22d3ee" stroke-opacity="0.55"/>
+<circle cx="989.6" cy="168" r="11" fill="#22d3ee" fill-opacity="0.18" stroke="#22d3ee"/>
+<text x="989.6" y="172.5" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f8fafc">8</text>
+<text x="1006.6" y="173" class="m" font-size="12" font-weight="700" fill="#f1f5f9">evidence</text>
+<text x="983.6" y="210" font-size="12" fill="#cbd5e1">path · lines ·</text>
+<text x="983.6" y="226" font-size="12" fill="#cbd5e1">file hash · SHA</text>
+<rect x="1101.8" y="146" width="118.2" height="92" rx="10" fill="#0c1a2b" stroke="#22d3ee" stroke-opacity="0.55"/>
+<circle cx="1119.8" cy="168" r="11" fill="#22d3ee" fill-opacity="0.18" stroke="#22d3ee"/>
+<text x="1119.8" y="172.5" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f8fafc">9</text>
+<text x="1136.8" y="173" class="m" font-size="12" font-weight="700" fill="#f1f5f9">verify</text>
+<text x="1113.8" y="210" font-size="12" fill="#cbd5e1">re-parse and</text>
+<text x="1113.8" y="226" font-size="12" fill="#cbd5e1">re-check claims</text>
+<rect x="60.0" y="252" width="378.7" height="30" rx="9" fill="#0b1224" stroke="#22d3ee" stroke-opacity="0.8"/>
+<text x="74.0" y="271.5" font-size="12.5" fill="#cbd5e1"><tspan font-weight="800" fill="#22d3ee">NETWORK</tspan>  api.github.com + codeload only · no redirects</text>
+<rect x="450.7" y="252" width="769.3" height="30" rx="9" fill="#0b1224" stroke="#22d3ee" stroke-opacity="0.8"/>
+<text x="464.7" y="271.5" font-size="12.5" fill="#cbd5e1"><tspan font-weight="800" fill="#22d3ee">SANDBOX</tspan>  child process · Landlock · seccomp (no sockets, exec, ptrace) · CPU / memory / file limits · scrubbed env</text>
+<text x="60" y="308" font-size="12.5" fill="#94a3b8">Languages: Python, JavaScript, TypeScript, JSX, TSX  ·  Claim status: verified · inferred · documentation-only · unsupported  ·  Output: verified analysis artifact (contract 2.3)</text>
+<path d="M640 334V374" stroke="#94a3b8" stroke-width="2" marker-end="url(#ah)"/>
+<text x="656" y="359" font-size="12.5" fill="#cbd5e1">verified Stage 9 result + pinned archive · hash-checked handoff between two databases</text>
+<rect x="40" y="376" width="1200" height="258" rx="16" fill="#ffffff" fill-opacity="0.03" stroke="#a78bfa" stroke-opacity="0.45" stroke-width="1.5"/>
+<text x="60" y="406" font-size="13" font-weight="800" letter-spacing="2" fill="#a78bfa">MEDIA WORKER · STAGES 10–15</text>
+<text x="1220" y="406" text-anchor="end" font-size="13" fill="#94a3b8">60 s fenced leases · two attempts · videos expire after 24 h</text>
+<path d="M70.0 448H1210.0" stroke="#a78bfa" stroke-opacity="0.35" stroke-width="2"/>
+<rect x="60.0" y="426" width="183.3" height="92" rx="10" fill="#17132e" stroke="#a78bfa" stroke-opacity="0.55"/>
+<circle cx="78.0" cy="448" r="11" fill="#a78bfa" fill-opacity="0.18" stroke="#a78bfa"/>
+<text x="78.0" y="452.5" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f8fafc">10</text>
+<text x="95.0" y="453" class="m" font-size="12" font-weight="700" fill="#f1f5f9">storyboard</text>
+<text x="72.0" y="490" font-size="12" fill="#cbd5e1">problem → solution story,</text>
+<text x="72.0" y="506" font-size="12" fill="#cbd5e1">up to 11 scenes</text>
+<rect x="255.3" y="426" width="183.3" height="92" rx="10" fill="#17132e" stroke="#a78bfa" stroke-opacity="0.55"/>
+<circle cx="273.3" cy="448" r="11" fill="#a78bfa" fill-opacity="0.18" stroke="#a78bfa"/>
+<text x="273.3" y="452.5" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f8fafc">11</text>
+<text x="290.3" y="453" class="m" font-size="12" font-weight="700" fill="#f1f5f9">narration</text>
+<text x="267.3" y="490" font-size="12" fill="#cbd5e1">re-verify every citation,</text>
+<text x="267.3" y="506" font-size="12" fill="#cbd5e1">approve the script</text>
+<rect x="450.7" y="426" width="183.3" height="92" rx="10" fill="#17132e" stroke="#a78bfa" stroke-opacity="0.55"/>
+<circle cx="468.7" cy="448" r="11" fill="#a78bfa" fill-opacity="0.18" stroke="#a78bfa"/>
+<text x="468.7" y="452.5" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f8fafc">12</text>
+<text x="485.7" y="453" class="m" font-size="12" font-weight="700" fill="#f1f5f9">tts</text>
+<text x="462.7" y="490" font-size="12" fill="#cbd5e1">espeak-ng or Kokoro-82M,</text>
+<text x="462.7" y="506" font-size="12" fill="#cbd5e1">technical pronunciation</text>
+<rect x="646.0" y="426" width="183.3" height="92" rx="10" fill="#17132e" stroke="#a78bfa" stroke-opacity="0.55"/>
+<circle cx="664.0" cy="448" r="11" fill="#a78bfa" fill-opacity="0.18" stroke="#a78bfa"/>
+<text x="664.0" y="452.5" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f8fafc">13</text>
+<text x="681.0" y="453" class="m" font-size="12" font-weight="700" fill="#f1f5f9">render</text>
+<text x="658.0" y="490" font-size="12" fill="#cbd5e1">1280×720 animated frames,</text>
+<text x="658.0" y="506" font-size="12" fill="#cbd5e1">WebVTT captions</text>
+<rect x="841.3" y="426" width="183.3" height="92" rx="10" fill="#17132e" stroke="#a78bfa" stroke-opacity="0.55"/>
+<circle cx="859.3" cy="448" r="11" fill="#a78bfa" fill-opacity="0.18" stroke="#a78bfa"/>
+<text x="859.3" y="452.5" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f8fafc">14</text>
+<text x="876.3" y="453" class="m" font-size="12" font-weight="700" fill="#f1f5f9">encode</text>
+<text x="853.3" y="490" font-size="12" fill="#cbd5e1">FFmpeg H.264 + AAC,</text>
+<text x="853.3" y="506" font-size="12" fill="#cbd5e1">full decode check</text>
+<rect x="1036.7" y="426" width="183.3" height="92" rx="10" fill="#17132e" stroke="#a78bfa" stroke-opacity="0.55"/>
+<circle cx="1054.7" cy="448" r="11" fill="#a78bfa" fill-opacity="0.18" stroke="#a78bfa"/>
+<text x="1054.7" y="452.5" text-anchor="middle" font-size="11.5" font-weight="800" fill="#f8fafc">15</text>
+<text x="1071.7" y="453" class="m" font-size="12" font-weight="700" fill="#f1f5f9">architecture</text>
+<text x="1048.7" y="490" font-size="12" fill="#cbd5e1">system map and route</text>
+<text x="1048.7" y="506" font-size="12" fill="#cbd5e1">explainers (1–3 videos)</text>
+<rect x="60.0" y="532" width="378.7" height="30" rx="9" fill="#0b1224" stroke="#fbbf24" stroke-opacity="0.8" stroke-dasharray="6 5"/>
+<text x="74.0" y="551.5" font-size="12.5" fill="#cbd5e1"><tspan font-weight="800" fill="#fbbf24">OPTIONAL LLM</tspan>  rewords only · every scene re-checked</text>
+<rect x="450.7" y="532" width="769.3" height="30" rx="9" fill="#0b1224" stroke="#a78bfa" stroke-opacity="0.8"/>
+<text x="464.7" y="551.5" font-size="12.5" fill="#cbd5e1"><tspan font-weight="800" fill="#a78bfa">OUTPUT</tspan>  walkthrough MP4 · captions · cited engineering story · architecture explainer videos</text>
+<text x="60" y="588" font-size="12.5" fill="#94a3b8">Optional narration model: self-hosted Ollama, an OpenAI-compatible endpoint or Anthropic. A scene that fails the grounding check keeps its template wording.</text>
+<text x="60" y="608" font-size="12.5" fill="#94a3b8">Labels on screen: VERIFIED · INFERRED · AUTHOR-STATED · UNVERIFIED — each sentence shows the weakest status among the claims it cites.</text>
+<text x="40" y="666" font-size="13" font-weight="800" letter-spacing="2" fill="#94a3b8">PLATFORM</text>
+<rect x="40.0" y="680" width="190.0" height="52" rx="10" fill="#0f172a" stroke="#334155"/>
+<text x="135.0" y="702" text-anchor="middle" font-size="14" font-weight="700" fill="#e2e8f0">Next.js 16</text>
+<text x="135.0" y="721" text-anchor="middle" font-size="12" fill="#94a3b8">web app · session BFF</text>
+<rect x="242.0" y="680" width="190.0" height="52" rx="10" fill="#0f172a" stroke="#334155"/>
+<text x="337.0" y="702" text-anchor="middle" font-size="14" font-weight="700" fill="#e2e8f0">FastAPI</text>
+<text x="337.0" y="721" text-anchor="middle" font-size="12" fill="#94a3b8">/v1 API · OpenAPI</text>
+<rect x="444.0" y="680" width="190.0" height="52" rx="10" fill="#0f172a" stroke="#334155"/>
+<text x="539.0" y="702" text-anchor="middle" font-size="14" font-weight="700" fill="#e2e8f0">PostgreSQL 16</text>
+<text x="539.0" y="721" text-anchor="middle" font-size="12" fill="#94a3b8">core + media DBs · RLS</text>
+<rect x="646.0" y="680" width="190.0" height="52" rx="10" fill="#0f172a" stroke="#334155"/>
+<text x="741.0" y="702" text-anchor="middle" font-size="14" font-weight="700" fill="#e2e8f0">Redis + Celery</text>
+<text x="741.0" y="721" text-anchor="middle" font-size="12" fill="#94a3b8">stage delivery</text>
+<rect x="848.0" y="680" width="190.0" height="52" rx="10" fill="#0f172a" stroke="#334155"/>
+<text x="943.0" y="702" text-anchor="middle" font-size="14" font-weight="700" fill="#e2e8f0">SeaweedFS</text>
+<text x="943.0" y="721" text-anchor="middle" font-size="12" fill="#94a3b8">S3-compatible objects</text>
+<rect x="1050.0" y="680" width="190.0" height="52" rx="10" fill="#0f172a" stroke="#334155"/>
+<text x="1145.0" y="702" text-anchor="middle" font-size="14" font-weight="700" fill="#e2e8f0">Docker Compose</text>
+<text x="1145.0" y="721" text-anchor="middle" font-size="12" fill="#94a3b8">hardened containers</text>
+</g></svg>

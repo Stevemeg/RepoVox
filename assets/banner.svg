@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="320" viewBox="0 0 1280 320" role="img" aria-labelledby="t d">
+  <title id="t">RepoVox</title>
+  <desc id="d">RepoVox turns a public GitHub repository into narrated, evidence-grounded engineering videos.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1020"/>
+      <stop offset="0.55" stop-color="#151036"/>
+      <stop offset="1" stop-color="#22114a"/>
+    </linearGradient>
+    <linearGradient id="word" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#a78bfa"/>
+      <stop offset="1" stop-color="#22d3ee"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#22d3ee" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#22d3ee" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#ffffff" stroke-opacity="0.035"/>
+    </pattern>
+    <style>
+      .sans { font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "DejaVu Sans Mono", monospace; }
+    </style>
+  </defs>
+
+  <rect width="1280" height="320" fill="url(#bg)"/>
+  <rect width="1280" height="320" fill="url(#grid)"/>
+  <circle cx="1040" cy="40" r="220" fill="#7c3aed" opacity="0.10"/>
+  <circle cx="160" cy="330" r="200" fill="#0891b2" opacity="0.08"/>
+
+  <!-- Left: wordmark and tagline -->
+  <g class="sans">
+    <rect x="70" y="52" width="292" height="26" rx="13" fill="#ffffff" fill-opacity="0.06" stroke="#a78bfa" stroke-opacity="0.45"/>
+    <text x="216" y="70" text-anchor="middle" font-size="12" font-weight="600" letter-spacing="2" fill="#c4b5fd">STATIC ANALYSIS · NARRATED VIDEO</text>
+
+    <text x="68" y="150" font-size="78" font-weight="800" fill="#f8fafc" letter-spacing="-1">Repo<tspan fill="url(#word)">Vox</tspan></text>
+    <text x="72" y="194" font-size="26" font-weight="600" fill="#e2e8f0">Bring source code to life visually.</text>
+    <text x="72" y="226" font-size="17" fill="#a5b4fc">Public GitHub repo → narrated, evidence-grounded engineering videos</text>
+
+    <g font-size="13" font-weight="600">
+      <rect x="72" y="252" width="168" height="30" rx="8" fill="#0f172a" stroke="#334155"/>
+      <circle cx="90" cy="267" r="4" fill="#34d399"/>
+      <text x="102" y="272" fill="#cbd5e1">Never runs the code</text>
+
+      <rect x="252" y="252" width="206" height="30" rx="8" fill="#0f172a" stroke="#334155"/>
+      <circle cx="270" cy="267" r="4" fill="#fbbf24"/>
+      <text x="282" y="272" fill="#cbd5e1">Every claim cites file:line</text>
+
+      <rect x="470" y="252" width="190" height="30" rx="8" fill="#0f172a" stroke="#334155"/>
+      <circle cx="488" cy="267" r="4" fill="#60a5fa"/>
+      <text x="500" y="272" fill="#cbd5e1">Self-hosted narration</text>
+    </g>
+  </g>
+
+  <!-- Right: stylised video frame with an animated architecture scene -->
+  <g transform="translate(776 34)">
+    <rect width="448" height="252" rx="16" fill="#0b1224" stroke="#334155" stroke-width="1.5"/>
+
+    <g class="sans" font-size="10" font-weight="700" letter-spacing="1.5" fill="#64748b">
+      <rect x="16" y="16" width="416" height="44" rx="8" fill="#ffffff" fill-opacity="0.025" stroke="#1e293b"/>
+      <text x="28" y="42">CLIENT / FRONTEND</text>
+      <rect x="16" y="68" width="416" height="44" rx="8" fill="#ffffff" fill-opacity="0.025" stroke="#1e293b"/>
+      <text x="28" y="94">API / ROUTES</text>
+      <rect x="16" y="120" width="416" height="44" rx="8" fill="#ffffff" fill-opacity="0.025" stroke="#1e293b"/>
+      <text x="28" y="146">CORE SERVICES</text>
+    </g>
+
+    <g class="mono" font-size="12" font-weight="600">
+      <rect x="262" y="24" width="160" height="28" rx="7" fill="#111c34" stroke="#34d399" stroke-width="1.5"/>
+      <text x="342" y="42" text-anchor="middle" fill="#e2e8f0">UI  page.tsx</text>
+      <rect x="262" y="76" width="160" height="28" rx="7" fill="#111c34" stroke="#34d399" stroke-width="1.5"/>
+      <text x="342" y="94" text-anchor="middle" fill="#e2e8f0">API  POST /jobs</text>
+      <rect x="262" y="128" width="160" height="28" rx="7" fill="#1a1634" stroke="#a78bfa" stroke-width="2"/>
+      <text x="342" y="146" text-anchor="middle" fill="#f5f3ff">SVC  JobService</text>
+      <rect x="148" y="128" width="92" height="28" rx="7" fill="#111c34" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="5 4"/>
+      <text x="194" y="146" text-anchor="middle" fill="#e2e8f0">DATA  db</text>
+    </g>
+
+    <g stroke-width="2" fill="none">
+      <path d="M342 52V76" stroke="#475569"/>
+      <path d="M342 104V128" stroke="#22d3ee"/>
+      <path d="M262 142H240" stroke="#fbbf24" stroke-dasharray="4 3"/>
+    </g>
+    <circle cx="342" cy="116" r="11" fill="url(#glow)"/>
+    <circle cx="342" cy="116" r="3.5" fill="#ecfeff"/>
+
+    <!-- caption bar -->
+    <rect x="16" y="176" width="416" height="30" rx="7" fill="#020617" stroke="#1e293b"/>
+    <rect x="26" y="183" width="70" height="16" rx="4" fill="#fbbf24" fill-opacity="0.15" stroke="#fbbf24" stroke-opacity="0.7"/>
+    <text x="61" y="195" text-anchor="middle" class="sans" font-size="9.5" font-weight="800" letter-spacing="1" fill="#fcd34d">INFERRED</text>
+    <text x="106" y="196" class="sans" font-size="12.5" fill="#e2e8f0">The route appears to call JobService</text>
+    <text x="420" y="196" text-anchor="end" class="mono" font-size="11" fill="#94a3b8">jobs.py:42</text>
+
+    <!-- player controls -->
+    <path d="M22 220l12 8-12 8z" fill="#e2e8f0"/>
+    <rect x="46" y="226" width="250" height="4" rx="2" fill="#1e293b"/>
+    <rect x="46" y="226" width="142" height="4" rx="2" fill="url(#word)"/>
+    <circle cx="188" cy="228" r="5" fill="#f8fafc"/>
+    <g fill="#a78bfa" opacity="0.9">
+      <rect x="318" y="224" width="4" height="8" rx="2"/><rect x="326" y="219" width="4" height="18" rx="2"/>
+      <rect x="334" y="222" width="4" height="12" rx="2"/><rect x="342" y="216" width="4" height="24" rx="2"/>
+      <rect x="350" y="221" width="4" height="14" rx="2"/><rect x="358" y="218" width="4" height="20" rx="2"/>
+      <rect x="366" y="223" width="4" height="10" rx="2"/><rect x="374" y="220" width="4" height="16" rx="2"/>
+      <rect x="382" y="224" width="4" height="8" rx="2"/><rect x="390" y="221" width="4" height="14" rx="2"/>
+      <rect x="398" y="225" width="4" height="6" rx="2"/><rect x="406" y="222" width="4" height="12" rx="2"/>
+      <rect x="414" y="224" width="4" height="8" rx="2"/>
+    </g>
+  </g>
+</svg>
