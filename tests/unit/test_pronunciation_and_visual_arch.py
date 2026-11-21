@@ -18,7 +18,7 @@ from typing import Any
 
 import pytest
 from repovox.core.config import Settings
-from repovox.media import stages
+from repovox.media import explainer, raster, stages
 from repovox.media.architecture import Citation, Component
 from repovox.media.diagram import AREA_BOTTOM, AREA_TOP, Diagram, classify
 from repovox.media.narration import FPS, Speech, Timing
@@ -31,6 +31,7 @@ from repovox.media.speech import (
     voice_record,
 )
 from repovox.media.storyboard import speakable
+from system_fixtures import HELPDESK
 from test_engineering_story import STRONG, Shape, shape
 
 SETTINGS: dict[str, Any] = {
@@ -549,3 +550,157 @@ def test_an_animated_architecture_sequence_encodes_and_decodes(
     video, summary = stages.encode_sequence(tmp_path, entries, wav(3.0), timeout=120)
     assert video[4:8] == b"ftyp" and summary["video_frames"] == FPS * 3
     assert summary["full_decode"] == "passed" and summary["duration_seconds"] == pytest.approx(3)
+
+
+# ------------------------------- 6. clean names, global step badges, story slides, voice label
+
+
+@pytest.mark.parametrize(
+    "written,spoken",
+    [
+        ("OpenAI API", "Open Eh I, Eh P I."),
+        ("Mismatch: OpenAI API is declared.", "Mismatch: Open Eh I, Eh P I is declared."),
+        ("openai-cs-agents-demo", "Open Eh I, C S agents demo."),
+        ("The route POST /chatkit is served.", "The route post slash chat kit is served."),
+        ("ChatKit and chatkit", "Chat Kit and chat kit."),
+        ("a chatbot, duckdb, mysdk and sparql", "a chat bot, duck D B, my S D K and spar Q L."),
+        (
+            "A robot, an okapi and a well-known toolkit.",
+            "A robot, an okapi and a well-known tool kit.",
+        ),
+    ],
+)
+def test_names_hyphenated_slugs_and_compounds_are_read_cleanly(written: str, spoken: str) -> None:
+    said = pronounce(written)
+    assert said == spoken
+    squeezed = said.replace(" ", "")
+    assert "AIAP" not in squeezed.upper() and "ICS" not in squeezed
+
+
+def test_pronunciation_changes_only_what_the_voice_is_given(strong: Shape) -> None:
+    caption = "Mismatch: OpenAI API is declared in openai-cs-agents-demo by chatkit."
+    spoken = speakable(caption)
+    assert "OpenAI API" in spoken and "openai-cs-agents-demo" in spoken and "chatkit" in spoken
+    said = audio_text(caption, spoken)
+    assert "Open Eh I, Eh P I" in said and "Open Eh I, C S agents demo" in said
+    assert "chat kit" in said
+    storyboard = stages.storyboard_stage(strong.payload, strong.story, strong.report)
+    script = stages.narration_stage(strong.payload, storyboard, strong.sources)  # Stage 11
+    board = stages.load_board(storyboard)
+    approved = [x.text for scene in board.scenes for x in scene.sentences]
+    assert [s["text"] for s in json.loads(script)] == approved  # Captions: the approved text.
+
+
+@pytest.fixture(scope="module")
+def helpdesk(tmp_path_factory: pytest.TempPathFactory) -> Shape:
+    return shape(tmp_path_factory.mktemp("helpdesk"), HELPDESK, "example/helpdesk")
+
+
+def drawn_text(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Every string drawn on any canvas from now on, in drawing order."""
+    seen: list[str] = []
+    original = raster.Canvas.text
+
+    def record(self: raster.Canvas, x: int, y: int, value: str, *rest: Any) -> None:
+        seen.append(value)
+        original(self, x, y, value, *rest)
+
+    monkeypatch.setattr(raster.Canvas, "text", record)
+    return seen
+
+
+def test_step_badges_count_every_relationship_of_the_video(
+    helpdesk: Shape, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert helpdesk.report is not None
+    system = helpdesk.report.architectures[0]
+    lines = explainer.narrate(system)
+    bars = explainer.step_bars(lines)
+    sections = {line.section for line in lines if line.id in bars}
+    assert sections == {"flow", "links"}  # The path and the other links: one sequence.
+    total = len(bars)
+    assert total >= 2 and sorted(bars.values()) == [(n, total) for n in range(1, total + 1)]
+    seen = drawn_text(monkeypatch)
+    diagram = Diagram(system, "example/helpdesk", "a" * 40, system.views[0])
+    for line in lines:
+        if line.id in bars:
+            diagram.base(
+                (), line.connection_ids, "INFERRED", line.text, None, 0, 1, step=bars[line.id]
+            )
+    badges = [text for text in seen if text.startswith("STEP ")]
+    assert badges == [f"STEP {n} OF {total}" for n in range(1, total + 1)]
+    # The walkthrough counts its workflow relationships the same way, across all its scenes.
+    board = stages.load_board(
+        stages.storyboard_stage(helpdesk.payload, helpdesk.story, helpdesk.report)
+    )
+    counted = stages.step_counts(board)
+    workflow = [
+        s.id
+        for scene in board.scenes
+        if scene.type == "workflow"
+        for s in scene.sentences
+        if s.connection_ids
+    ]
+    assert [counted[i] for i in workflow] == [
+        (n, len(workflow)) for n in range(1, len(workflow) + 1)
+    ]
+
+
+def test_story_slides_show_each_claim_beside_its_citation_and_status(
+    strong: Shape, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    board = stages.load_board(stages.storyboard_stage(strong.payload, strong.story, strong.report))
+    seen = drawn_text(monkeypatch)
+    slides = [s for s in board.scenes if s.type in raster.CLAIM_SCENES and not s.diagram]
+    assert {"problem", "solution", "limitations"} <= {s.type for s in slides}
+    for position, scene in enumerate(slides):
+        seen.clear()
+        raster.base(board, scene, position, "kokoro_onnx")  # Never clips or overlaps.
+        items = raster.claim_items(board, scene)
+        assert items, scene.type
+        for status, citation, text in items[:3]:
+            assert raster.clamp(text, 94, 2)[0] in seen  # The claim's own words are shown.
+            assert raster.STATUS_BADGES[status][0] in seen
+            place = citation.split(" +", 1)[0]
+            assert any(place.rsplit("/", 1)[-1] in shown for shown in seen)
+        # No bare citation row: a status word is always a badge beside a citation and text.
+        assert not any(shown in {"UNVERIFIED", "AUTHOR-STATED", "VERIFIED"} for shown in seen[:2])
+    problem = next(s for s in slides if s.type == "problem")
+    status, citation, text = raster.claim_items(board, problem)[0]
+    assert citation.startswith("README.md:") and status == "documentation"
+    long = raster.clamp("word " * 80, 94, 2)
+    assert len(long) == 2 and long[-1].endswith("...") and all(len(x) <= 94 for x in long)
+
+
+def test_the_footer_names_the_voice_that_spoke(
+    strong: Shape, fullstack: Shape, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert raster.voice_label("kokoro_onnx") == "KOKORO NEURAL VOICE"
+    assert (
+        raster.voice_label("deterministic") == raster.voice_label(None) == "LOCAL SYNTHETIC VOICE"
+    )
+    seen = drawn_text(monkeypatch)
+    board = stages.load_board(stages.storyboard_stage(strong.payload, strong.story, strong.report))
+    raster.base(board, board.scenes[0], 0, "kokoro_onnx")
+    raster.base(board, board.scenes[0], 0, "deterministic")
+    assert "ENGINEERING STORY / CITED EVIDENCE / KOKORO NEURAL VOICE" in seen
+    assert "ENGINEERING STORY / CITED EVIDENCE / LOCAL SYNTHETIC VOICE" in seen
+    assert fullstack.report is not None
+    architecture = fullstack.report.architectures[0]
+    view = architecture.views[0]
+    for voice, label in (("kokoro_onnx", "KOKORO NEURAL VOICE"), (None, "LOCAL SYNTHETIC VOICE")):
+        diagram = Diagram(architecture, "example/demo", "a" * 40, view, voice=voice)
+        diagram.base((), (), "VERIFIED", "x", None, 0, 1)
+        assert f"ARCHITECTURE FROM SOURCE / {label}" in seen
+
+
+def test_rendered_frames_name_kokoro_when_kokoro_spoke(
+    strong: Shape, assets: tuple[str, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    storyboard = stages.storyboard_stage(strong.payload, strong.story, strong.report)
+    script = stages.narration_stage(strong.payload, storyboard, strong.sources)
+    speech = stages.tts_stage(storyboard, script, kokoro(assets), tmp_path)  # voice.json: kokoro
+    seen = drawn_text(monkeypatch)
+    stages.render_stage(storyboard, script, speech)
+    footers = [text for text in seen if text.endswith(" VOICE")]
+    assert footers and all(text.endswith("/ KOKORO NEURAL VOICE") for text in footers)

@@ -26,10 +26,18 @@ from repovox.media.render import produce
 from repovox.media.sandbox import sources_from
 from repovox.media.story import EngineeringStory, StoryError
 from repovox.media.story_board import SCENES, build_story_board, check_story_board
-from repovox.media.story_extract import TEMPLATES, extract_story, story_sources, verify_story
+from repovox.media.story_extract import (
+    TEMPLATES,
+    extract_story,
+    lead_in,
+    specific,
+    story_sources,
+    verify_story,
+)
 from repovox.media.storyboard import STORY_VERSION, VERSION, GroundingError, Storyboard
 from repovox.media.worker import MediaWorker
 from repovox.synthetic_source import SyntheticSource
+from system_fixtures import HELPDESK
 from test_media_runtime import Database
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "architectures"
@@ -935,3 +943,64 @@ def test_end_to_end_story_video_plays_with_matching_captions(strong: Shape, tmp_
     subprocess.run(
         ["ffmpeg", "-v", "error", "-xerror", "-i", str(video), "-f", "null", "-"], check=True
     )
+
+
+# ----------------------------------------- 9. lead-in fragments and specific corroboration
+
+
+@pytest.mark.parametrize(
+    "text,fragment",
+    [
+        ("It is composed of two parts:", True),
+        ("The repository contains the following components", True),
+        ("Key features:", True),
+        ("A python backend that handles the agent orchestration logic.", False),
+        ("Export weekly reports to PDF documents.", False),
+    ],
+)
+def test_lead_in_lines_are_told_from_feature_statements(text: str, fragment: bool) -> None:
+    assert lead_in(text) is fragment
+
+
+def test_generic_words_alone_are_not_specific() -> None:
+    assert not any(specific(w) for w in ("chat", "agents", "context", "models", "services"))
+    assert all(specific(w) for w in ("airline", "triage", "invoice", "reconcile"))
+
+
+@pytest.fixture(scope="module")
+def helpdesk(tmp_path_factory: pytest.TempPathFactory) -> Shape:
+    return shape(tmp_path_factory.mktemp("helpdesk"), HELPDESK, "example/helpdesk")
+
+
+def test_a_colon_lead_in_is_never_a_readme_only_feature(helpdesk: Shape) -> None:
+    story = helpdesk.story
+    claims = story.claims()
+    stated = texts(story.intended_solution.claims)
+    assert "It is composed of two parts:" not in stated
+    assert not any(text.rstrip().endswith(":") for text in stated)
+    for mismatch in story.mismatches:
+        assert not any(lead_in(claims[i].text) for i in mismatch.stated_claim_ids)
+    assert not any("two parts" in c.text for c in story.unresolved_questions.claims)
+    verify_story(story, helpdesk.payload, helpdesk.sources, helpdesk.report)
+
+
+def test_a_ui_claim_is_never_backed_by_a_python_class_through_generic_words(
+    helpdesk: Shape,
+) -> None:
+    """ "A Next.js UI ... agent orchestration ... chat interface" shares only `agent`, `chat`
+    and `context`-like words with the Python class `AirlineAgentChatContext`: no match."""
+    story = helpdesk.story
+    claims = story.claims()
+    ui = next(c for c in story.intended_solution.claims if c.text.startswith("A Next.js UI"))
+    backing = [claims[i] for i in ui.supports]
+    assert not any("AirlineAgentChatContext" in c.text for c in backing)
+    assert not any(ref.path.endswith(".py") for c in backing for ref in c.evidence_refs)
+    # The Python statement is still corroborated, by Python code with specific shared words.
+    python = next(c for c in story.intended_solution.claims if c.text.startswith("A python"))
+    assert python.status == "INFERRED" and python.supports
+    assert all(
+        ref.path.startswith("python-backend/")
+        for i in python.supports
+        for ref in claims[i].evidence_refs
+    )
+    assert any("triage_agent" in claims[i].text for i in python.supports)

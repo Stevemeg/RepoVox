@@ -258,3 +258,102 @@ LIBRARY = {
         "    return write(rows)\n"
     ),
 }
+
+# A customer-service demo laid out like many small full-stack apps: the backend lives in a
+# hyphenated folder and imports its own sibling package by an absolute name
+# (`python-backend/main.py` -> `airline.agents`), which only resolves from that folder.
+HELPDESK = {
+    "README.md": (
+        "# Helpdesk Agents Demo\n\n"
+        "This repository contains a demo of a customer service interface built on an agent "
+        "orchestration library.\n\n"
+        "It is composed of two parts:\n\n"
+        "1. A python backend that handles the agent orchestration logic for airline triage "
+        "and seat booking.\n\n"
+        "2. A Next.js UI allowing the visualization of the agent orchestration process and "
+        "providing a chat interface.\n"
+    ),
+    "python-backend/main.py": (
+        "from fastapi import FastAPI\n"
+        "\n"
+        "from airline.agents import triage_agent\n"
+        "from airline.context import AirlineAgentChatContext\n"
+        "\n"
+        "app = FastAPI()\n"
+        "\n"
+        "\n"
+        '@app.post("/chat")\n'
+        "def chat_endpoint(message: dict) -> dict:\n"
+        "    context = AirlineAgentChatContext()\n"
+        "    return triage_agent(message, context)\n"
+        "\n"
+        "\n"
+        '@app.get("/chat/state")\n'
+        "def chat_state(thread_id: str) -> dict:\n"
+        '    return {"thread": thread_id}\n'
+    ),
+    "python-backend/airline/__init__.py": "",
+    "python-backend/airline/agents.py": (
+        "from .context import AirlineAgentChatContext\n"
+        "from .tools import book_seat, lookup_flight\n"
+        "\n"
+        "\n"
+        "def triage_agent(message: dict, context: AirlineAgentChatContext) -> dict:\n"
+        '    flight = lookup_flight(message.get("flight", ""))\n'
+        '    return {"flight": flight, "seat": book_seat(flight)}\n'
+    ),
+    "python-backend/airline/context.py": (
+        "class AirlineAgentChatContext:\n"
+        "    def __init__(self) -> None:\n"
+        '        self.passenger = ""\n'
+    ),
+    "python-backend/airline/tools.py": (
+        "def lookup_flight(number: str) -> dict:\n"
+        '    return {"number": number}\n'
+        "\n"
+        "\n"
+        "def book_seat(flight: dict) -> str:\n"
+        '    return "12A"\n'
+    ),
+    "python-backend/airline/guardrails.py": (
+        'def relevance_guardrail(text: str) -> bool:\n    return "flight" in text\n'
+    ),
+    "ui/lib/api.ts": (
+        "export async function fetchBootstrapState(threadId: string) {\n"
+        "  const response = await fetch(`/chat/state?thread_id=${threadId}`);\n"
+        "  return response.json();\n"
+        "}\n"
+    ),
+    "ui/components/Chat.tsx": (
+        'import { useState } from "react";\n'
+        "\n"
+        "export function Chat() {\n"
+        '  const [text] = useState("");\n'
+        "  async function send() {\n"
+        '    await fetch("/chat", { method: "POST", body: text });\n'
+        "  }\n"
+        "  return <button onClick={send}>{text}</button>;\n"
+        "}\n"
+    ),
+    "ui/components/AgentPanel.tsx": (
+        'import { Chat } from "./Chat";\n'
+        "\n"
+        "export function AgentPanel() {\n"
+        "  return <section><Chat /></section>;\n"
+        "}\n"
+    ),
+    "ui/app/page.tsx": (
+        'import { AgentPanel } from "@/components/AgentPanel";\n'
+        "\n"
+        "export default function Home() {\n"
+        "  return <main><AgentPanel /></main>;\n"
+        "}\n"
+    ),
+    "ui/app/layout.tsx": (
+        'import type { ReactNode } from "react";\n'
+        "\n"
+        "export default function RootLayout({ children }: { children: ReactNode }) {\n"
+        "  return <html><body>{children}</body></html>;\n"
+        "}\n"
+    ),
+}

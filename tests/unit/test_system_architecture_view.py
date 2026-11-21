@@ -15,23 +15,27 @@ from repovox.media.architecture import (
     Component,
     Connection,
     Context,
+    View,
     validate,
 )
 from repovox.media.diagram import (
     AREA_BOTTOM,
     AREA_TOP,
     TIER_ORDER,
+    TIER_TITLES,
     Diagram,
     card_label,
     classify,
+    crossings,
     fit,
     fit_path,
+    route,
     tiered,
 )
 from repovox.media.narration import FPS
 from repovox.media.story_board import check_story_board
 from repovox.media.system_view import IDENTITY, TYPE, matches, normalised
-from system_fixtures import FULL_STACK, LIBRARY
+from system_fixtures import FULL_STACK, HELPDESK, LIBRARY
 from test_architecture import every_citation
 from test_engineering_story import Shape, shape
 
@@ -41,6 +45,11 @@ UI_HELPERS = {"date", "human", "Section", "State", "Empty", "Facts", "Typography
 @pytest.fixture(scope="module")
 def full(tmp_path_factory: pytest.TempPathFactory) -> Shape:
     return shape(tmp_path_factory.mktemp("full"), FULL_STACK, "example/forge")
+
+
+@pytest.fixture(scope="module")
+def helpdesk(tmp_path_factory: pytest.TempPathFactory) -> Shape:
+    return shape(tmp_path_factory.mktemp("helpdesk"), HELPDESK, "example/helpdesk")
 
 
 @pytest.fixture(scope="module")
@@ -343,3 +352,122 @@ def test_walkthrough_story_uses_the_system_map_and_passes_every_check(full: Shap
     assert len(json.loads(script)) == sum(len(s.sentences) for s in board.scenes)
     diagram = stages.story_diagram(board)
     assert diagram is not None and diagram.architecture.type == TYPE
+
+
+# ------------------------------------------- 6. packages beside the importing file, card budget
+
+
+def test_a_package_beside_a_hyphenated_backend_folder_is_a_core_service(helpdesk: Shape) -> None:
+    """`python-backend/main.py` imports `airline.agents`, which resolves only from its own
+    folder: the analyzer leaves it unresolved, the map joins it as an inferred import."""
+    assert helpdesk.report is not None
+    validate(helpdesk.report, helpdesk.payload, helpdesk.sources)
+    system = system_of(helpdesk)
+    cards = {c.label: c for c in system.components}
+    airline, backend = cards["airline"], cards["python-backend"]
+    assert (airline.role, tier(airline), airline.group) == ("service", "service", "python-backend")
+    assert TIER_TITLES[tier(airline)] == "CORE SERVICES"
+    assert "5 files" in airline.lines
+    link = next(c for c in system.connections if (c.source, c.target) == (backend.id, airline.id))
+    assert (link.kind, link.status, link.basis) == ("imports", "INFERRED", "static_structure")
+    main = "python-backend/main.py"
+    assert (main, line_of(helpdesk, main, "from airline.agents import triage_agent")) in quoted(
+        link.citations
+    )
+    assert {tier(c) for c in system.components} == {"client", "api", "service"}
+    assert system.title == "System architecture across 3 tiers"
+    narration = [line.text for line in explainer.narrate(system)]
+    assert any(t.startswith("The core services tier holds airline") for t in narration)
+    assert any(
+        t.startswith("python-backend, in the API tier, imports triage_agent")
+        and t.endswith("from airline in the core services tier.")
+        for t in narration
+    )
+
+
+def test_no_real_subsystem_is_left_out_while_the_card_budget_has_room(helpdesk: Shape) -> None:
+    """`ui/app` imports through a path alias no relationship resolves; with cards to spare it
+    is still drawn, and the map does not claim anything was left out."""
+    system = system_of(helpdesk)
+    labels = {c.label for c in system.components}
+    assert {"app", "components", "lib", "python-backend", "airline"} <= labels
+    assert "not drawn" not in {u.topic for u in system.unresolved}
+    app = next(c for c in system.components if c.label == "app")
+    assert not any(app.id in (c.source, c.target) for c in system.connections)
+    diagram = Diagram(system, "example/helpdesk", "a" * 40, system.views[0])
+    assert [t for t, _ in diagram.bands] == ["client", "api", "service"]
+
+
+def subsystem(identity: str, role: str, group: str) -> Component:
+    citation = Citation(
+        path=f"{group}/{identity}.py",
+        file_sha256="a" * 64,
+        line=1,
+        quote="x",
+        claim_ids=("claim-1",),
+        permalink="https://github.com/example/demo/blob/" + "a" * 40 + "/x#L1-L1",
+    )
+    return Component(
+        id=identity,
+        role=role,
+        kind=f"{role}_subsystem",
+        label=identity,
+        status="VERIFIED",
+        anchors=("x",),
+        citations=(citation,),
+        group=group,
+    )
+
+
+def test_a_cross_tier_line_runs_in_the_gap_between_bands_not_through_cards() -> None:
+    """Three client cards above three API cards, a line from the first client card to the
+    last API card: both plain elbows cut through neighbouring cards; the drawn line turns in
+    the gap between the bands instead and crosses none."""
+    clients = [subsystem(f"page{n}", "client", "web") for n in range(3)]
+    servers = [subsystem(f"route{n}", "api", "server") for n in range(3)]
+    cards = clients + servers
+    links = [
+        Connection(
+            id=f"c{n}",
+            source=source,
+            target=target,
+            kind="imports",
+            label="imports",
+            phase="structure",
+            status="VERIFIED",
+            anchors=("x",),
+            citations=clients[0].citations,
+        )
+        for n, (source, target) in enumerate(
+            [("page0", "route2"), ("page1", "page2"), ("route0", "route1")]
+        )
+    ]
+    system = Architecture(
+        id=IDENTITY,
+        type=TYPE,
+        level="system",
+        title="System architecture across 2 tiers",
+        scope=("web/page0.py",),
+        status="VERIFIED",
+        components=tuple(cards),
+        connections=tuple(links),
+        views=(
+            View(
+                id="overview",
+                title="x",
+                component_ids=tuple(c.id for c in cards),
+                connection_ids=tuple(c.id for c in links),
+            ),
+        ),
+    )
+    diagram = Diagram(system, "example/demo", "a" * 40, system.views[0])
+    a, b = diagram.boxes["page0"], diagram.boxes["route2"]
+    others = [box for key, box in diagram.boxes.items() if key not in {"page0", "route2"}]
+    assert crossings(route(a, b, False, 0), others) and crossings(route(a, b, True, 0), others)
+    drawn = diagram.routes["c0"]
+    assert crossings(drawn, others) == 0
+    (_, client), (_, api) = diagram.bands
+    legs = [(p, q) for p, q in zip(drawn, drawn[1:], strict=False) if p[1] == q[1]]
+    assert legs and all(client[1] + client[3] <= p[1] <= api[1] for p, _ in legs)
+    assert drawn[0][1] == a[1] + a[3] and drawn[-1][1] == b[1]  # Leaves and enters by an edge.
+    assert Diagram(system, "example/demo", "a" * 40, system.views[0]).routes == diagram.routes
