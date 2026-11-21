@@ -2,7 +2,8 @@
 
 Status: proposed; implementation output, not independently reviewed or accepted. Date:
 2026-11-20. Branch `fix/github-sha-and-ml-weights` (draft PR #21), following
-[ADR-0028](0028-sha-only-commit-resolution-and-weight-containers.md). Related:
+[ADR-0028](0028-sha-only-commit-resolution-and-weight-containers.md). Content rules amended by
+[ADR-0033](0033-secret-screen-template-and-placeholder-precision.md). Related:
 
 - [threat model S-01 and S-07](../security/threat-model.md)
 - [static analysis notes](../development/analysis.md)

@@ -58,7 +58,11 @@ Scratch is removed on handled exit. Worker container tmpfs
 bounds interrupted scratch; abnormal container death clears it on container removal.
 
 All bytes are screened before original archives are published. Known credential/key
-patterns fail `secret_detected`, including secret-looking fixtures. A suspicious-entropy
+patterns fail `secret_detected`, including secret-looking fixtures. Interpolation templates
+(`{password}`, `${API_KEY}`), placeholder values (`your-api-key-here`) and database URLs
+with a development password on a loopback or single-label host are not credentials;
+provider keys, private keys, literal secrets and remote credential URLs still fail
+([ADR-0033](../adr/0033-secret-screen-template-and-placeholder-precision.md)). A suspicious-entropy
 span in a file path also fails, unless it is only plain words joined by `/`, `-` or `_`
 (such as `ADR-0019-production-observability`); token-like spans still fail
 ([ADR-0029](../adr/0029-prose-path-names-and-oversized-syntax-facts.md)). Suspicious entropy
