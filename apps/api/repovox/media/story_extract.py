@@ -248,6 +248,50 @@ UI_CLAIM = re.compile(
 )
 PYTHON_CLAIM = re.compile(r"(?i)(?<![\w.])(?:python|fastapi|django|flask|pytorch)(?![\w-])")
 SCRIPT_LANGUAGES = frozenset({"javascript", "typescript", "tsx"})
+# A statement that names a language or framework and the layer it builds: "A python backend",
+# "a FastAPI backend", "a TypeScript/Next.js frontend", "a Next.js UI".
+LAYER_CLAIM = re.compile(
+    r"(?i)(?<![\w.])(python|fastapi|django|flask|node(?:\.?js)?|express|typescript|javascript"
+    r"|next\.?js|react(?:\.?js)?|vue(?:\.?js)?|svelte|angular)(?![\w-])[\s/a-z.-]{0,24}?"
+    r"(?<![\w-])(backend|back-end|server|api|service|frontend|front-end|ui|client|web app)"
+    r"(?![\w-])"
+)
+PYTHON_LAYER = frozenset({"python", "fastapi", "django", "flask"})
+BACKEND_LAYER = frozenset({"backend", "back-end", "server", "api", "service"})
+LAYER_FOLDERS = {
+    "backend": frozenset({"backend", "server", "api", "services", "service"}),
+    "frontend": frozenset({"frontend", "ui", "client", "web", "webapp"}),
+}
+EXTENSION_LANGUAGES = {
+    ".py": "python",
+    ".js": "javascript",
+    ".jsx": "javascript",
+    ".mjs": "javascript",
+    ".cjs": "javascript",
+    ".ts": "typescript",
+    ".tsx": "tsx",
+}
+
+
+def layer_of(text: str) -> tuple[frozenset[str], frozenset[str]] | None:
+    """(languages, folder words) of the layer a statement names, or None. "A python backend"
+    is Python code in a backend, server or api folder; "a Next.js UI" is script code in a
+    frontend, ui, client or web folder."""
+    found = LAYER_CLAIM.search(text)
+    if found is None:
+        return None
+    language = found.group(1).lower()
+    languages = frozenset({"python"}) if language in PYTHON_LAYER else SCRIPT_LANGUAGES
+    side = "backend" if found.group(2).lower() in BACKEND_LAYER else "frontend"
+    return languages, LAYER_FOLDERS[side]
+
+
+def in_layer(path: str, languages: frozenset[str], folders: frozenset[str]) -> bool:
+    """Whether a file is code of that language in a folder named for that layer, such as
+    `python-backend/main.py` for a python backend."""
+    p = PurePosixPath(path)
+    words = {w for part in p.parts[:-1] for w in re.split(r"[-_.]", part.lower()) if w}
+    return EXTENSION_LANGUAGES.get(p.suffix.lower()) in languages and bool(words & folders)
 
 
 def lead_in(text: str) -> bool:
@@ -1004,6 +1048,7 @@ def extract_story(
 
     candidates = knowledge["entrypoints"]["candidates"]
     entries: set[str] = set()
+    entry_claims: list[Claim] = []
     for candidate in candidates:
         if (
             candidate["rule"] == "framework-route-v1"
@@ -1013,12 +1058,14 @@ def extract_story(
         ):
             continue
         reason = RULE_TEXT.get(candidate["rule"], "matches a declared entry rule")
-        if support_claim(
+        entry = support_claim(
             "implementation_approach",
             candidate,
             TEMPLATES["entrypoint"].format(path=candidate["path"], reason=reason),
-        ):
+        )
+        if entry is not None:
             entries.add(candidate["path"])
+            entry_claims.append(entry)
     test_modules = facts.symbols_where("module", roles=("test",))
     if test_modules:
         symbol_claim(
@@ -1116,6 +1163,30 @@ def extract_story(
         if found_words:
             index.append((symbol, found_words))
     declared_words = set().union(*(found for _, found in index))
+
+    def layer_support(languages: frozenset[str], folders: frozenset[str]) -> Claim | None:
+        """A published claim about the named layer: an entry point there, then a technology
+        it imports, then its first declaration, each in code of that language."""
+        published = kept_ids(builder)
+        for claim in [*entry_claims, *(technology_claims[t] for t in sorted(technology_claims))]:
+            where = claim.evidence_refs[0].path if claim.evidence_refs else ""
+            if claim.id in published and in_layer(where, languages, folders):
+                return claim
+        for symbol in sorted(declared_symbols, key=lambda s: (s["path"], s["start_line"])):
+            if symbol["id"] in stubs or not in_layer(symbol["path"], languages, folders):
+                continue
+            made = symbol_claim(
+                "implementation_evidence",
+                symbol,
+                TEMPLATES["declaration"].format(
+                    path=symbol["path"], kind=symbol["kind"], name=symbol["name"]
+                ),
+                [symbol["start_line"]],
+            )
+            if made is not None and made.id in kept_ids(builder):
+                return made
+        return None
+
     for line in intended_lines:
         terms = content_words(line.text)
         wanted = {v for w in terms for v in variants(w)}
@@ -1163,6 +1234,13 @@ def extract_story(
             for t in named_tech
             if t in technology_claims and technology_claims[t].id in kept_ids(builder)
         ]
+        layer = layer_of(line.text)
+        if layer is not None and not supports:
+            # "A python backend that handles ..." names a layer, not a feature: it is backed by
+            # same-language code in a folder for that layer, never by the other side's code.
+            backing = layer_support(*layer)
+            if backing is not None:
+                supports.append(backing)
         intended = builder.claim(
             "intended_solution",
             "intended_solution",
