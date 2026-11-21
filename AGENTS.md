@@ -178,7 +178,7 @@ Phase 0 was independently accepted at `e35d8ef8a8a53cb34e46271a9813b5332ea42c1f`
 - Limits belong to [PRD](docs/product/prd.md); workflow rules to [data model](docs/architecture/data-model.md); retention/deployment to [deployment](docs/operations/deployment.md); assumptions/formulas to [cost model](docs/operations/cost-model.md). Update dependencies together.
 - Examples are synthetic. All technical narration has claim references and pinned evidence or labelled uncertainty. Never execute submitted repository code or treat README as implementation truth.
 - Carry forward Phase 0 documentation/estimate checks; Phase 1 application/integration tests are separate. Generated logs, diagrams and credentials stay outside Git.
-- Run [README checks](README.md#documentation-checks), inspect diff and deliver A-K revision completion report with exact commands, failures, limitations, attribution audit and evidence. Never fabricate tests/deployment results. Future PRs need appropriate tests, authorization coverage, migration/rollback/security/cost analysis and [roadmap](docs/delivery/roadmap.md) traceability. Owner approval cannot replace independent validation.
+- Run [README checks](README.md#tests-and-quality-gates), inspect diff and deliver A-K revision completion report with exact commands, failures, limitations, attribution audit and evidence. Never fabricate tests/deployment results. Future PRs need appropriate tests, authorization coverage, migration/rollback/security/cost analysis and [roadmap](docs/delivery/roadmap.md) traceability. Owner approval cannot replace independent validation.
 
 ## Model policy
 

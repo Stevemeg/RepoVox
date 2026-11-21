@@ -2,7 +2,7 @@
 
 # Phase 0 verification record
 
-Phase 0 only, 2026-10-08. Review evidence; independent validation has not passed yet. [Roadmap](roadmap.md) · [Checks](../../README.md#documentation-checks) · [Sole-contributor policy](../../AGENTS.md)
+Phase 0 only, 2026-10-08. Review evidence; independent validation has not passed yet. [Roadmap](roadmap.md) · [Checks](../../README.md#tests-and-quality-gates) · [Sole-contributor policy](../../AGENTS.md)
 
 No application, security fixture, paid API, load, media, cloud deployment or restore tests were run: those are later-phase gates. Synthetic JSON timings/probe fields are expressly illustrative. Cost compute timings are assumptions, not benchmarks.
 
