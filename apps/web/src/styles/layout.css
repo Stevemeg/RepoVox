@@ -1,0 +1,620 @@
+/* Application shell: desktop sidebar, tablet icon rail, mobile drawer. */
+.app-shell {
+  --shell-column: var(--sidebar-width);
+  display: grid;
+  grid-template-columns: var(--shell-column) minmax(0, 1fr);
+  min-height: 100vh;
+  /* Paint the sidebar column (and its border) for the full document height; the sidebar
+     itself is sticky and only as tall as the viewport. */
+  background: linear-gradient(
+    90deg,
+    var(--color-surface) 0 calc(var(--shell-column) - 1px),
+    var(--color-border) calc(var(--shell-column) - 1px) var(--shell-column),
+    var(--color-canvas) var(--shell-column)
+  );
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  height: 100vh;
+  padding: var(--space-5) var(--space-4);
+  border-right: 1px solid var(--color-border);
+  background: var(--color-surface);
+  overflow-y: auto;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+  text-decoration: none;
+}
+
+.brand:hover {
+  color: var(--color-text);
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-md);
+  background: var(--color-brand);
+  color: var(--color-on-brand);
+  flex-shrink: 0;
+}
+
+.nav-section-label {
+  padding: 0 var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--color-text-subtle);
+}
+
+.nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 2.5rem;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+}
+
+.nav-link:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.nav-link[aria-current="page"] {
+  background: var(--color-brand-soft);
+  color: var(--color-brand-strong);
+  font-weight: var(--weight-semibold);
+}
+
+.nav-link svg {
+  flex-shrink: 0;
+}
+
+.nav-count {
+  margin-left: auto;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-subtle);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.nav-link[aria-current="page"] .nav-count {
+  background: var(--color-surface);
+}
+
+.sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: auto;
+}
+
+.environment-card {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-subtle);
+}
+
+.environment-card p {
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.env-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--color-brand-strong);
+}
+
+.env-badge::before {
+  content: "";
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-brand);
+}
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.account-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.account-text strong {
+  display: block;
+  font-size: var(--text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-text small {
+  display: block;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-brand-soft);
+  color: var(--color-brand-strong);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+}
+
+.app-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-header);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--header-height);
+  padding: 0 var(--space-8);
+  border-bottom: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-surface) 92%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.menu-button,
+.topbar-brand {
+  display: none;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-subtle);
+}
+
+.breadcrumb strong {
+  color: var(--color-text);
+  font-weight: var(--weight-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar .env-badge {
+  margin-left: auto;
+}
+
+.content {
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: var(--space-8);
+  flex: 1;
+}
+
+.content > * + * {
+  margin-top: var(--space-6);
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.page-header > div {
+  min-width: 0;
+}
+
+.eyebrow {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--color-text-subtle);
+}
+
+.page-header h1 {
+  overflow-wrap: anywhere;
+}
+
+.page-description {
+  margin-top: var(--space-2);
+  font-size: var(--text-base);
+}
+
+.app-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-5) var(--space-8);
+  border-top: 1px solid var(--color-border);
+  font-size: var(--text-xs);
+  color: var(--color-text-subtle);
+}
+
+.nav-backdrop {
+  display: none;
+}
+
+/* Tablet: icon rail. Labels stay in the accessibility tree, only visually hidden. */
+@media (max-width: 1100px) {
+  .app-shell {
+    --shell-column: var(--rail-width);
+  }
+
+  .sidebar {
+    align-items: center;
+    padding: var(--space-4) var(--space-2);
+  }
+
+  .sidebar .brand-text,
+  .nav-section-label,
+  .nav-label,
+  .nav-count,
+  .environment-card,
+  .account-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .nav-link {
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+  }
+
+  .account {
+    flex-direction: column;
+    border-top: 0;
+  }
+
+  .content {
+    padding: var(--space-6);
+  }
+
+  .topbar,
+  .app-footer {
+    padding-left: var(--space-6);
+    padding-right: var(--space-6);
+  }
+
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Mobile: the sidebar becomes a drawer opened from the header. */
+@media (max-width: 760px) {
+  .app-shell {
+    grid-template-columns: minmax(0, 1fr);
+    background: var(--color-canvas);
+  }
+
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: var(--z-drawer);
+    width: min(18rem, 85vw);
+    align-items: stretch;
+    padding: var(--space-5) var(--space-4);
+    box-shadow: var(--shadow-lg);
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition:
+      transform var(--duration-base) var(--easing-standard),
+      visibility 0s linear var(--duration-base);
+  }
+
+  .app-shell[data-nav-open="true"] .sidebar {
+    transform: none;
+    visibility: visible;
+    transition: transform var(--duration-base) var(--easing-standard);
+  }
+
+  .app-shell[data-nav-open="true"] .nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--z-drawer) - 1);
+    background: var(--color-overlay);
+  }
+
+  /* Inside the open drawer every label is shown again. */
+  .sidebar .brand-text,
+  .nav-section-label,
+  .nav-label,
+  .nav-count,
+  .environment-card,
+  .account-text {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    clip-path: none;
+    white-space: normal;
+  }
+
+  .nav-count {
+    white-space: nowrap;
+  }
+
+  .nav-link {
+    justify-content: flex-start;
+    width: auto;
+    height: auto;
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .account {
+    flex-direction: row;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .menu-button {
+    display: inline-flex;
+  }
+
+  .topbar-brand {
+    display: inline-flex;
+  }
+
+  .topbar {
+    padding: 0 var(--space-4);
+  }
+
+  .breadcrumb {
+    display: none;
+  }
+
+  .content {
+    padding: var(--space-5) var(--space-4);
+  }
+
+  .app-footer {
+    padding: var(--space-4);
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .stat-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .callout {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .callout > .button,
+  .callout > a {
+    align-self: flex-start;
+  }
+
+  .panel-header,
+  .panel-body {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+
+  .job-row,
+  .stage-list li {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+
+  .definition-list {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1);
+  }
+
+  .definition-list dd + dt {
+    margin-top: var(--space-3);
+  }
+}
+
+/* Sign-in ---------------------------------------------------------------- */
+.sign-in {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  min-height: 100vh;
+  background: var(--color-surface);
+}
+
+.sign-in-art {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-8);
+  padding: var(--space-12);
+  background: var(--color-surface-media);
+  color: var(--color-text-inverse);
+}
+
+.sign-in-art .brand,
+.sign-in-art h1 {
+  color: var(--color-text-inverse);
+}
+
+.sign-in-art .eyebrow,
+.sign-in-art p,
+.sign-in-art small {
+  color: var(--color-text-inverse-muted);
+}
+
+.sign-in-art h1 {
+  margin-top: var(--space-4);
+  font-size: clamp(2.25rem, 4vw, 3.25rem);
+  line-height: 1.1;
+}
+
+.sign-in-art p {
+  margin-top: var(--space-4);
+  font-size: var(--text-md);
+  max-width: 28rem;
+}
+
+.pipeline-art {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-8);
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-code);
+}
+
+.pipeline-art li {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-text-inverse) 24%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-code);
+}
+
+.sign-in-panel {
+  width: 100%;
+  max-width: 27rem;
+  margin: auto;
+  padding: var(--space-10) var(--space-6);
+}
+
+.sign-in-panel > * + * {
+  margin-top: var(--space-4);
+}
+
+.sign-in-panel h2 {
+  font-size: var(--text-2xl);
+}
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  min-height: 4rem;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-weight: var(--weight-regular);
+  text-align: left;
+  text-decoration: none;
+  white-space: normal;
+  box-shadow: var(--shadow-xs);
+}
+
+.identity:hover {
+  border-color: var(--color-brand);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.identity-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.identity strong {
+  display: block;
+  font-size: var(--text-base);
+}
+
+.identity small {
+  display: block;
+  margin-top: 0.125rem;
+}
+
+.fine-print {
+  font-size: var(--text-xs);
+  color: var(--color-text-subtle);
+}
+
+@media (max-width: 760px) {
+  .sign-in {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sign-in-art {
+    padding: var(--space-6) var(--space-5);
+  }
+
+  .pipeline-art,
+  .sign-in-art > small {
+    display: none;
+  }
+
+  .sign-in-panel {
+    padding: var(--space-8) var(--space-5);
+  }
+}

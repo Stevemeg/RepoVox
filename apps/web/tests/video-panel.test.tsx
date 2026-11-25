@@ -15,32 +15,44 @@ const walkthrough = "33333333-3333-4333-8333-333333333333";
 const explainer = "44444444-4444-4444-8444-444444444444";
 afterEach(() => vi.unstubAllGlobals());
 
+const published = "2026-11-14T00:10:00Z";
+const expires = "2026-11-15T00:00:00Z";
 const succeeded: VideoJob = {
   id: job,
   project_id: project,
+  analysis_job_id: "55555555-5555-4555-8555-555555555555",
   state: "succeeded",
+  version: 9,
   repository: "example/demo",
   commit_sha: "a".repeat(40),
   architecture: "published",
   error_code: null,
   created_at: "2026-11-14T00:00:00Z",
+  deadline: "2026-11-14T01:00:00Z",
+  finished_at: published,
   stages: [],
   videos: [
     {
       id: walkthrough,
       category: "walkthrough",
+      position: 0,
       title: "Repository walkthrough",
       byte_count: 10,
       checksum: "b".repeat(64),
       metadata: { duration_seconds: 91.9 },
+      published_at: published,
+      expires_at: expires,
     },
     {
       id: explainer,
       category: "architecture",
+      position: 1,
       title: "cycle() in cycle.py",
       byte_count: 10,
       checksum: "c".repeat(64),
       metadata: { media: { duration_seconds: 100.5 } },
+      published_at: published,
+      expires_at: expires,
     },
   ],
 };
@@ -185,8 +197,61 @@ it("submits a video job only after acknowledgement, with an idempotency key", as
   const [url, options] = fetch.mock.calls[1];
   expect(url).toBe(`/api/v1/projects/${project}/video-jobs`);
   expect(options.method).toBe("POST");
-  expect(options.headers["Idempotency-Key"]).toMatch(/^[a-f0-9-]{36}$/);
+  expect(new Headers(options.headers).get("Idempotency-Key")).toMatch(/^[a-f0-9-]{36}$/);
   expect(JSON.parse(options.body)).toEqual({ processing_acknowledged: true });
+});
+
+it("retries a failed submission with the same idempotency key", async () => {
+  const fetch = vi
+    .fn()
+    .mockResolvedValueOnce(respond([]))
+    .mockResolvedValueOnce(respond({ error: { code: "admission_rate" } }, 429))
+    .mockResolvedValueOnce(respond(succeeded, 202))
+    .mockResolvedValue(respond([succeeded]));
+  vi.stubGlobal("fetch", fetch);
+  render(<VideoJobs projectId={project} />);
+  fireEvent.click(screen.getByRole("checkbox"));
+  const button = screen.getByText("Create narrated videos");
+  await waitFor(() => expect(button).toBeEnabled());
+  fireEvent.click(button);
+  expect(await screen.findByRole("alert")).toHaveTextContent(/Too many jobs were started/);
+  await waitFor(() => expect(button).toBeEnabled());
+  fireEvent.click(button);
+  await screen.findByLabelText("Repository walkthrough");
+  const posts = fetch.mock.calls.filter(([, init]) => init?.method === "POST");
+  expect(posts).toHaveLength(2);
+  const [first, second] = posts.map(([, init]) => new Headers(init.headers).get("Idempotency-Key"));
+  expect(first).toMatch(/^[a-f0-9-]{36}$/);
+  expect(second).toBe(first);
+});
+
+it("explains a failed video job in our own words, with the code only as a reference", async () => {
+  const failed = {
+    ...succeeded,
+    state: "failed",
+    architecture: null,
+    error_code: "narration_not_grounded",
+    videos: [],
+  };
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(respond([failed])));
+  render(<VideoJobs projectId={project} />);
+  expect(await screen.findByText(/narration could not be verified/)).toBeVisible();
+  expect(screen.getByText("Reference: narration_not_grounded")).toBeVisible();
+  expect(screen.queryByText(/Status code/)).toBeNull();
+});
+
+it("renders the player through CSS classes, with no inline styles", () => {
+  const { container } = render(<VideoPlayer jobId={job} video={succeeded.videos[0]} />);
+  const video = container.querySelector("video") as HTMLVideoElement;
+  expect(video).toHaveClass("video-player");
+  expect(video.getAttribute("style")).toBeNull();
+});
+
+it("makes no claim about which narrator or voice was used", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(respond([])));
+  render(<VideoJobs projectId={project} />);
+  await screen.findByRole("heading", { name: "Narrated videos" });
+  expect(screen.queryByText(/No AI model|no paid service/i)).toBeNull();
 });
 
 it("forwards a byte range and returns partial video content", async () => {

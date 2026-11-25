@@ -1,11 +1,22 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
+
 export const metadata: Metadata = {
-  title: "RepoVox · Bring source code to life visually",
+  title: {
+    default: "RepoVox · Bring source code to life visually",
+    template: "%s · RepoVox",
+  },
   description:
-    "Your local workspace for source-code stories. Phase 1 development foundation.",
+    "Evidence-grounded, narrated walkthroughs of public GitHub repositories. RepoVox reads one pinned commit as data and never runs it.",
 };
-export default function Layout({
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#1d6a4d",
+};
+
+export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
