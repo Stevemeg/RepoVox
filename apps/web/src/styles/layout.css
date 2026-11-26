@@ -82,6 +82,9 @@
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   text-decoration: none;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
 }
 
 .nav-link:hover {
@@ -248,6 +251,12 @@
   margin-top: var(--space-6);
 }
 
+/* Page content rises into place when a workspace view mounts. Vertical only, and the
+   animation ends at `transform: none`, so no lasting stacking context or containing block. */
+.content > * {
+  animation: rv-rise var(--motion-slow) var(--ease-decelerate);
+}
+
 .page-header {
   display: flex;
   align-items: flex-end;
@@ -361,25 +370,41 @@
     align-items: stretch;
     padding: var(--space-5) var(--space-4);
     box-shadow: var(--shadow-lg);
+    /* Off-canvas to the left (negative x), which never adds scrollable width. While closed
+       it is visibility: hidden, so nothing inside is focusable or announced; visibility
+       flips only after the slide-out ends, and at once when it opens. */
     transform: translateX(-100%);
     visibility: hidden;
     transition:
-      transform var(--duration-base) var(--easing-standard),
-      visibility 0s linear var(--duration-base);
+      transform var(--motion-base) var(--ease-standard),
+      visibility var(--motion-instant) var(--ease-linear) var(--motion-base);
   }
 
   .app-shell[data-nav-open="true"] .sidebar {
     transform: none;
     visibility: visible;
-    transition: transform var(--duration-base) var(--easing-standard);
+    transition: transform var(--motion-base) var(--ease-decelerate);
   }
 
-  .app-shell[data-nav-open="true"] .nav-backdrop {
+  /* The backdrop fades with the drawer. Closed it is transparent and visibility: hidden, so
+     it never intercepts a tap or reaches the accessibility tree. */
+  .nav-backdrop {
     display: block;
     position: fixed;
     inset: 0;
     z-index: calc(var(--z-drawer) - 1);
     background: var(--color-overlay);
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity var(--motion-base) var(--ease-standard),
+      visibility var(--motion-instant) var(--ease-linear) var(--motion-base);
+  }
+
+  .app-shell[data-nav-open="true"] .nav-backdrop {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity var(--motion-base) var(--ease-decelerate);
   }
 
   /* Inside the open drawer every label is shown again. */

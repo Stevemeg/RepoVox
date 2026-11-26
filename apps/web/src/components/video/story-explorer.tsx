@@ -516,6 +516,8 @@ function LoadedStory({ view, issues }: { view: VideoStoryView; issues: number })
         />
       ))}
       <div
+        // Keyed by tab: a switch remounts the panel, which replays its CSS reveal.
+        key={tab}
         className="tab-panel story-panel"
         role="tabpanel"
         id={`${base}-panel-${tab}`}

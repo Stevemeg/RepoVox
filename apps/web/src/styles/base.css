@@ -70,6 +70,7 @@ a {
   text-decoration: underline;
   text-underline-offset: 0.18em;
   text-decoration-thickness: 1px;
+  transition: color var(--motion-fast) var(--ease-standard);
 }
 
 a:hover {
@@ -158,12 +159,76 @@ textarea {
   font-family: var(--font-mono);
 }
 
+/*
+ * Shared motion keyframes. Timing comes from the --motion-* tokens at each use. Entrances
+ * move on the vertical axis only; the one horizontal sweep (rv-shimmer) runs inside a
+ * positioned `overflow: hidden` skeleton, so it can never widen the page. No keyframe sets
+ * `visibility`, so focus and the accessibility tree are never affected by an animation.
+ */
+@keyframes rv-rise {
+  from {
+    opacity: 0;
+    transform: translateY(var(--motion-rise));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes rv-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rv-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--motion-lift)) scale(var(--motion-dialog-scale));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes rv-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes rv-pulse {
+  from {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+}
+
+/*
+ * Reduced motion: every animation finishes at once and every transition is instant (delays
+ * included, so the drawer hides immediately), and shimmer and pulse loops stop after one
+ * zero-length pass. Focus outlines, hover/selected colours and visibility changes are
+ * untouched: only time is removed, never a state.
+ */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
     transition-duration: 0.01ms !important;
     transition-delay: 0ms !important;
     scroll-behavior: auto !important;

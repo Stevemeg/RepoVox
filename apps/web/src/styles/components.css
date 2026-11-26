@@ -21,15 +21,25 @@ button,
   cursor: pointer;
   box-shadow: var(--shadow-xs);
   transition:
-    background-color var(--duration-fast) var(--easing-standard),
-    border-color var(--duration-fast) var(--easing-standard),
-    color var(--duration-fast) var(--easing-standard);
+    background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
 }
 
 button:hover,
 .button:hover {
   background: var(--color-hover);
   color: var(--color-text);
+}
+
+/* Press feedback: a 1px settle, never on tabs, whose strip scrolls and must not gain a
+   vertical overflow while a tab is held down. */
+button:active:not(:disabled, [aria-disabled="true"], .tab),
+.button:active {
+  transform: translateY(1px);
+  box-shadow: none;
 }
 
 button:disabled,
@@ -133,6 +143,22 @@ button:disabled:hover {
   border-radius: var(--radius-pill);
   background: currentColor;
   flex-shrink: 0;
+}
+
+/* A running job's dot sends out a soft ring. Decorative: the badge text states the state.
+   The ring rests at opacity 0, so with reduced motion it simply disappears. */
+.badge[data-tone="running"] .badge-dot {
+  position: relative;
+}
+
+.badge[data-tone="running"] .badge-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: 0;
+  animation: rv-pulse var(--motion-pulse) var(--ease-decelerate) infinite;
 }
 
 .badge[data-tone="verified"] {
@@ -258,16 +284,22 @@ button:disabled:hover {
   text-decoration: none;
   box-shadow: var(--shadow-xs);
   transition:
-    border-color var(--duration-fast) var(--easing-standard),
-    box-shadow var(--duration-fast) var(--easing-standard),
-    transform var(--duration-fast) var(--easing-standard);
+    border-color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
 }
 
-.project-card:hover {
+.project-card:hover,
+.project-card:focus-visible {
   color: var(--color-text);
   border-color: var(--color-brand);
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
+}
+
+.project-card:active {
+  box-shadow: var(--shadow-sm);
+  transform: none;
 }
 
 .project-card-top,
@@ -439,6 +471,13 @@ button:disabled:hover {
   font-size: var(--text-sm);
 }
 
+/* Banners (flash confirmations such as a rename or deletion notice, and problem notices)
+   ease in when they appear. Their live-region role announces them regardless. */
+.flash-notice,
+.problem {
+  animation: rv-rise var(--motion-base) var(--ease-decelerate);
+}
+
 .problem-body {
   flex: 1;
   min-width: 12rem;
@@ -484,18 +523,29 @@ button:disabled:hover {
   justify-content: center;
 }
 
+/* The shimmer is a highlight that slides across on the compositor (transform only). The
+   skeleton is positioned and clips it, so the sweep never adds scrollable width. */
 .skeleton {
+  position: relative;
   display: block;
   height: 0.875rem;
+  overflow: hidden;
   border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
   background: linear-gradient(
     90deg,
-    var(--color-surface-sunken) 0%,
+    transparent 0%,
     var(--color-surface-subtle) 50%,
-    var(--color-surface-sunken) 100%
+    transparent 100%
   );
-  background-size: 200% 100%;
-  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  transform: translateX(-100%);
+  animation: rv-shimmer var(--motion-shimmer) var(--ease-standard) infinite;
 }
 
 .skeleton-stack {
@@ -512,15 +562,6 @@ button:disabled:hover {
   width: 48%;
 }
 
-@keyframes skeleton-shimmer {
-  from {
-    background-position: 100% 0;
-  }
-  to {
-    background-position: -100% 0;
-  }
-}
-
 /* Lists ------------------------------------------------------------------ */
 .job-list {
   display: flex;
@@ -535,13 +576,17 @@ button:disabled:hover {
   border-top: 1px solid var(--color-border);
   color: var(--color-text);
   text-decoration: none;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
 }
 
 .job-list > .job-row:first-child {
   border-top: 0;
 }
 
-.job-row:hover {
+.job-row:hover,
+.job-row:focus-visible {
   background: var(--color-surface-subtle);
   color: var(--color-text);
 }
@@ -719,6 +764,9 @@ input::placeholder {
 }
 
 /* Dialogs ---------------------------------------------------------------- */
+/* Every modal (Dialog, ConfirmDialog, create and rename project) enters the same way: the
+   backdrop fades in and the dialog lifts and settles. Focus moves in on mount, during the
+   entrance, so keyboard users never wait for it. */
 .dialog-backdrop {
   position: fixed;
   inset: 0;
@@ -727,6 +775,7 @@ input::placeholder {
   place-items: center;
   padding: var(--space-4);
   background: var(--color-overlay);
+  animation: rv-fade var(--motion-base) var(--ease-standard);
 }
 
 .dialog {
@@ -739,6 +788,7 @@ input::placeholder {
   border-radius: var(--radius-lg);
   background: var(--color-surface);
   box-shadow: var(--shadow-lg);
+  animation: rv-dialog-in var(--motion-base) var(--ease-decelerate);
 }
 
 .dialog h2 {
@@ -786,6 +836,14 @@ input::placeholder {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4);
+  transition:
+    border-color var(--motion-base) var(--ease-standard),
+    box-shadow var(--motion-base) var(--ease-standard);
+}
+
+.evidence[open] {
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-xs);
 }
 
 .evidence + .evidence {
@@ -810,6 +868,24 @@ input::placeholder {
   cursor: pointer;
   font-weight: var(--weight-semibold);
   font-size: var(--text-sm);
+}
+
+/* Citation and disclosure expansions: the summary tints on hover and the revealed content
+   eases in each time the <details> opens (the rule only matches while it is open). */
+.evidence summary,
+.disclosure summary {
+  border-radius: var(--radius-sm);
+  transition: color var(--motion-fast) var(--ease-standard);
+}
+
+.evidence summary:hover,
+.disclosure summary:hover {
+  color: var(--color-brand-strong);
+}
+
+.evidence[open] > :not(summary),
+.disclosure[open] > :not(summary) {
+  animation: rv-rise var(--motion-base) var(--ease-decelerate);
 }
 
 .disclosure > ul {
@@ -890,6 +966,7 @@ input::placeholder {
   border-radius: var(--radius-lg);
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
+  animation: rv-rise var(--motion-slow) var(--ease-decelerate);
 }
 
 .status-card > * + * {
@@ -1103,6 +1180,11 @@ input::placeholder {
   font-weight: var(--weight-medium);
 }
 
+/* The selected panel is keyed by its tab, so it remounts and eases in on every switch. */
+.tab-panel:not([hidden]) {
+  animation: rv-rise var(--motion-slow) var(--ease-decelerate);
+}
+
 .tab-panel > * + * {
   margin-top: var(--space-3);
 }
@@ -1206,11 +1288,13 @@ input::placeholder {
   align-items: start;
 }
 
+/* Keyed by the active video, so switching videos replays this reveal. */
 .studio-stage {
   display: grid;
   gap: var(--space-3);
   min-width: 0;
   border-radius: var(--radius-md);
+  animation: rv-rise var(--motion-slow) var(--ease-decelerate);
 }
 
 .studio-heading {
@@ -1329,6 +1413,11 @@ p.studio-unavailable {
   padding: var(--space-3);
   text-align: left;
   white-space: normal;
+}
+
+.playlist-item:hover,
+.playlist-item:focus-visible {
+  border-color: color-mix(in srgb, var(--color-brand) 45%, var(--color-border-strong));
 }
 
 .playlist-item[aria-pressed="true"] {

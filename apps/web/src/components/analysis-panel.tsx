@@ -312,6 +312,8 @@ function AnalysisExplorer({ result }: { result: Analysis }) {
           />
         ))}
         <div
+          // Keyed by section: a switch remounts the panel, which replays its CSS reveal.
+          key={section}
           className="tab-panel"
           role="tabpanel"
           id={`${base}-panel-${section}`}

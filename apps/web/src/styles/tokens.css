@@ -137,8 +137,24 @@
   --z-dialog: 60;
   --z-skip-link: 70;
 
-  /* Motion */
-  --duration-fast: 120ms;
-  --duration-base: 200ms;
-  --easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  /*
+   * Motion. Every transition and animation takes its timing from here; stylesheets never
+   * hard-code a duration or easing. Movement is limited to opacity and transform (a small
+   * vertical rise, a dialog lift, the off-canvas drawer) so it stays on the compositor;
+   * colour, border and shadow changes are short transitions only. Entrances rise
+   * vertically, never sideways, so nothing can widen a 375px viewport.
+   * base.css collapses all of it under `prefers-reduced-motion: reduce`.
+   */
+  --motion-instant: 0s; /* a discrete flip, such as visibility at the end of a slide */
+  --motion-fast: 120ms; /* hover, press and focus feedback */
+  --motion-base: 200ms; /* drawer, backdrops, dialogs, disclosures */
+  --motion-slow: 320ms; /* page, tab-panel and stage reveals */
+  --motion-shimmer: 1400ms; /* one skeleton shimmer sweep (loops) */
+  --motion-pulse: 1600ms; /* one running-status pulse (loops) */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-decelerate: cubic-bezier(0, 0, 0, 1);
+  --ease-linear: linear;
+  --motion-rise: 6px; /* entrance offset, applied with translateY only */
+  --motion-lift: 10px; /* dialog entrance offset */
+  --motion-dialog-scale: 0.98;
 }
