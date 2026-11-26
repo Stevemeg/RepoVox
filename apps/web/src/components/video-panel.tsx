@@ -1,32 +1,26 @@
 "use client";
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import { ProblemNotice } from "@/components/ui/problem-notice";
 import { RemediationPanel } from "@/components/ui/remediation-panel";
 import { SkeletonRows } from "@/components/ui/states";
+import { currentStage, JobStages, stageLabel } from "@/components/video/job-stages";
+import { VideoStudio } from "@/components/video/video-studio";
 import { WorkspaceContext } from "@/components/workspace/context";
+import { StatusBadge } from "@/components/workspace/records";
 import { useAction } from "@/components/workspace/use-action";
-import { api, ApiError, API_BASE, type Video, type VideoJob } from "@/lib/api";
+import { api, ApiError, type Video, type VideoJob } from "@/lib/api";
 import { describeJobOutcome, toProblem, type Problem } from "@/lib/errors";
-import { shortId, TERMINAL_VIDEO_STATES } from "@/lib/format";
+import { formatDateTime, shortId, TERMINAL_VIDEO_STATES } from "@/lib/format";
 import { useIdempotencyKey } from "@/lib/idempotency";
+import { videoJobStatus } from "@/lib/job-status";
 import { isUuid } from "@/lib/security";
 import { useVisibilityPolling } from "@/lib/use-visibility-polling";
 
 export type { Video, VideoJob };
+// Re-exported for existing importers; the routes now live with the other media helpers.
+export { videoRoutes } from "@/lib/video-media";
 
 const REFRESH_MS = 3000;
-
-// Same-origin, owner-authorized routes only. Ids are validated before they enter a URL.
-export function videoRoutes(jobId: string, videoId: string) {
-  if (!isUuid(jobId) || !isUuid(videoId)) return null;
-  const base = `${API_BASE}/video-jobs/${jobId}/videos/${videoId}`;
-  return {
-    video: base,
-    captions: `${base}/captions`,
-    download: `${base}/download`,
-  };
-}
 
 // The architecture outcome is reported separately from the walkthrough. A published
 // walkthrough never implies that an architecture explainer was produced.
@@ -46,64 +40,97 @@ const architectureNote = (job: VideoJob): string =>
   (job.architecture && architectureNotes[job.architecture]) ||
   "Architecture outcome was not recorded.";
 
-// Every frame already shows its caption in the lower band, so the WebVTT track is loaded
-// hidden: its cues are available to the page and to the player's captions menu, but the
-// browser does not draw a second caption box over the burned-in one. Without `default` a
-// track starts disabled and is never fetched; "hidden" fetches it without drawing it.
-// The callback is module-level, so its identity is stable and React calls it only when
-// the track mounts: a re-render does not undo a viewer's own captions choice.
-function loadCaptionsHidden(element: HTMLTrackElement | null) {
-  if (element?.track) element.track.mode = "hidden";
+function progressNote(job: VideoJob): string {
+  if (job.state === "awaiting_analysis") return "Waiting for verified static analysis to finish.";
+  const stage = currentStage(job.stages);
+  if (!stage) return "Working: starting.";
+  const ordered = [...job.stages].sort((a, b) => a.ordinal - b.ordinal);
+  const index = ordered.findIndex((item) => item.ordinal === stage.ordinal);
+  return `Working: ${stageLabel(stage.stage_key)} (stage ${index + 1} of ${ordered.length}).`;
 }
 
-export function VideoPlayer({ jobId, video }: { jobId: string; video: Video }) {
-  const [failed, setFailed] = useState(false);
-  const routes = videoRoutes(jobId, video.id);
-  const seconds = video.metadata.duration_seconds ?? video.metadata.media?.duration_seconds;
-  if (!routes || failed)
-    return (
-      <p role="status" className="notice" data-tone="neutral">
-        {video.title}: this video is not available. It may have expired.
-      </p>
-    );
+/** One video job: its status, progress, outcome and, once succeeded, its Video Studio. */
+function VideoJobCard({
+  job,
+  busy,
+  onCancel,
+}: {
+  job: VideoJob;
+  busy: boolean;
+  onCancel: () => void;
+}) {
+  const status = videoJobStatus(job);
+  const outcome = describeJobOutcome(job.error_code);
+  const terminal = TERMINAL_VIDEO_STATES.includes(job.state);
+  const succeededStages = job.stages.filter((stage) => stage.state === "succeeded").length;
   return (
-    <figure className="video-item">
-      <figcaption>
-        <strong>{video.title}</strong>{" "}
-        <span>
-          {video.category === "architecture" ? "Architecture explainer" : "Repository walkthrough"}
-          {seconds ? ` · ${Math.round(seconds)} s` : ""}
-        </span>
-      </figcaption>
-      <video
-        className="video-player"
-        controls
-        preload="metadata"
-        aria-label={video.title}
-        onError={() => setFailed(true)}
-      >
-        <source src={routes.video} type="video/mp4" />
-        <track
-          ref={loadCaptionsHidden}
-          kind="captions"
-          src={routes.captions}
-          srcLang="en"
-          label="English"
-        />
-      </video>
-      <div className="actions">
-        <a className="button" href={routes.download} download>
-          Download MP4
-        </a>
-      </div>
-    </figure>
-  );
-}
-
-function currentStage(job: VideoJob): string {
-  return (
-    job.stages.find((stage) => ["ready", "running", "retry_wait"].includes(stage.state))
-      ?.stage_key ?? "starting"
+    <article
+      className="video-job"
+      aria-label={`Video job ${shortId(job.id)}`}
+      data-state={job.state}
+    >
+      <header className="video-job-header">
+        <h3>
+          Video job <code className="sha">{shortId(job.id)}</code>
+          <StatusBadge status={status} />
+        </h3>
+        <p className="video-job-meta">
+          {job.repository && <span>{job.repository}</span>}
+          {job.commit_sha && (
+            <span>
+              pinned commit <code className="sha">{job.commit_sha}</code>
+            </span>
+          )}
+          <span>created {formatDateTime(job.created_at)}</span>
+        </p>
+      </header>
+      {!terminal && (
+        <>
+          <p role="status">{progressNote(job)}</p>
+          <JobStages stages={job.stages} />
+          <div className="actions">
+            <button type="button" disabled={busy} onClick={onCancel}>
+              Cancel video job
+            </button>
+          </div>
+        </>
+      )}
+      {outcome && (
+        <div className="notice" data-tone="warning">
+          <div>
+            <p>{outcome}</p>
+            <small className="problem-meta">Reference: {job.error_code}</small>
+          </div>
+        </div>
+      )}
+      {job.state === "failed" && (
+        <>
+          <RemediationPanel code={job.error_code} />
+          <JobStages stages={job.stages} />
+        </>
+      )}
+      {job.state === "succeeded" && (
+        <>
+          <p data-architecture={job.architecture ?? "unknown"}>{architectureNote(job)}</p>
+          {job.stages.length > 0 && (
+            <details className="disclosure">
+              <summary>
+                Production stages: {succeededStages} of {job.stages.length} succeeded
+              </summary>
+              <JobStages stages={job.stages} />
+            </details>
+          )}
+          {job.videos.length > 0 ? (
+            <VideoStudio job={job} />
+          ) : (
+            <p className="notice" data-tone="neutral">
+              No videos are listed for this job. Published videos are available for 24 hours
+              after their job was created, so they may have expired.
+            </p>
+          )}
+        </>
+      )}
+    </article>
   );
 }
 
@@ -227,65 +254,18 @@ export function VideoJobs({
         )}
         {loadProblem && <ProblemNotice problem={loadProblem} onRetry={() => void load()} />}
         {!loaded && <SkeletonRows rows={2} />}
-        {jobs.map((job) => {
-          const outcome = describeJobOutcome(job.error_code);
-          return (
-            <article
-              key={job.id}
-              className="video-job"
-              aria-label={`Video job ${shortId(job.id)}`}
-            >
-              <h3>
-                Video job <code className="sha">{shortId(job.id)}</code>
-                <span aria-hidden="true">·</span>
-                {/* Raw state text: the video E2E reads it from this heading (M3 restyles it). */}
-                <Badge state={job.state} />
-              </h3>
-              {job.commit_sha && (
-                <p>
-                  {job.repository} · pinned commit <code className="sha">{job.commit_sha}</code>
-                </p>
-              )}
-              {!TERMINAL_VIDEO_STATES.includes(job.state) && (
-                <>
-                  <p role="status">
-                    {job.state === "awaiting_analysis"
-                      ? "Waiting for verified static analysis to finish."
-                      : `Working: ${currentStage(job)}.`}
-                  </p>
-                  <div className="actions">
-                    <button
-                      type="button"
-                      disabled={action.busy}
-                      onClick={() =>
-                        void action
-                          .run(() => api(`/video-jobs/${job.id}/cancel`, { method: "POST" }))
-                          .then((ok) => (ok ? load() : undefined))
-                      }
-                    >
-                      Cancel video job
-                    </button>
-                  </div>
-                </>
-              )}
-              {outcome && (
-                <div className="notice" data-tone="warning">
-                  <div>
-                    <p>{outcome}</p>
-                    <small className="problem-meta">Reference: {job.error_code}</small>
-                  </div>
-                </div>
-              )}
-              {job.state === "failed" && <RemediationPanel code={job.error_code} />}
-              {job.state === "succeeded" && (
-                <p data-architecture={job.architecture ?? "unknown"}>{architectureNote(job)}</p>
-              )}
-              {job.videos.map((video) => (
-                <VideoPlayer key={video.id} jobId={job.id} video={video} />
-              ))}
-            </article>
-          );
-        })}
+        {jobs.map((job) => (
+          <VideoJobCard
+            key={job.id}
+            job={job}
+            busy={action.busy}
+            onCancel={() =>
+              void action
+                .run(() => api(`/video-jobs/${job.id}/cancel`, { method: "POST" }))
+                .then((ok) => (ok ? load() : undefined))
+            }
+          />
+        ))}
       </div>
     </section>
   );

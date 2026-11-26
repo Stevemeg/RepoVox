@@ -97,12 +97,12 @@ async function succeeded(page: Page, job: Job): Promise<Job> {
   const card = page.getByRole("article", {
     name: `Video job ${job.id.slice(0, 8)}`,
   });
-  await expect(card.getByRole("heading")).toContainText(
-    /succeeded|failed|cancelled/,
-    {
-      timeout: 14 * MINUTE,
-    },
-  );
+  // The job heading carries a status badge with the capitalized label ("Succeeded").
+  await expect(
+    card.getByRole("heading", { name: /^Video job / }),
+  ).toContainText(/succeeded|failed|cancelled/i, {
+    timeout: 14 * MINUTE,
+  });
   const settled = await fetchJob(page.request, job.id);
   expect(settled.state, JSON.stringify(settled.stages)).toBe("succeeded");
   expect(settled.error_code).toBeNull();
@@ -183,7 +183,12 @@ test("supported repository: submit, generate with the browser closed, play, down
     "data-architecture",
     "published",
   );
-  await expect(card.locator("video")).toHaveCount(done.videos.length);
+  // The Video Studio plays one video at a time and lists every published video in a
+  // playlist, in the job's position order.
+  const entries = card.locator("button[data-video-id]");
+  await expect(entries).toHaveCount(done.videos.length);
+  await expect(entries.first()).toHaveAttribute("aria-pressed", "true");
+  await expect(card.locator("video")).toHaveCount(1);
 
   // Ownership: the owner's listing contains exactly this job with these videos.
   const listing = (await (
@@ -217,6 +222,19 @@ test("supported repository: submit, generate with the browser closed, play, down
     const vtt = await captions.text();
     expect(vtt.startsWith("WEBVTT")).toBe(true);
     expect(vtt).toContain("-->");
+
+    // Put this video on the stage through its playlist entry, as a user would.
+    const entry = card.locator(`button[data-video-id="${video.id}"]`);
+    await entry.click();
+    await expect(entry).toHaveAttribute("aria-pressed", "true");
+    await expect(card.locator("video")).toHaveCount(1);
+    if (video.category === "walkthrough")
+      // The walkthrough's story either loads or is reported as not available; never an error.
+      await expect(
+        card.locator(
+          '.story-explorer [role="tablist"], .story-explorer [data-story="not-available"]',
+        ),
+      ).toBeVisible({ timeout: 30_000 });
 
     // Playback in the real browser: decoded frames advance and captions are loaded.
     // Located by the video's own id, since titles need not be unique. An inner locator

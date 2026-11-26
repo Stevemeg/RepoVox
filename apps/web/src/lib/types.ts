@@ -3,6 +3,7 @@
  * Every field is snake_case exactly as sent. Literal unions narrow fields the API types as
  * plain strings; unknown values must still render safely.
  */
+import type { NarrationView, VoiceView } from "./story-types";
 
 export type AuthProviderName = "dev" | "github";
 
@@ -111,26 +112,11 @@ export type ArchitectureOutcome =
   | "rendering_failed"
   | "not_completed";
 
-/** Which voice spoke a video (ADR-0027). Null on videos that predate the record. */
-export type VoiceRecord = {
-  tts_provider: "deterministic" | "kokoro_onnx" | "local" | null;
-  tts_engine: string | null;
-  tts_voice: string | null;
-};
+/** Which voice spoke a video (ADR-0027); defined with the story contract. */
+export type VoiceRecord = VoiceView;
 
 /** NarrationView: how a walkthrough was worded (ADR-0026) and voiced. */
-export type NarrationRecord = VoiceRecord & {
-  refiner: "deterministic-template-1.0" | "grounded-llm-refiner-1.0";
-  provider: "deterministic" | "ollama" | "openai_compatible" | "anthropic";
-  model: string | null;
-  blueprint_sha256: string | null;
-  scenes_total: number;
-  scenes_refined: number;
-  scenes_fallback: number;
-  refined_scene_ids: string[];
-  fallback_reason: string | null;
-  rejection_reasons: Record<string, string[]>;
-};
+export type NarrationRecord = NarrationView;
 
 /** VideoView.metadata is an open object in the contract; known keys are typed here. */
 export type VideoMetadata = {

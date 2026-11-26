@@ -36,6 +36,9 @@ describe("shipped web source", () => {
     ["external font or remote asset", /@import\s+url\(|fonts\.googleapis|https?:\/\/[^"')\s]*\.(woff2?|ttf|otf|css)/g],
     ["stale phase copy", /later phase|Phase [12]\b|remains unavailable|arrives in a later/gi],
     ["raw status code as a message", /Status code:/g],
+    // Frontend handoff section 3: narration provenance is conditional, and tests are read, not run.
+    ["unconditional narration claim", /No AI model|no paid service/gi],
+    ["claim that tests pass", /tests? (pass|passed|passing)\b/gi],
   ])("has no %s", (_, pattern) => {
     expect(count(pattern)).toBe(0);
   });
@@ -50,6 +53,24 @@ describe("shipped web source", () => {
 
   it("never puts an unvalidated repository URL or permalink in an href", () => {
     expect(count(/href=\{[^}]*(repository_url|\.permalink)[^}]*\}/g)).toBe(0);
+  });
+
+  it("builds media and story URLs only from id-validated route helpers", () => {
+    // Every video, caption, download and story URL comes from lib/video-media.ts, which
+    // checks both ids as UUIDs before they enter a path.
+    const builders = sources.filter((file) => /\/videos\/\$\{/.test(file.text)).map((file) => file.path);
+    expect(builders).toEqual(["lib/video-media.ts"]);
+    const media = sources.find((file) => file.path === "lib/video-media.ts")!.text;
+    expect(media.match(/if \(!isUuid\(jobId\) \|\| !isUuid\(videoId\)\) return null;/g)).toHaveLength(2);
+  });
+
+  it("loads caption tracks hidden and never with `default`", () => {
+    const tracks = sources.flatMap((file) => [...file.text.matchAll(/<track[\s\S]*?\/>/g)].map((m) => m[0]));
+    expect(tracks.length).toBeGreaterThan(0);
+    for (const track of tracks) {
+      expect(track).toContain("ref={loadCaptionsHidden}");
+      expect(track).not.toMatch(/\bdefault\b/);
+    }
   });
 
   it("has no inline style attributes", () => {
