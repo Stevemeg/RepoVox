@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 import { AnalysisPanel } from "../src/components/analysis-panel";
 import { safePermalink } from "../src/lib/security";
@@ -77,7 +78,9 @@ it("labels uncertainty and escapes source excerpts", async () => {
   );
   const { container } = render(<AnalysisPanel jobId="job-1" />);
   expect(await screen.findByText("Verified static analysis")).toBeVisible();
+  await userEvent.click(screen.getByRole("tab", { name: /^Claims/ }));
   expect(screen.getByText("inferred", { exact: true })).toBeVisible();
+  await userEvent.click(screen.getByRole("tab", { name: /^Code evidence/ }));
   expect(container.querySelector("pre")?.textContent).toBe(
     "<script>evil()</script>",
   );
@@ -128,6 +131,7 @@ it("drops a citation whose permalink points at another commit or host", async ()
   vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(body), { status: 200 }));
   const { container } = render(<AnalysisPanel jobId="job-2" />);
   expect(await screen.findByText("Verified static analysis")).toBeVisible();
+  await userEvent.click(screen.getByRole("tab", { name: /^Code evidence/ }));
   expect(container.querySelectorAll("details.evidence")).toHaveLength(3);
   expect(container.querySelectorAll("a[href]")).toHaveLength(0);
 });

@@ -83,6 +83,19 @@ test("local sign-in, create project, fixture history, delete and sign-out", asyn
     .fill("https://github.com/example/demo");
   await page.getByRole("button", { name: "Create project" }).click();
   await page.getByRole("link", { name: new RegExp(title) }).click();
+  // Rename through PATCH /projects/{id}: focus starts in the field and returns to the opener.
+  const renamed = `${title} renamed`;
+  const rename = page.getByRole("button", { name: "Rename project" });
+  await rename.click();
+  const renameDialog = page.getByRole("dialog", { name: "Rename project" });
+  await expect(renameDialog.getByLabel("Project name")).toBeFocused();
+  await renameDialog.getByLabel("Project name").fill(renamed);
+  await renameDialog.getByRole("button", { name: "Save name" }).click();
+  await expect(page.getByRole("heading", { name: renamed, level: 1 })).toBeVisible();
+  await expect(
+    page.getByRole("status").filter({ hasText: `Project renamed to “${renamed}”.` }),
+  ).toBeVisible();
+  await expect(rename).toBeFocused();
   await page.getByRole("button", { name: "Run synthetic fixture" }).click();
   await expect(
     page.getByText("Synthetic ·", { exact: false }).first(),
@@ -94,6 +107,25 @@ test("local sign-in, create project, fixture history, delete and sign-out", asyn
       exact: false,
     }),
   ).toBeVisible({ timeout: 20000 });
+  // Unified history: the fixture boundary is complete, never a red failure, and the raw
+  // recorded state stays visible.
+  await page
+    .getByRole("navigation", { name: "Primary" })
+    .getByRole("link", { name: "Job history" })
+    .click();
+  const history = page.getByRole("region", { name: "All jobs" });
+  await page.getByLabel("Search", { exact: true }).fill(renamed);
+  const rows = history.locator("a[data-kind]");
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toHaveAttribute("data-kind", "fixture");
+  await expect(rows.first().locator(".badge")).toHaveText("Fixture complete");
+  await expect(rows.first().locator(".badge")).toHaveAttribute("data-tone", "succeeded");
+  await expect(rows.first()).toContainText("recorded as failed / phase1_fixture_boundary");
+  await page.getByLabel("Status", { exact: true }).selectOption("failed");
+  await expect(rows).toHaveCount(0);
+  await page.getByLabel("Status", { exact: true }).selectOption("succeeded");
+  await page.getByLabel("Type", { exact: true }).selectOption("fixture");
+  await expect(rows).toHaveCount(1);
   await page.getByRole("link", { name: /^Projects/ }).click();
   await page.getByRole("link", { name: new RegExp(title) }).click();
   let nativeDialogs = 0;
@@ -109,6 +141,16 @@ test("local sign-in, create project, fixture history, delete and sign-out", asyn
   await expect(
     page.getByRole("heading", { name: "Projects", exact: true }),
   ).toBeVisible();
+  // DELETE answers 202: access is revoked now and cleanup is reported as pending, not done.
+  const deletedNotice = page
+    .getByRole("status")
+    .filter({ hasText: "was removed from your workspace" });
+  await expect(deletedNotice).toContainText(
+    "Access to the project and its jobs was revoked immediately.",
+  );
+  await expect(deletedNotice).toContainText("cleaned up in the background");
+  await deletedNotice.getByRole("button", { name: "Dismiss notice" }).click();
+  await expect(deletedNotice).toHaveCount(0);
   expect(nativeDialogs).toBe(0);
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/sign-in/);

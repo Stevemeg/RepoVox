@@ -448,6 +448,16 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .filter-bar {
+    padding: var(--space-4);
+  }
+
+  .filter-bar .field,
+  .filter-bar .filter-search {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
   .callout {
     flex-direction: column;
     align-items: stretch;

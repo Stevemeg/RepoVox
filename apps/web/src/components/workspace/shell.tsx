@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  CheckCircle2,
   ChevronRight,
   Clock3,
   Folder,
@@ -32,7 +33,7 @@ import {
 import { isUnauthorized, toProblem, type Problem } from "@/lib/errors";
 import { initials } from "@/lib/format";
 import { useVisibilityPolling } from "@/lib/use-visibility-polling";
-import { authLabel, WorkspaceContext, type WorkspaceValue } from "./context";
+import { authLabel, WorkspaceContext, type Flash, type WorkspaceValue } from "./context";
 
 const NAVIGATION = [
   { href: "/", label: "Overview", icon: LayoutDashboard, key: "overview" },
@@ -67,6 +68,13 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
   const [problem, setProblem] = useState<Problem | null>(null);
   const [navOpen, setNavOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [flash, setFlash] = useState<Flash | null>(null);
+  // A banner belongs to one page: leaving that page dismisses it.
+  const [flashPath, setFlashPath] = useState(path);
+  if (flashPath !== path) {
+    setFlashPath(path);
+    if (flash && flash.path !== path) setFlash(null);
+  }
   // Incremented when the session ends, so responses for the old session are discarded.
   const generation = useRef(0);
 
@@ -75,6 +83,7 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
     setAccount(null);
     setProjects([]);
     setJobs([]);
+    setFlash(null);
   }, []);
 
   const handleUnauthorized = useCallback(
@@ -166,6 +175,7 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
         problem,
         refresh: () => load(),
         handleUnauthorized,
+        showFlash: setFlash,
       },
     [account, projects, jobs, loading, problem, load, handleUnauthorized],
   );
@@ -294,6 +304,28 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
                   void load();
                 }}
               />
+            )}
+            {flash && flash.path === path && (
+              <div className="notice flash-notice" data-tone="success" role="status">
+                <CheckCircle2 size={16} aria-hidden="true" />
+                <div className="flash-body">
+                  <p>
+                    <strong>{flash.title}.</strong> {flash.message}
+                  </p>
+                  {flash.reference && (
+                    <small className="problem-meta">Reference: {flash.reference}</small>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label="Dismiss notice"
+                  title="Dismiss notice"
+                  onClick={() => setFlash(null)}
+                >
+                  <X size={16} aria-hidden="true" />
+                </button>
+              </div>
             )}
             {children}
           </main>

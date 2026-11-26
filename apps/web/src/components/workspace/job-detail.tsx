@@ -6,20 +6,17 @@ import { Badge } from "@/components/ui/badge";
 import { ExternalLink } from "@/components/ui/external-link";
 import { PageHeader } from "@/components/ui/page-header";
 import { ProblemNotice } from "@/components/ui/problem-notice";
+import { RemediationPanel } from "@/components/ui/remediation-panel";
 import { SkeletonRows } from "@/components/ui/states";
 import { api, ApiError, type Job } from "@/lib/api";
-import {
-  BOUNDARY_CODES,
-  describeJobOutcome,
-  toProblem,
-  type Problem,
-} from "@/lib/errors";
+import { describeJobOutcome, toProblem, type Problem } from "@/lib/errors";
 import { ACTIVE_JOB_STATES, formatDate, formatDateTime, humanize, shortId } from "@/lib/format";
 import { useIdempotencyKey } from "@/lib/idempotency";
+import { jobStatus } from "@/lib/job-status";
 import { safeGitHubRepoUrl } from "@/lib/security";
 import { useVisibilityPolling } from "@/lib/use-visibility-polling";
 import { useWorkspace } from "./context";
-import { repositoryLabel } from "./records";
+import { repositoryLabel, StatusBadge } from "./records";
 import { useAction } from "./use-action";
 
 const REFRESH_MS = 5000;
@@ -74,7 +71,8 @@ export function JobDetailView({ jobId }: { jobId: string }) {
     );
 
   const outcome = describeJobOutcome(job.error_code);
-  const boundary = job.error_code !== null && BOUNDARY_CODES.has(job.error_code);
+  const status = jobStatus(job);
+  const boundary = status.boundary;
   const repository = job.repository_url ? safeGitHubRepoUrl(job.repository_url) : null;
   const stages = job.stages ?? [];
 
@@ -108,7 +106,7 @@ export function JobDetailView({ jobId }: { jobId: string }) {
             ? "Trusted development fixture · No repository acquisition, AI, audio or video processing."
             : "Static analysis of one pinned commit · Repository code is never run."
         }
-        actions={<Badge state={job.state} />}
+        actions={<StatusBadge status={status} />}
       />
       {problem && <ProblemNotice problem={problem} onRetry={() => void load()} />}
       {outcome && (
@@ -119,6 +117,7 @@ export function JobDetailView({ jobId }: { jobId: string }) {
           </div>
         </div>
       )}
+      {job.state === "failed" && !boundary && <RemediationPanel code={job.error_code} />}
       <section className="panel" aria-labelledby="job-summary">
         <div className="panel-header">
           <h2 id="job-summary">Summary</h2>
@@ -183,6 +182,27 @@ export function JobDetailView({ jobId }: { jobId: string }) {
               </>
             )}
           </dl>
+          <details className="disclosure technical-details" open={boundary}>
+            <summary>Technical details</summary>
+            <dl className="definition-list">
+              <dt>Recorded state</dt>
+              <dd>
+                <code>{job.state}</code>
+              </dd>
+              <dt>Stop code</dt>
+              <dd>{job.error_code ? <code>{job.error_code}</code> : "None"}</dd>
+              <dt>Record version</dt>
+              <dd>
+                <code>{job.version}</code>
+              </dd>
+            </dl>
+            {boundary && (
+              <p className="field-hint">
+                The API records the normal end of this pipeline as <code>failed</code> with a
+                boundary code. It is shown as {status.label} because nothing went wrong.
+              </p>
+            )}
+          </details>
         </div>
       </section>
       {!job.synthetic && job.error_code === "phase2_pipeline_boundary" && (
@@ -216,7 +236,9 @@ export function JobDetailView({ jobId }: { jobId: string }) {
             {job.history?.map((entry) => (
               <li key={entry.version}>
                 <span className="mono">v{entry.version}</span>
-                <Badge state={entry.state} />
+                <StatusBadge
+                  status={jobStatus({ ...entry, error_code: entry.error_code ?? null, synthetic: job.synthetic })}
+                />
                 <time dateTime={entry.created_at}>{formatDate(entry.created_at)}</time>
               </li>
             ))}

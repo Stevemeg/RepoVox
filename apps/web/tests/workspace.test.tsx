@@ -219,7 +219,9 @@ describe("overview", () => {
     const { unmount } = renderAt("/", <OverviewView />);
     expect(await screen.findByText("Create narrated videos from a project")).toBeVisible();
     expect(screen.getByRole("link", { name: /Go to your projects/ })).toHaveAttribute("href", "/projects");
-    expect(screen.getByText("Active jobs").closest(".stat")).toHaveTextContent("1");
+    await waitFor(() =>
+      expect(screen.getByText("Active jobs").closest(".stat")).toHaveTextContent("1"),
+    );
     unmount();
     serve({ "GET /api/v1/auth/session": account, "GET /api/v1/projects": [], "GET /api/v1/jobs": [] });
     renderAt("/", <OverviewView />);
@@ -296,11 +298,16 @@ describe("projects", () => {
 });
 
 describe("project workspace", () => {
+  const direct = {
+    [`GET /api/v1/projects/${project.id}`]: project,
+    [`GET /api/v1/projects/${project.id}/jobs`]: [],
+  };
   beforeEach(() =>
     serve({
       "GET /api/v1/auth/session": account,
       "GET /api/v1/projects": [project],
       "GET /api/v1/jobs": [],
+      ...direct,
     }),
   );
 
@@ -317,6 +324,8 @@ describe("project workspace", () => {
       "GET /api/v1/auth/session": account,
       "GET /api/v1/projects": [{ ...project, repository_url: "javascript:alert(1)" }],
       "GET /api/v1/jobs": [],
+      [`GET /api/v1/projects/${project.id}`]: { ...project, repository_url: "javascript:alert(1)" },
+      [`GET /api/v1/projects/${project.id}/jobs`]: [],
     });
     const { container } = renderAt(`/projects/${project.id}`, <ProjectDetailView projectId={project.id} />);
     expect(await screen.findByText("javascript:alert(1)")).toBeVisible();
@@ -329,6 +338,7 @@ describe("project workspace", () => {
       "GET /api/v1/auth/session": account,
       "GET /api/v1/projects": [project],
       "GET /api/v1/jobs": [],
+      ...direct,
       [`DELETE /api/v1/projects/${project.id}`]: () =>
         respond({ deletion_id: "d", access_revoked: true, cleanup: "pending" }, 202),
     });
@@ -365,6 +375,7 @@ describe("project workspace", () => {
       "GET /api/v1/auth/session": account,
       "GET /api/v1/projects": [project],
       "GET /api/v1/jobs": [],
+      ...direct,
       [`POST ${url}`]: () => answers.shift()!,
     });
     renderAt(`/projects/${project.id}`, <ProjectDetailView projectId={project.id} />);
@@ -398,7 +409,7 @@ describe("jobs", () => {
     });
     renderAt("/jobs", <JobsView />);
     expect(await screen.findByText("Demo project")).toBeVisible();
-    expect(screen.getByText(/Synthetic · job-1/)).toBeVisible();
+    expect(screen.getByText(/Synthetic fixture · job-1/)).toBeVisible();
     expect(screen.getByText(/do not analyze repositories or generate videos/)).toBeVisible();
   });
 

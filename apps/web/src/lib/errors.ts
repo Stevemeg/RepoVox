@@ -19,6 +19,7 @@ export type ErrorContext =
   | "general"
   | "sign-in"
   | "create-project"
+  | "rename-project"
   | "delete-project"
   | "analysis"
   | "fixture"
@@ -168,6 +169,12 @@ const CODE_MESSAGES: Record<string, string> = {
 const CONTEXT_MESSAGES: Partial<Record<ErrorContext, Record<string, string>>> = {
   "create-project": {
     invalid_request: `Check the project name and URL. ${URL_HELP}`,
+  },
+  "rename-project": {
+    invalid_request:
+      "Enter a project name of 1 to 100 characters, without line breaks or control characters.",
+    not_found:
+      "This project is no longer in your workspace. It may have been deleted in another tab.",
   },
   "sign-in": {
     not_found: "That sign-in method is not available in this environment.",

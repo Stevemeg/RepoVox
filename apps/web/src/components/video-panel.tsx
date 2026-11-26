@@ -1,7 +1,8 @@
 "use client";
-import { useCallback, useContext, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ProblemNotice } from "@/components/ui/problem-notice";
+import { RemediationPanel } from "@/components/ui/remediation-panel";
 import { SkeletonRows } from "@/components/ui/states";
 import { WorkspaceContext } from "@/components/workspace/context";
 import { useAction } from "@/components/workspace/use-action";
@@ -106,7 +107,19 @@ function currentStage(job: VideoJob): string {
   );
 }
 
-export function VideoJobs({ projectId }: { projectId: string }) {
+/**
+ * A project's narrated videos. `onJobs` receives each loaded list (or null when loading
+ * failed) so the project page can describe the project truthfully. The section is the
+ * `#videos` target that Job history links to: when the page was opened with that hash, the
+ * section scrolls into view and takes focus once its jobs have loaded.
+ */
+export function VideoJobs({
+  projectId,
+  onJobs,
+}: {
+  projectId: string;
+  onJobs?: (jobs: VideoJob[] | null) => void;
+}) {
   const workspace = useContext(WorkspaceContext);
   const handleUnauthorized = workspace?.handleUnauthorized;
   const [jobs, setJobs] = useState<VideoJob[]>([]);
@@ -116,14 +129,25 @@ export function VideoJobs({ projectId }: { projectId: string }) {
   const key = useIdempotencyKey();
   const action = useAction("video");
   const valid = isUuid(projectId);
+  const report = useRef(onJobs);
+  useEffect(() => {
+    report.current = onJobs;
+  });
+  const section = useRef<HTMLElement>(null);
+  const revealed = useRef(false);
 
   const load = useCallback(async () => {
     if (!valid) return;
     try {
-      setJobs(await api<VideoJob[]>(`/projects/${projectId}/video-jobs`));
+      const found = await api<VideoJob[]>(`/projects/${projectId}/video-jobs`);
+      setJobs(found);
       setLoadProblem(null);
+      report.current?.(found);
     } catch (cause) {
-      if (!handleUnauthorized?.(cause)) setLoadProblem(toProblem(cause, "video"));
+      if (!handleUnauthorized?.(cause)) {
+        setLoadProblem(toProblem(cause, "video"));
+        report.current?.(null);
+      }
     } finally {
       setLoaded(true);
     }
@@ -132,6 +156,12 @@ export function VideoJobs({ projectId }: { projectId: string }) {
   useEffect(() => {
     void load();
   }, [load]);
+  useEffect(() => {
+    if (!loaded || revealed.current || window.location.hash !== "#videos") return;
+    revealed.current = true;
+    section.current?.scrollIntoView?.({ block: "start" });
+    section.current?.focus({ preventScroll: true });
+  }, [loaded]);
   // Display refresh only. Jobs advance on the server whether or not this page is open.
   useVisibilityPolling(load, REFRESH_MS, active);
 
@@ -154,7 +184,14 @@ export function VideoJobs({ projectId }: { projectId: string }) {
 
   if (!valid) return null;
   return (
-    <section className="panel" aria-labelledby="narrated-videos" aria-busy={!loaded}>
+    <section
+      ref={section}
+      id="videos"
+      tabIndex={-1}
+      className="panel"
+      aria-labelledby="narrated-videos"
+      aria-busy={!loaded}
+    >
       <div className="panel-header">
         <h2 id="narrated-videos">Narrated videos</h2>
       </div>
@@ -182,7 +219,12 @@ export function VideoJobs({ projectId }: { projectId: string }) {
             Create narrated videos
           </button>
         </div>
-        {action.problem && <ProblemNotice problem={action.problem} />}
+        {action.problem && (
+          <>
+            <ProblemNotice problem={action.problem} />
+            <RemediationPanel code={action.problem.code} context="request" compact />
+          </>
+        )}
         {loadProblem && <ProblemNotice problem={loadProblem} onRetry={() => void load()} />}
         {!loaded && <SkeletonRows rows={2} />}
         {jobs.map((job) => {
@@ -196,6 +238,7 @@ export function VideoJobs({ projectId }: { projectId: string }) {
               <h3>
                 Video job <code className="sha">{shortId(job.id)}</code>
                 <span aria-hidden="true">·</span>
+                {/* Raw state text: the video E2E reads it from this heading (M3 restyles it). */}
                 <Badge state={job.state} />
               </h3>
               {job.commit_sha && (
@@ -233,6 +276,7 @@ export function VideoJobs({ projectId }: { projectId: string }) {
                   </div>
                 </div>
               )}
+              {job.state === "failed" && <RemediationPanel code={job.error_code} />}
               {job.state === "succeeded" && (
                 <p data-architecture={job.architecture ?? "unknown"}>{architectureNote(job)}</p>
               )}

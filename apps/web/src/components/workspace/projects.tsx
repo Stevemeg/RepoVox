@@ -6,7 +6,7 @@ import { NewProjectButton } from "./create-project";
 import { ProjectGrid } from "./records";
 
 export function ProjectsView() {
-  const { projects, loading } = useWorkspace();
+  const { projects, jobs, loading } = useWorkspace();
   return (
     <>
       <PageHeader
@@ -20,7 +20,7 @@ export function ProjectsView() {
           <SkeletonRows />
         </section>
       ) : projects.length ? (
-        <ProjectGrid projects={projects} />
+        <ProjectGrid projects={projects} jobs={jobs} />
       ) : (
         <section className="panel">
           <EmptyState

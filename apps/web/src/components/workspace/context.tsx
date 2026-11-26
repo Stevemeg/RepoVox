@@ -3,6 +3,15 @@ import { createContext, useContext } from "react";
 import type { Account, Job, Project } from "@/lib/api";
 import type { Problem } from "@/lib/errors";
 
+/** A one-time status banner for the page at `path`, such as the result of a deletion. */
+export type Flash = {
+  path: string;
+  title: string;
+  message: string;
+  /** A record reference shown as muted support metadata. */
+  reference?: string;
+};
+
 export type WorkspaceValue = {
   account: Account;
   projects: Project[];
@@ -18,6 +27,11 @@ export type WorkspaceValue = {
    * true when it handled the error, so callers report everything else themselves.
    */
   handleUnauthorized: (cause: unknown) => boolean;
+  /**
+   * Shows `flash` once its `path` is the current page. It stays until dismissed or until the
+   * person navigates to another page.
+   */
+  showFlash: (flash: Flash) => void;
 };
 
 export const WorkspaceContext = createContext<WorkspaceValue | null>(null);
