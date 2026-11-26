@@ -1056,7 +1056,14 @@ input::placeholder {
   max-width: 32rem;
 }
 
+/*
+ * The strip scrolls sideways on narrow screens. It must be a positioned element: each tab's
+ * screen-reader count is `.visually-hidden` (position: absolute), and an absolutely
+ * positioned box is clipped only by a scroll container that is also its containing block.
+ * Without `position: relative` those spans escape the strip and widen the whole page.
+ */
 .tabs {
+  position: relative;
   display: flex;
   gap: var(--space-1);
   overflow-x: auto;

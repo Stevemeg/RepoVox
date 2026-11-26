@@ -55,4 +55,29 @@ describe("shipped web source", () => {
   it("has no inline style attributes", () => {
     expect(count(/style=\{\{/g)).toBe(0);
   });
+
+  it("keeps every horizontal scroll container positioned, so hidden labels cannot widen the page", () => {
+    // `.visually-hidden` is absolutely positioned. Inside a sideways-scrolling strip that is
+    // not itself positioned, such spans escape the strip's clipping and widen the document
+    // (the analysis tab strip measured 903px wide at a 375px viewport before this rule).
+    const css = (name: string) => sources.find((file) => file.path === `styles/${name}`)!.text;
+    const rules = (text: string) =>
+      [...text.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^}]*)\}/g)].map((m) => ({
+        selector: m[1].trim(),
+        body: m[2],
+      }));
+    const hidden = rules(css("base.css")).find((rule) => rule.selector === ".visually-hidden");
+    expect(hidden?.body).toMatch(/position:\s*absolute/);
+
+    const tabs = rules(css("components.css")).find((rule) => rule.selector === ".tabs");
+    expect(tabs?.body).toMatch(/overflow-x:\s*auto/);
+    expect(tabs?.body).toMatch(/position:\s*relative/);
+
+    const scrollers = ["base.css", "components.css", "layout.css"]
+      .flatMap((name) => rules(css(name)))
+      .filter((rule) => /overflow-x:\s*(auto|scroll)/.test(rule.body));
+    expect(scrollers.length).toBeGreaterThan(0);
+    for (const rule of scrollers)
+      expect(rule.body, rule.selector).toMatch(/position:\s*(relative|absolute|fixed|sticky)/);
+  });
 });
