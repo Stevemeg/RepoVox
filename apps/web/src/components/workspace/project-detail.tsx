@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ProblemNotice } from "@/components/ui/problem-notice";
 import { RemediationPanel } from "@/components/ui/remediation-panel";
 import { SkeletonRows } from "@/components/ui/states";
+import { linkAbort } from "@/lib/abort";
 import {
   api,
   ApiError,
@@ -185,7 +186,8 @@ const empty = (projectId: string): Loaded => ({
 
 export function ProjectDetailView({ projectId }: { projectId: string }) {
   const router = useRouter();
-  const { account, handleUnauthorized, refresh, showFlash } = useWorkspace();
+  const { account, handleUnauthorized, refresh, showFlash, sessionSignal, signingOut } =
+    useWorkspace();
   const remove = useAction("delete-project");
   const [loaded, setLoaded] = useState<Loaded>(() => empty(projectId));
   const [videoJobs, setVideoJobs] = useState<{ projectId: string; jobs: VideoJob[] | null }>();
@@ -195,14 +197,20 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
   const [deleted, setDeleted] = useState(false);
   const view = loaded.projectId === projectId ? loaded : empty(projectId);
 
-  /** The project itself and its own jobs, straight from the API, never from a cache. */
+  /**
+   * The project itself and its own jobs, straight from the API, never from a cache.
+   * Cancelled by unmounting or by signing out, which then shows nothing.
+   */
   const load = useCallback(
     async (signal?: AbortSignal) => {
+      const link = linkAbort(sessionSignal, signal);
+      if (link.signal.aborted) return;
       const [project, jobs] = await Promise.allSettled([
-        api<Project>(`/projects/${projectId}`, { signal }),
-        api<Job[]>(`/projects/${projectId}/jobs`, { signal }),
+        api<Project>(`/projects/${projectId}`, { signal: link.signal }),
+        api<Job[]>(`/projects/${projectId}/jobs`, { signal: link.signal }),
       ]);
-      if (signal?.aborted) return;
+      link.release();
+      if (link.signal.aborted) return;
       for (const result of [project, jobs])
         if (result.status === "rejected" && handleUnauthorized(result.reason)) return;
       setLoaded((previous) => {
@@ -223,7 +231,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
         };
       });
     },
-    [projectId, handleUnauthorized],
+    [projectId, handleUnauthorized, sessionSignal],
   );
   useEffect(() => {
     const controller = new AbortController();
@@ -237,7 +245,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
     !!projectJobs?.some((job) => isActiveState(job.state)) ||
     !!videos?.some((job) => isActiveState(job.state));
   // A video job also admits an analysis job, so refreshing while either runs shows both.
-  useVisibilityPolling(() => load(), REFRESH_MS, active && !deleted);
+  useVisibilityPolling(() => load(), REFRESH_MS, active && !deleted && !signingOut);
   const reportVideoJobs = useCallback(
     (jobs: VideoJob[] | null) => setVideoJobs({ projectId, jobs }),
     [projectId],

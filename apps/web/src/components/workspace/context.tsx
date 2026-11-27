@@ -23,6 +23,15 @@ export type WorkspaceValue = {
   /** Reload the session, projects and jobs. */
   refresh: () => Promise<void>;
   /**
+   * Aborts the moment the person signs out, before the sign-out request is sent. Link
+   * every workspace read to it with `linkAbort`, so no read reaches the API after the
+   * session has ended. If sign-out fails and the person stays signed in, a fresh signal
+   * replaces it, and reads that depend on it load again.
+   */
+  sessionSignal: AbortSignal;
+  /** True from the moment sign-out starts until it fails: start no new reads or polls. */
+  signingOut: boolean;
+  /**
    * Ends the local session view and redirects to sign-in when `cause` is a 401. Returns
    * true when it handled the error, so callers report everything else themselves.
    */

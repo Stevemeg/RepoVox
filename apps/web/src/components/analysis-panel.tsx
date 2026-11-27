@@ -1,5 +1,6 @@
 "use client";
 import {
+  useContext,
   useEffect,
   useId,
   useRef,
@@ -9,6 +10,8 @@ import {
 } from "react";
 import { Badge, type Tone } from "@/components/ui/badge";
 import { ExternalLink } from "@/components/ui/external-link";
+import { WorkspaceContext } from "@/components/workspace/context";
+import { linkAbort } from "@/lib/abort";
 import { api, ApiError } from "@/lib/api";
 import { toProblem } from "@/lib/errors";
 import { humanize } from "@/lib/format";
@@ -601,6 +604,8 @@ function AnalysisExplorer({ result }: { result: Analysis }) {
 }
 
 export function AnalysisPanel({ jobId }: { jobId: string }) {
+  // Signing out aborts the request before the sign-out request is sent.
+  const sessionSignal = useContext(WorkspaceContext)?.sessionSignal;
   const [current, setCurrent] = useState<{
     jobId: string;
     result?: Analysis;
@@ -610,7 +615,8 @@ export function AnalysisPanel({ jobId }: { jobId: string }) {
   const message =
     current?.jobId === jobId ? current.message : "Loading verified analysis…";
   useEffect(() => {
-    const controller = new AbortController();
+    const controller = linkAbort(sessionSignal);
+    if (controller.signal.aborted) return;
     api<Analysis>(`/development/jobs/${jobId}/analysis`, {
       signal: controller.signal,
     })
@@ -626,9 +632,10 @@ export function AnalysisPanel({ jobId }: { jobId: string }) {
                 ? "Verified analysis is not available yet or has expired."
                 : toProblem(error).message,
           });
-      });
+      })
+      .finally(controller.release);
     return () => controller.abort();
-  }, [jobId]);
+  }, [jobId, sessionSignal]);
   if (!result)
     return (
       <section className="panel" aria-busy={!current}>

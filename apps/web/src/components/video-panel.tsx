@@ -8,6 +8,7 @@ import { VideoStudio } from "@/components/video/video-studio";
 import { WorkspaceContext } from "@/components/workspace/context";
 import { StatusBadge } from "@/components/workspace/records";
 import { useAction } from "@/components/workspace/use-action";
+import { linkAbort, type AbortLink } from "@/lib/abort";
 import { api, ApiError, type Video, type VideoJob } from "@/lib/api";
 import { describeJobOutcome, toProblem, type Problem } from "@/lib/errors";
 import { formatDateTime, shortId, TERMINAL_VIDEO_STATES } from "@/lib/format";
@@ -149,6 +150,8 @@ export function VideoJobs({
 }) {
   const workspace = useContext(WorkspaceContext);
   const handleUnauthorized = workspace?.handleUnauthorized;
+  const sessionSignal = workspace?.sessionSignal;
+  const signingOut = workspace?.signingOut === true;
   const [jobs, setJobs] = useState<VideoJob[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [loadProblem, setLoadProblem] = useState<Problem | null>(null);
@@ -162,26 +165,39 @@ export function VideoJobs({
   });
   const section = useRef<HTMLElement>(null);
   const revealed = useRef(false);
+  const inFlight = useRef<AbortLink | null>(null);
 
+  // Each load aborts the one before it, unmounting aborts the last, and signing out aborts
+  // it before the sign-out request is sent. An aborted load changes nothing on screen.
   const load = useCallback(async () => {
     if (!valid) return;
+    inFlight.current?.abort();
+    const current = linkAbort(sessionSignal);
+    inFlight.current = current;
+    const { signal } = current;
+    if (signal.aborted) return;
     try {
-      const found = await api<VideoJob[]>(`/projects/${projectId}/video-jobs`);
+      const found = await api<VideoJob[]>(`/projects/${projectId}/video-jobs`, { signal });
+      if (signal.aborted) return;
       setJobs(found);
       setLoadProblem(null);
       report.current?.(found);
     } catch (cause) {
+      if (signal.aborted) return;
       if (!handleUnauthorized?.(cause)) {
         setLoadProblem(toProblem(cause, "video"));
         report.current?.(null);
       }
     } finally {
-      setLoaded(true);
+      current.release();
+      if (inFlight.current === current) inFlight.current = null;
+      if (!signal.aborted) setLoaded(true);
     }
-  }, [projectId, valid, handleUnauthorized]);
+  }, [projectId, valid, handleUnauthorized, sessionSignal]);
   const active = jobs.some((job) => !TERMINAL_VIDEO_STATES.includes(job.state));
   useEffect(() => {
     void load();
+    return () => inFlight.current?.abort();
   }, [load]);
   useEffect(() => {
     if (!loaded || revealed.current || window.location.hash !== "#videos") return;
@@ -190,7 +206,7 @@ export function VideoJobs({
     section.current?.focus({ preventScroll: true });
   }, [loaded]);
   // Display refresh only. Jobs advance on the server whether or not this page is open.
-  useVisibilityPolling(load, REFRESH_MS, active);
+  useVisibilityPolling(load, REFRESH_MS, active && !signingOut);
 
   async function create() {
     let failure: unknown;

@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Brand } from "@/components/brand";
 import { ProblemNotice } from "@/components/ui/problem-notice";
+import { linkAbort } from "@/lib/abort";
 import {
   api,
   ApiError,
@@ -77,6 +78,14 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
   }
   // Incremented when the session ends, so responses for the old session are discarded.
   const generation = useRef(0);
+  // Every workspace read is linked to this signal. Signing out aborts it before the
+  // sign-out request is sent, so no read can reach the API after the session ends and be
+  // answered 401. A failed sign-out replaces it, so the workspace stays usable. The state
+  // carries it to the views (their reads re-run with the fresh signal); the ref is what the
+  // shell's own loads read, so replacing it does not reload the shell and clear the notice
+  // that says why sign-out failed. Both change together, only in signOut().
+  const [session, setSession] = useState(() => new AbortController());
+  const sessionRef = useRef(session);
 
   const forget = useCallback(() => {
     generation.current += 1;
@@ -102,6 +111,9 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
+      const sessionSignal = sessionRef.current.signal;
+      // Signing out has already cancelled every workspace read: send nothing.
+      if (sessionSignal.aborted) return;
       const current = generation.current;
       // The API sets and clears the readable CSRF cookie together with the session cookie:
       // without it this browser holds no session, so go to sign-in without a request.
@@ -112,22 +124,27 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
         setLoading(false);
         return;
       }
+      // Cancelled by unmounting (the effect's signal) or by signing out (the session's),
+      // including the polling refreshes, which pass no signal of their own.
+      const link = linkAbort(sessionSignal, signal);
+      const stale = () => link.signal.aborted || current !== generation.current;
       try {
-        const user = await api<Account>("/auth/session", { signal });
+        const user = await api<Account>("/auth/session", { signal: link.signal });
         const [ownedProjects, ownedJobs] = await Promise.all([
-          api<Project[]>("/projects", { signal }),
-          api<Job[]>("/jobs", { signal }),
+          api<Project[]>("/projects", { signal: link.signal }),
+          api<Job[]>("/jobs", { signal: link.signal }),
         ]);
-        if (signal?.aborted || current !== generation.current) return;
+        if (stale()) return;
         setAccount(user);
         setProjects(ownedProjects);
         setJobs(ownedJobs);
         setProblem(null);
       } catch (cause) {
-        if (signal?.aborted || current !== generation.current) return;
+        if (stale()) return;
         if (!handleUnauthorized(cause)) setProblem(toProblem(cause));
       } finally {
-        if (!signal?.aborted && current === generation.current) setLoading(false);
+        link.release();
+        if (!stale()) setLoading(false);
       }
     },
     [forget, handleUnauthorized, router],
@@ -138,7 +155,7 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
     void load(controller.signal);
     return () => controller.abort();
   }, [load]);
-  useVisibilityPolling(() => load(), REFRESH_MS, account !== null);
+  useVisibilityPolling(() => load(), REFRESH_MS, account !== null && !signingOut);
 
   useEffect(() => {
     if (!navOpen) return;
@@ -150,12 +167,22 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
   }, [navOpen]);
 
   async function signOut() {
+    // Before the sign-out request leaves the browser: stop polling, discard responses for
+    // this session, and cancel every linked workspace read (the shell's own loads, the
+    // per-project video-job fan-out and the detail views), so none reaches the API after
+    // the session ends.
     setSigningOut(true);
+    generation.current += 1;
+    sessionRef.current.abort();
     try {
       await api("/auth/sign-out", { method: "POST" });
     } catch (cause) {
       // An already-ended session is still a completed sign-out.
       if (!isUnauthorized(cause)) {
+        // Still signed in: a fresh session signal lets the cancelled reads load again.
+        const fresh = new AbortController();
+        sessionRef.current = fresh;
+        setSession(fresh);
         setProblem(toProblem(cause));
         setSigningOut(false);
         return;
@@ -176,8 +203,10 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
         refresh: () => load(),
         handleUnauthorized,
         showFlash: setFlash,
+        sessionSignal: session.signal,
+        signingOut,
       },
-    [account, projects, jobs, loading, problem, load, handleUnauthorized],
+    [account, projects, jobs, loading, problem, load, handleUnauthorized, session, signingOut],
   );
 
   if (!value)

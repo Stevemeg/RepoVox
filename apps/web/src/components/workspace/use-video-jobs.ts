@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { linkAbort, type AbortLink } from "@/lib/abort";
 import type { Project, VideoJob } from "@/lib/api";
 import { isUnauthorized, toProblem, type Problem } from "@/lib/errors";
 import { isActiveState } from "@/lib/job-status";
@@ -31,7 +32,8 @@ type Loaded = { byProject: Record<string, VideoJob[]>; failed: { id: string; pro
 
 /**
  * Video jobs for every given project, loaded through the per-project route with bounded
- * concurrency. Each load aborts the one before it, and unmounting aborts the last; a
+ * concurrency. Each load aborts the one before it, unmounting aborts the last, and signing
+ * out aborts it before the sign-out request is sent (so no queued project starts after); a
  * project whose request fails keeps its last good list and is reported in `failures`, so a
  * single failure never empties the page. While any video job is active the list refreshes
  * every few seconds, only while the tab is visible. `refreshKey` reloads on change (pass
@@ -45,6 +47,8 @@ export function useVideoJobs(
 ): VideoJobsState {
   const workspace = useContext(WorkspaceContext);
   const handleUnauthorized = workspace?.handleUnauthorized;
+  const sessionSignal = workspace?.sessionSignal;
+  const signingOut = workspace?.signingOut === true;
   // Keyed by the id set, not the array, so the shell's periodic refresh does not refetch.
   const ids = useMemo(
     () =>
@@ -56,12 +60,13 @@ export function useVideoJobs(
     [projects],
   );
   const [loaded, setLoaded] = useState<Loaded | null>(null);
-  const controller = useRef<AbortController | null>(null);
+  const controller = useRef<AbortLink | null>(null);
 
   const load = useCallback(async () => {
     if (!enabled) return;
     controller.current?.abort();
-    const current = new AbortController();
+    // Starts aborted while signing out: mapBounded then sends nothing at all.
+    const current = linkAbort(sessionSignal);
     controller.current = current;
     try {
       const results = await fetchVideoJobs(ids ? ids.split(",") : [], {
@@ -84,11 +89,12 @@ export function useVideoJobs(
         return { byProject, failed };
       });
     } catch {
-      // fetchVideoJobs rejects only when this load was aborted for a newer one.
+      // fetchVideoJobs rejects only on abort: a newer load, unmounting or signing out.
     } finally {
+      current.release();
       if (controller.current === current) controller.current = null;
     }
-  }, [enabled, ids, handleUnauthorized]);
+  }, [enabled, ids, handleUnauthorized, sessionSignal]);
 
   useEffect(() => {
     void load();
@@ -119,7 +125,7 @@ export function useVideoJobs(
     [loaded, titles],
   );
   const active = jobs.some((job) => isActiveState(job.state));
-  useVisibilityPolling(load, REFRESH_MS, enabled && active);
+  useVisibilityPolling(load, REFRESH_MS, enabled && active && !signingOut);
 
   return {
     enabled,

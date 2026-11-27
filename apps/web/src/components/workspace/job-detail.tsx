@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ProblemNotice } from "@/components/ui/problem-notice";
 import { RemediationPanel } from "@/components/ui/remediation-panel";
 import { SkeletonRows } from "@/components/ui/states";
+import { linkAbort } from "@/lib/abort";
 import { api, ApiError, type Job } from "@/lib/api";
 import { describeJobOutcome, toProblem, type Problem } from "@/lib/errors";
 import { ACTIVE_JOB_STATES, formatDate, formatDateTime, humanize, shortId } from "@/lib/format";
@@ -26,28 +27,32 @@ function measurement(value: unknown): string {
 }
 
 export function JobDetailView({ jobId }: { jobId: string }) {
-  const { handleUnauthorized, refresh } = useWorkspace();
+  const { handleUnauthorized, refresh, sessionSignal, signingOut } = useWorkspace();
   const [job, setJob] = useState<Job | null>(null);
   const [problem, setProblem] = useState<Problem | null>(null);
   const [loading, setLoading] = useState(true);
   const action = useAction("cancel");
   const retryKey = useIdempotencyKey();
 
+  // Cancelled by unmounting or by signing out, which then shows nothing.
   const load = useCallback(
     async (signal?: AbortSignal) => {
+      const link = linkAbort(sessionSignal, signal);
+      if (link.signal.aborted) return;
       try {
-        const found = await api<Job>(`/jobs/${jobId}`, { signal });
-        if (signal?.aborted) return;
+        const found = await api<Job>(`/jobs/${jobId}`, { signal: link.signal });
+        if (link.signal.aborted) return;
         setJob(found);
         setProblem(null);
       } catch (cause) {
-        if (signal?.aborted) return;
+        if (link.signal.aborted) return;
         if (!handleUnauthorized(cause)) setProblem(toProblem(cause));
       } finally {
-        if (!signal?.aborted) setLoading(false);
+        link.release();
+        if (!link.signal.aborted) setLoading(false);
       }
     },
-    [jobId, handleUnauthorized],
+    [jobId, handleUnauthorized, sessionSignal],
   );
   useEffect(() => {
     const controller = new AbortController();
@@ -55,7 +60,7 @@ export function JobDetailView({ jobId }: { jobId: string }) {
     return () => controller.abort();
   }, [load]);
   const active = job !== null && ACTIVE_JOB_STATES.includes(job.state);
-  useVisibilityPolling(() => load(), REFRESH_MS, active);
+  useVisibilityPolling(() => load(), REFRESH_MS, active && !signingOut);
 
   if (!job)
     return loading ? (
